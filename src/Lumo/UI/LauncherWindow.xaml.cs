@@ -40,6 +40,7 @@ public partial class LauncherWindow : Window
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
     private HotkeyService? _hotkey;
+    private bool _sourceReady;                       // v1.7 — glass needs the HWND, applied on SourceInitialized
     private bool _allowClose;
     private IntPtr _hwnd;
     private Brush _themeBorderBrush = Brushes.DimGray;
@@ -113,6 +114,12 @@ public partial class LauncherWindow : Window
                 if (_hotkey.UsedFallback)
                     DiagnosticLogger.Log("Window", $"Configured hotkey unavailable — fallback '{active}' active");
             }
+
+            // v1.7 — the HWND now exists: enable the acrylic glass backdrop, then re-run
+            // the palette so the card paints translucent (glass) or opaque (fallback).
+            _sourceReady = true;
+            GlassBackdrop.Apply(this, _settings.EffectiveDark(), _settings.GlassEffect);
+            ApplyTheme();
         }
         catch (Exception ex)
         {
@@ -685,27 +692,40 @@ public partial class LauncherWindow : Window
         try
         {
             bool dark = _settings.EffectiveDark();
+
+            // v1.7 — keep the glass backdrop in sync when theme / glass toggle change live
+            if (_sourceReady)
+                GlassBackdrop.Apply(this, dark, _settings.GlassEffect);
+
+            bool glass = GlassBackdrop.Applied;
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
+            var g = Appearance.GlassFor(dark);
 
             Resources["TitleBrush"] = new SolidColorBrush(p.Title);
             Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
             Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
             Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
-            Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
             Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["ChipBrush"] = new SolidColorBrush(dark ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
+            Resources["ChipBrush"] = new SolidColorBrush(glass ? g.Chip
+                : (dark ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00)));
             Resources["ChipTextBrush"] = new SolidColorBrush(p.Subtitle);
             Resources["PlaceholderBrush"] = new SolidColorBrush(dark ? FromRgb(0x63, 0x63, 0x66) : FromRgb(0xC7, 0xC7, 0xCC));
             Resources["IconBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
+            Resources["GlyphBoxBrush"] = new SolidColorBrush(glass ? g.GlyphBox : p.GlyphBox);
+            Resources["BorderLineBrush"] = new SolidColorBrush(glass ? g.Border : p.Border);
 
-            Root.Background = new SolidColorBrush(p.Panel);
-            _themeBorderBrush = new SolidColorBrush(p.Border);
+            // glass → translucent panel over the acrylic; fallback → the opaque palette panel.
+            // Without blur the DWM frame would show through rounded corners as artifacts,
+            // so the card goes square when glass is unavailable (Win11 keeps DWM rounding).
+            Root.Background = new SolidColorBrush(glass ? g.Panel : p.Panel);
+            Root.CornerRadius = new CornerRadius(glass ? 8 : 0);
+            GlowHalo.CornerRadius = new CornerRadius(glass ? 8 : 0);
+            _themeBorderBrush = new SolidColorBrush(glass ? g.Border : p.Border);
             Input.Foreground = new SolidColorBrush(p.Title);
             Input.CaretBrush = new SolidColorBrush(p.Accent);
             Input.SelectionBrush = new SolidColorBrush(Appearance.Tint(p.Accent, 0x55));
             Input.SelectionTextBrush = new SolidColorBrush(p.Title);
-            Separator.Background = new SolidColorBrush(p.Separator);
+            Separator.Background = new SolidColorBrush(glass ? g.Separator : p.Separator);
             PrefixBadge.Foreground = new SolidColorBrush(p.Accent);
         }
         catch (Exception ex)
@@ -719,9 +739,11 @@ public partial class LauncherWindow : Window
     private double CurrentGlowOpacity() => _glowDimmed ? GlowDimOpacity : GlowActiveOpacity;
 
     /// <summary>
-    /// The "chat box" glow border: a rotating multi-colour gradient stroke on the card
-    /// plus a blurred halo copy behind the window. v1.3 runs it through a controllable
-    /// storyboard so it can pause whenever the window is hidden or inactive.
+    /// The glow effect, v1.7: the animated gradient border stroke stays, but the halo is
+    /// now an ambient accent wash INSIDE the top of the glass card (a soft light source
+    /// fading down into the panel) instead of a blurred copy bleeding out behind the window.
+    /// v1.3's controllable storyboard is kept so it can pause whenever the window is
+    /// hidden or inactive (zero idle CPU).
     /// </summary>
     public void ApplyBorderEffect()
     {
@@ -734,10 +756,9 @@ public partial class LauncherWindow : Window
             if (_settings.BorderEffect)
             {
                 var borderBrush = Appearance.BuildBorderBrush(_settings.BorderStyle, _settings.AccentColor, out var rotBorder);
-                var haloBrush = Appearance.BuildHaloBrush(_settings.BorderStyle, _settings.AccentColor, out var rotHalo);
 
                 Root.BorderBrush = borderBrush;
-                GlowHalo.Background = haloBrush;
+                GlowHalo.Background = Appearance.BuildWashBrush(_settings.BorderStyle, _settings.AccentColor);
                 GlowHalo.Visibility = Visibility.Visible;
 
                 double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 3.5 : _settings.BorderSpeedSec;
@@ -749,16 +770,8 @@ public partial class LauncherWindow : Window
                 Storyboard.SetTargetProperty(anim, new PropertyPath(RotateTransform.AngleProperty));
                 sb.Children.Add(anim);
 
-                if (rotHalo is not null)
-                {
-                    var anim2 = anim.Clone();
-                    Storyboard.SetTarget(anim2, rotHalo);
-                    Storyboard.SetTargetProperty(anim2, new PropertyPath(RotateTransform.AngleProperty));
-                    sb.Children.Add(anim2);
-                }
-
                 _rotBorder = rotBorder;
-                _rotHalo = rotHalo;
+                _rotHalo = null;
                 _borderStoryboard = sb;
                 sb.Begin(this, true); // isControllable → pause/resume supported
                 _glowRunning = true;

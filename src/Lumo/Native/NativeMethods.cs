@@ -113,6 +113,40 @@ internal static class NativeMethods
         catch { return false; }
     }
 
+    // ---------------- glass backdrop (v1.7) ----------------
+    public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    public const int DWMWA_SYSTEMBACKDROP_TYPE = 38;
+    public const int DWMWCP_ROUND = 2;             // Win11 rounded window corners
+    public const int DWMSBT_TRANSIENTWINDOW = 3;   // system acrylic (transient surfaces)
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    public const int WCA_ACCENT_POLICY = 19;
+    public const int ACCENT_DISABLED = 0;
+    public const int ACCENT_ENABLE_ACRYLICBLURBEHIND = 4;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct ACCENT_POLICY
+    {
+        public int AccentState;
+        public uint AccentFlags;
+        public uint GradientColor;   // ABGR tint
+        public uint AnimationId;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct WINDOWCOMPOSITIONATTRIBDATA
+    {
+        public int Attribute;
+        public IntPtr Data;
+        public int SizeOfData;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowCompositionAttribute(IntPtr hWnd, ref WINDOWCOMPOSITIONATTRIBDATA data);
+
     /// <summary>Best-effort window title for feedback messages.</summary>
     public static string GetTitle(IntPtr hWnd)
     {

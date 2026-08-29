@@ -1,6 +1,22 @@
 ======================================================
-  LUMO v1.6.0  —  universal launcher for Windows
+  LUMO v1.7.0  —  universal launcher for Windows
 ======================================================
+
+WHAT'S NEW IN v1.7 (the Glass update)
+-------------------------------------
+1. GLASS BACKDROP - the launcher sits on a live
+   acrylic blur (real system acrylic on Win11 22H2+,
+   composition acrylic on Win10). Falls back to the
+   solid panel automatically on unsupported systems.
+   Toggle: Settings -> Appearance -> Glass backdrop.
+2. MODERN VECTOR ICONS - every row, hint and button
+   uses a coherent Fluent-style outline icon set,
+   razor sharp at any DPI and tinted by your accent.
+3. NATIVE ROUNDED CORNERS + real drop shadow on Win11.
+4. AMBIENT ACCENT WASH inside the top of the card
+   (the glow halo, reimagined for glass).
+5. FIXED - the search clear button now appears when
+   you type (it was hidden by a style bug since v1.3).
 
 WHAT'S NEW IN v1.4 (Shortcuts & macros + smoother motion)
 ---------------------------------------------------------

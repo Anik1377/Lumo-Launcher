@@ -29,6 +29,7 @@ public sealed class Settings
 
     // ---- v1.3 customization -------------------------------------------------
     public bool AnimationsEnabled { get; set; } = true;    // master switch for every animation
+    public bool GlassEffect { get; set; } = true;          // v1.7 acrylic glass backdrop (graceful fallback)
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
@@ -57,6 +58,7 @@ public sealed class Settings
                     s.StartWithWindows  = GetBool(root, nameof(StartWithWindows), s.StartWithWindows);
                     s.MaxIndexedFiles   = (int)Math.Clamp(GetNum(root, nameof(MaxIndexedFiles), s.MaxIndexedFiles), 10_000, 500_000);
                     s.AnimationsEnabled = GetBool(root, nameof(AnimationsEnabled), s.AnimationsEnabled);
+                    s.GlassEffect       = GetBool(root, nameof(GlassEffect), s.GlassEffect);
                 }
             }
         }

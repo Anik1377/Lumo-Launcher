@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.5.0-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.7.0-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -28,18 +28,49 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
 | 🎛️ | **Advanced Settings UI** | macOS-style sidebar settings window: General · Appearance · Hotkey · Search · About — all live-apply |
-| 🌈 | **Glow border effect** | Chat-bubble style animated gradient border + halo: 5 colour presets, solid accent, 3 speeds — pauses when hidden |
+| 🪟 | **Glassmorphism UI** | Acrylic blur behind the launcher — the real system backdrop on Win11 22H2+, composition acrylic on Win10 — with a graceful opaque fallback |
+| 🖆️ | **Modern vector icons** | A coherent Fluent-style outline icon set (24×24 stroke paths) for every row, hint and button — razor sharp at any DPI, tinted by your accent |
+| 🌈 | **Glow border effect** | Animated gradient border + ambient accent wash inside the glass: 5 colour presets, solid accent, 3 speeds — pauses when hidden |
+| 📋 | **Clipboard history** | `H/` — your last 50 copies with timestamps, searchable, in memory only |
+| ▣ | **Window management** | `S/` — snap the last window left/right, maximize, center or restore; multi-monitor aware |
+| 📝 | **Snippets** | Save paste-anywhere texts as shortcuts and trigger with `!name` — multi-line supported |
 | 🎬 | **Fluid motion** | Spring-in window, cascading result rows, smooth hover transitions — with a reduced-motion master switch |
 | 🎨 | **Accent theming** | 9 accent presets + custom hex, driving the whole highlight system (accent-tinted selection) |
 | 🌗 | **Dark / light / auto theme** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
 | ⏰ | **Start with Windows** | One toggle in Settings (per-user Run key, no admin rights) |
-| 🧳 | **Truly portable** | One ~260 KB exe, no installer |
+| 🧳 | **Truly portable** | One ~340 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
+## 🆕 What's new in v1.7 — the Glass update
+
+1. **🪟 Glassmorphism, the real thing** — the launcher now sits on a live acrylic
+   backdrop: on **Windows 11 22H2+** it uses the actual system acrylic
+   (`DWMWA_SYSTEMBACKDROP_TYPE`, the same transient backdrop Spotlight-style popovers
+   get), on **Windows 10 / early Win11** it falls back to composition-attribute acrylic
+   with a themed tint. The card paints translucent smoked-glass / light-frost panels on
+   top, so your desktop shows through with a beautiful blur. Unsupported systems (remote
+   sessions, old GPUs) automatically get the opaque panel — and the new
+   **Settings → Appearance → Glass backdrop** toggle lets you switch it off any time.
+2. **Native rounded corners + real shadow** — on Win11 the window itself is rounded by
+   DWM (`DWMWCP_ROUND`) with the genuine drop shadow, instead of a hand-painted halo
+   bleed. The card now *is* the window — cleaner edges, no more shadow banding.
+3. **🔆 Modern vector icon set** — every glyph tile, hint row and footer button now
+   draws from a coherent **Fluent-style outline icon set** (24×24 stroke paths with
+   round caps — the Lucide/Fluent look): app grid, file, percent, globe, image, sliders,
+   clipboard, window snap, snippet, zap, gear, record, plus, alert… rendered as frozen
+   `StreamGeometry`, razor sharp at any DPI, tinted by your accent colour, no fonts or
+   emoji involved. Real shell icons (app logos, file-type icons) are unchanged.
+4. **Ambient accent wash** — the old outer glow halo is now a soft accent-coloured
+   light source inside the top of the glass card (it fades down into the panel), still
+   driven by the 5 border-style presets and still pausing when the window is inactive.
+5. **Polish** — the search **clear button** finally appears when you type (a v1.3 style
+   trigger bug kept it hidden) and gets an accent hover state; the footer gear is a
+   crisp vector icon; glass-aware translucent chips, tiles and separators everywhere.
+
 ## 🆕 What's new in v1.6 — the Raycast update
 
-Built after studying [Raycast for Windows](https://www.raycast.com/windows) — same flagship features, same feel, still one ~260 KB portable exe.
+Built after studying [Raycast for Windows](https://www.raycast.com/windows) — same flagship features, same feel, still one ~340 KB portable exe.
 
 1. **⧉ Clipboard History** — type `H/` and see everything you've copied (last 50, with
    "copied 3m ago" stamps). Pick one → it's on your clipboard again, ready to paste.

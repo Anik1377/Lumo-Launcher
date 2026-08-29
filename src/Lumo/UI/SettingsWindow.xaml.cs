@@ -267,6 +267,7 @@ public partial class SettingsWindow : Window
             }
 
             BorderEffectToggle.IsChecked = _settings.BorderEffect;
+            GlassEffectToggle.IsChecked = _settings.GlassEffect;
             switch (_settings.BorderStyle?.ToLowerInvariant())
             {
                 case "sunset": StyleSunset.IsChecked = true; break;
@@ -324,6 +325,7 @@ public partial class SettingsWindow : Window
             EngineDdg.Checked += (_, _) => { if (!_suppress) _settings.WebEngine = "duckduckgo"; };
 
             BorderEffectToggle.Click += (_, _) => SyncLiveAppearance();
+            GlassEffectToggle.Click += (_, _) => SyncLiveAppearance();
             ThemeDark.Checked += (_, _) => SyncLiveAppearance();
             ThemeLight.Checked += (_, _) => SyncLiveAppearance();
             ThemeAuto.Checked += (_, _) => SyncLiveAppearance();
@@ -357,6 +359,7 @@ public partial class SettingsWindow : Window
                 ThemeLight.IsChecked == true ? "light" :
                 ThemeAuto.IsChecked == true ? "auto" : "dark";
             _settings.BorderEffect = BorderEffectToggle.IsChecked == true;
+            _settings.GlassEffect = GlassEffectToggle.IsChecked == true;
             _settings.BorderStyle =
                 StyleSunset.IsChecked == true ? "Sunset" :
                 StyleOcean.IsChecked == true ? "Ocean" :

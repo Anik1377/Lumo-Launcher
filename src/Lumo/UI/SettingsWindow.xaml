@@ -458,6 +458,19 @@
                                             <ToggleButton x:Name="BorderEffectToggle" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Center"/>
                                         </Grid>
 
+                                        <Separator Background="{DynamicResource BorderLineBrush}" Margin="0,14"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Glass backdrop" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}" Text="Acrylic blur behind the launcher — Raycast-style glassmorphism with a modern vector icon set. Falls back to a solid panel on unsupported systems."/>
+                                            </StackPanel>
+                                            <ToggleButton x:Name="GlassEffectToggle" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Center"/>
+                                        </Grid>
+
                                         <Grid Margin="0,14,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>

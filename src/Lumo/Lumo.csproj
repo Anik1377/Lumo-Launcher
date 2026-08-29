@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>1.6.0</Version>
-    <InformationalVersion>Lumo 1.6.0</InformationalVersion>
+    <Version>1.7.0</Version>
+    <InformationalVersion>Lumo 1.7.0</InformationalVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>

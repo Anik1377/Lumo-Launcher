@@ -153,6 +153,56 @@ public static class Appearance
     /// <summary>accent with the given alpha — the base for tinted highlights.</summary>
     public static Color Tint(Color accent, byte alpha) => Color.FromArgb(alpha, accent.R, accent.G, accent.B);
 
+    // ---------------------------------------------------------------- glass (v1.7)
+
+    /// <summary>
+    /// v1.7 — translucent panel/border/chip fills for the glassmorphism look. These sit
+    /// ON TOP of the acrylic backdrop, so they carry real alpha (the blur shines through);
+    /// when the backdrop is unavailable the launcher falls back to the opaque values from
+    /// <see cref="PaletteFor"/>.
+    /// </summary>
+    public sealed record GlassPalette(Color Panel, Color Border, Color Separator, Color Chip, Color GlyphBox);
+
+    public static GlassPalette GlassFor(bool dark) => dark
+        ? new GlassPalette(
+            Panel:     Color.FromArgb(0xC2, 0x18, 0x18, 0x1C),  // deep smoked glass
+            Border:    Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF),  // 19% white edge highlight
+            Separator: Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF),
+            Chip:      Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF),
+            GlyphBox:  Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))
+        : new GlassPalette(
+            Panel:     Color.FromArgb(0xC8, 0xFA, 0xFA, 0xFC),  // light frost
+            Border:    Color.FromArgb(0x2E, 0x00, 0x00, 0x00),
+            Separator: Color.FromArgb(0x22, 0x00, 0x00, 0x00),
+            Chip:      Color.FromArgb(0x12, 0x00, 0x00, 0x00),
+            GlyphBox:  Color.FromArgb(0x10, 0x00, 0x00, 0x00));
+
+    /// <summary>
+    /// v1.7 — the ambient colour wash inside the top of the glass card. Replaces the old
+    /// outer halo (which needed a transparent window bleed); on glass it reads like a
+    /// soft light source — accent-coloured, fading down into the panel.
+    /// </summary>
+    public static Brush BuildWashBrush(string? styleName, string? accentHex)
+    {
+        Color tint;
+        if (BorderPresets.TryGetValue(styleName ?? "", out var stops))
+            tint = ParseColor(stops[0]);
+        else
+            tint = ParseAccent(accentHex);
+
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(0, 1),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+        };
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x5E, tint.R, tint.G, tint.B), 0.0));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x16, tint.R, tint.G, tint.B), 0.45));
+        brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1.0));
+        brush.Freeze();
+        return brush;
+    }
+
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
 
     // ---------------------------------------------------------------- system theme
