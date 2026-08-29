@@ -330,6 +330,15 @@
                             </RadioButton>
                             <RadioButton Tag="4" Checked="OnNavChanged" Style="{StaticResource NavRadio}">
                                 <StackPanel Orientation="Horizontal">
+                                    <Border Width="23" Height="23" CornerRadius="6" Background="#30D158" Margin="0,0,9,0">
+                                        <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="11.5"
+                                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="Shortcuts" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
+                            <RadioButton Tag="5" Checked="OnNavChanged" Style="{StaticResource NavRadio}">
+                                <StackPanel Orientation="Horizontal">
                                     <Border Width="23" Height="23" CornerRadius="6" Background="#FF375F" Margin="0,0,9,0">
                                         <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="11.5"
                                                    Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -595,6 +604,68 @@
                                         </StackPanel>
                                         <TextBlock x:Name="LogPathText" Margin="0,10,0,0" FontSize="11" Foreground="{DynamicResource SubtitleBrush}"
                                                    TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- ================= SHORTCUTS (v1.4) ================= -->
+                        <ScrollViewer x:Name="PanelShortcuts" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="SHORTCUTS &amp; MACROS" Style="{StaticResource SectionTitle}"/>
+
+                                <Border Style="{StaticResource Card}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Your one-tap launches" Style="{StaticResource SettingName}"/>
+                                            <TextBlock Style="{StaticResource SettingDesc}" TextWrapping="Wrap"
+                                                       Text="Save a URL, file, folder or a multi-step macro — then type  /sc name  in Lumo (or just  /  to browse)."/>
+                                        </StackPanel>
+                                        <Button Grid.Column="1" Content="＋ New shortcut" Style="{StaticResource AccentButton}"
+                                                VerticalAlignment="Center" Click="OnNewShortcut"/>
+                                    </Grid>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <TextBlock Text="SAVED SHORTCUTS" FontSize="11.5"
+                                                   FontWeight="SemiBold" Foreground="{DynamicResource SubtitleBrush}"/>
+                                        <ItemsControl x:Name="ShortcutsList" Margin="0,6,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="&#xE945;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"
+                                                                           Margin="0,1,8,0"/>
+                                                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding DescribeText}" FontSize="11.5" Margin="19,2,0,0"
+                                                                       Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <Button Content="Edit" Style="{StaticResource GhostButton}" Padding="12,6"
+                                                                    Click="OnEditShortcut"/>
+                                                            <Button Content="Delete" Style="{StaticResource GhostButton}" Padding="12,6"
+                                                                    Margin="8,0,0,0" Click="OnDeleteShortcut"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock x:Name="ShortcutsEmpty" Text="No shortcuts yet — create your first one above. A good start: a URL you open every day."
+                                                   FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}" Margin="0,6,0,0"
+                                                   TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

@@ -22,6 +22,7 @@ public sealed class ResultItem
         ResultKind.Image => "Image",
         ResultKind.Tool => "Tool",
         ResultKind.Hint => "Tip",
+        ResultKind.Shortcut => "Shortcut",
         _ => "",
     };
 }
@@ -36,6 +37,7 @@ public enum ResultKind
     Tool,
     Hint,
     Error,
+    Shortcut,   // v1.4 — user-defined /sc launch
 }
 
 /// <summary>
@@ -50,10 +52,11 @@ public sealed class SearchEngine
     private readonly AppIndex _apps;
     private readonly FileIndex _files;
     private readonly Settings _settings;
+    private readonly ShortcutStore? _shortcuts;   // v1.4
 
-    public SearchEngine(AppIndex apps, FileIndex files, Settings settings)
+    public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null)
     {
-        _apps = apps; _files = files; _settings = settings;
+        _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts;
     }
 
     public List<ResultItem> Search(string rawQuery)
@@ -81,6 +84,16 @@ public sealed class SearchEngine
             if (query.StartsWith("U/", StringComparison.OrdinalIgnoreCase))
                 return ToolRows(query[2..].Trim());
 
+            // v1.4 — /sc <name> : user shortcuts & macros. Any "/…" query enters
+            // shortcut mode; a leading "sc" token is optional and stripped.
+            if (query.StartsWith("/"))
+            {
+                string rest = query[1..].Trim();
+                if (rest.Equals("sc", StringComparison.OrdinalIgnoreCase)) rest = "";
+                else if (rest.StartsWith("sc ", StringComparison.OrdinalIgnoreCase)) rest = rest[3..].Trim();
+                return ShortcutRows(rest);
+            }
+
             // Default view: apps + tools matching, plus top files.
             return MixedRows(query);
         }
@@ -106,11 +119,57 @@ public sealed class SearchEngine
             new() { Title = "W/  Web search", Subtitle = "e.g.  W/weather tomorrow", Glyph = "W", Kind = ResultKind.Hint, RunArgument = "W/" },
             new() { Title = "I/  Image search", Subtitle = "e.g.  I/mountain sunrise", Glyph = "I", Kind = ResultKind.Hint, RunArgument = "I/" },
             new() { Title = "U/  Utilities", Subtitle = "lock · sleep · restart · shutdown · empty bin", Glyph = "U", Kind = ResultKind.Hint, RunArgument = "U/" },
+            new() { Title = "/sc  Shortcuts & macros", Subtitle = "your saved one-tap launches — e.g.  /sc work", Glyph = "⚡", Kind = ResultKind.Hint, RunArgument = "/sc" },
             new() { Title = "Settings — customize Lumo", Subtitle = "themes · accent colour · glow border · hotkey · index", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
         };
 
+        // v1.4 — surface the most useful saved shortcuts right on the empty view
+        if (_shortcuts is { Count: > 0 })
+        {
+            foreach (var (def, _) in _shortcuts.Match("", 3))
+                rows.Add(ShortcutRow(def));
+        }
+
         foreach (var app in _apps.Query("", 6))
             rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path });
+
+        return rows;
+    }
+
+    // ---------------------------------------------------------------- shortcuts (v1.4)
+
+    private static ResultItem ShortcutRow(ShortcutDef def) => new()
+    {
+        Title = def.Name,
+        Subtitle = def.Describe(),
+        Glyph = "⚡",
+        Kind = ResultKind.Shortcut,
+        RunArgument = def.Id,
+    };
+
+    private List<ResultItem> ShortcutRows(string q)
+    {
+        var rows = new List<ResultItem>();
+
+        // management rows always available
+        rows.Add(string.IsNullOrWhiteSpace(q)
+            ? new ResultItem { Title = "New shortcut", Subtitle = "save a URL, file, folder or a multi-step macro", Glyph = "＋", Kind = ResultKind.Tool, RunArgument = "cmd:new-shortcut" }
+            : new ResultItem { Title = $"Create shortcut “{q}”", Subtitle = "save this name as a new one-tap shortcut", Glyph = "＋", Kind = ResultKind.Tool, RunArgument = "cmd:new-shortcut:" + q });
+        rows.Add(new ResultItem { Title = "Manage shortcuts", Subtitle = "edit or delete in the settings window", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:manage-shortcuts" });
+
+        if (_shortcuts is not null)
+        {
+            foreach (var (def, _) in _shortcuts.Match(q, MaxResults - rows.Count))
+                rows.Add(ShortcutRow(def));
+        }
+
+        if (q.Length == 0 && (_shortcuts is null || _shortcuts.Count == 0))
+            rows.Add(new ResultItem
+            {
+                Title = "No shortcuts yet",
+                Subtitle = "Press Enter on “New shortcut” — then run it any time with /sc name",
+                Glyph = "⚡", Kind = ResultKind.Hint,
+            });
 
         return rows;
     }
@@ -233,6 +292,13 @@ public sealed class SearchEngine
         if (Calculator.TryEvaluate(q, out var value))
             rows.Add(new ResultItem { Title = value, Subtitle = $"{q}  —  press Enter to copy", Glyph = "=", Kind = ResultKind.Calculator, RunArgument = value });
 
+        // v1.4 — quick-hit shortcuts whose name starts with the query
+        if (_shortcuts is not null)
+        {
+            foreach (var def in _shortcuts.PrefixMatches(q, 2))
+                rows.Add(ShortcutRow(def));
+        }
+
         if (_files.Ready)
         {
             foreach (var f in _files.Query(q, 6))
@@ -255,7 +321,7 @@ public sealed class SearchEngine
 
     public static bool IsExecutable(ResultItem item) =>
         item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web or ResultKind.Image
-            or ResultKind.Tool or ResultKind.Calculator;
+            or ResultKind.Tool or ResultKind.Calculator or ResultKind.Shortcut;
 
     /// <summary>
     /// Runs the item. Returns null on success, or a short human-readable
@@ -282,6 +348,9 @@ public sealed class SearchEngine
                 case ResultKind.Tool:
                     RunTool(item.RunArgument);
                     break;
+
+                case ResultKind.Shortcut:
+                    return RunShortcut(item.RunArgument) ?? null;
             }
             return null;
         }
@@ -303,6 +372,51 @@ public sealed class SearchEngine
             case "cmd:shutdown": OpenCommand("shutdown", "/s /t 0"); break;
             case "cmd:settings": OpenPath(AppPaths.SettingsDir); break;
             case "cmd:log": OpenPath(AppPaths.DataDir); break;
+        }
+    }
+
+    /// <summary>v1.4 — runs a saved shortcut/macro by id. Null = success.</summary>
+    private string? RunShortcut(string id)
+    {
+        if (_shortcuts?.Find(id) is not { } def)
+            return "Shortcut not found — it may have been deleted";
+
+        try
+        {
+            if (def.IsMacro)
+            {
+                int launched = 0;
+                foreach (var step in def.Steps.Where(s => !string.IsNullOrWhiteSpace(s)).Take(12))
+                {
+                    OpenAnyTarget(step.Trim());
+                    launched++;
+                }
+                return launched == 0 ? "Macro has no valid steps — edit it in Settings → Shortcuts" : null;
+            }
+
+            OpenAnyTarget(def.Target);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Services.DiagnosticLogger.LogException("SearchEngine.RunShortcut", ex);
+            return $"Shortcut “{def.Name}” failed — {ex.InnerException?.Message ?? ex.Message}";
+        }
+    }
+
+    /// <summary>Opens a URL or a file/folder path, whichever the target looks like.</summary>
+    private static void OpenAnyTarget(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target)) return;
+        if (target.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            target.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            (target.Contains('.') && !target.Contains('\\') && !target.Contains('/') && !File.Exists(target)))
+        {
+            OpenUrl(EnsureUrl(target));
+        }
+        else
+        {
+            OpenPath(Environment.ExpandEnvironmentVariables(target));
         }
     }
 

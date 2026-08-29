@@ -32,6 +32,8 @@ public partial class SettingsWindow : Window
     private readonly Action _applyAppearance;
     private readonly Func<string> _applyHotkey;
     private readonly Action _rebuildIndex;
+    private readonly ShortcutStore _shortcuts;   // v1.4
+    private int _initialPage = 0;
 
     private readonly List<(Border Box, string Hex)> _swatches = new();
     private bool _suppress;                   // guard while programmatically wiring controls
@@ -39,7 +41,8 @@ public partial class SettingsWindow : Window
     private bool _pendingStartWithWindows;
     private RotateTransform? _previewRotation;
 
-    public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex)
+    public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex,
+                          ShortcutStore? shortcuts = null, int initialPage = 0)
     {
         InitializeComponent();
         _settings = settings;
@@ -47,6 +50,8 @@ public partial class SettingsWindow : Window
         _applyAppearance = applyAppearance;
         _applyHotkey = applyHotkey;
         _rebuildIndex = rebuildIndex;
+        _shortcuts = shortcuts ?? new ShortcutStore();
+        _initialPage = initialPage;
 
         BuildAccentSwatches();
         LoadFromSettings();
@@ -55,11 +60,85 @@ public partial class SettingsWindow : Window
         StartOwnBorder();
         PlayEntrance();
 
+        _shortcuts.Changed += () => Dispatcher.InvokeAsync(() => { try { LoadShortcutList(); } catch { } });
+        LoadShortcutList();
+
         LogPathText.Text = "Log: " + AppPaths.LogFile;
         var ver = typeof(SettingsWindow).Assembly.GetName().Version;
-        string vs = ver is null ? "v1.3" : $"v{ver.Major}.{ver.Minor}";
+        string vs = ver is null ? "v1.4" : $"v{ver.Major}.{ver.Minor}";
         VersionText.Text = vs;
         AboutVersion.Text = vs;
+
+        // open directly on the requested page (e.g. Shortcuts from the launcher)
+        if (_initialPage > 0) SelectPage(_initialPage);
+    }
+
+    /// <summary>Selects a sidebar page by index (checks the matching nav radio).</summary>
+    public void SelectPage(int idx)
+    {
+        try
+        {
+            if (NavGeneral.Parent is StackPanel sp)
+            {
+                var rb = sp.Children.OfType<RadioButton>()
+                    .FirstOrDefault(r => r.Tag?.ToString() == idx.ToString());
+                if (rb is not null)
+                {
+                    rb.IsChecked = true;   // Checked → OnNavChanged → ShowPanel
+                    return;
+                }
+            }
+            ShowPanel(idx);
+        }
+        catch { try { ShowPanel(idx); } catch { } }
+    }
+
+    // ---------------------------------------------------------------- shortcuts (v1.4)
+
+    private void LoadShortcutList()
+    {
+        var items = _shortcuts.Snapshot();
+        ShortcutsList.ItemsSource = items;
+        ShortcutsEmpty.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnNewShortcut(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, null) { Owner = this };
+            dlg.ShowDialog();
+            LoadShortcutList();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.NewShortcut", ex); }
+    }
+
+    private void OnEditShortcut(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not ShortcutDef def) return;
+            var live = _shortcuts.Find(def.Id);
+            if (live is null) { LoadShortcutList(); return; }
+            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, live) { Owner = this };
+            dlg.ShowDialog();
+            LoadShortcutList();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.EditShortcut", ex); }
+    }
+
+    private void OnDeleteShortcut(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not ShortcutDef def) return;
+            var answer = System.Windows.MessageBox.Show(
+                $"Delete shortcut “{def.Name}” ?",
+                "Lumo", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (answer != MessageBoxResult.Yes) return;
+            _shortcuts.Remove(def.Id);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.DeleteShortcut", ex); }
     }
 
     /// <summary>Window springs in — fade + gentle scale, matching the launcher.</summary>
@@ -564,7 +643,8 @@ public partial class SettingsWindow : Window
         PanelAppearance.Visibility = idx == 1 ? Visibility.Visible : Visibility.Collapsed;
         PanelHotkey.Visibility = idx == 2 ? Visibility.Visible : Visibility.Collapsed;
         PanelSearch.Visibility = idx == 3 ? Visibility.Visible : Visibility.Collapsed;
-        PanelAbout.Visibility = idx == 4 ? Visibility.Visible : Visibility.Collapsed;
+        PanelShortcuts.Visibility = idx == 4 ? Visibility.Visible : Visibility.Collapsed;
+        PanelAbout.Visibility = idx == 5 ? Visibility.Visible : Visibility.Collapsed;
 
         // v1.3 — gentle page transition: the incoming panel fades + slides up a touch
         if (!_settings.AnimationsEnabled) return;
@@ -576,6 +656,7 @@ public partial class SettingsWindow : Window
                 1 => PanelAppearance,
                 2 => PanelHotkey,
                 3 => PanelSearch,
+                4 => PanelShortcuts,
                 _ => (ScrollViewer?)PanelAbout,
             } is not { } panel) return;
 

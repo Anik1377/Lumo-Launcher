@@ -13,6 +13,7 @@ public static class AppPaths
 
     public static readonly string LogFile = Path.Combine(DataDir, "log.txt");
     public static readonly string SettingsFile = Path.Combine(SettingsDir, "settings.json");
+    public static readonly string ShortcutsFile = Path.Combine(SettingsDir, "shortcuts.json");
 
     static AppPaths()
     {

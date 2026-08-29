@@ -34,6 +34,7 @@ public partial class LauncherWindow : Window
     private readonly AppIndex _apps = new();
     private readonly FileIndex _files = new();
     private readonly SearchEngine _engine;
+    private readonly ShortcutStore? _shortcuts;   // v1.4
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
     private HotkeyService? _hotkey;
@@ -46,6 +47,8 @@ public partial class LauncherWindow : Window
     private bool _glowRunning;               // animation clock currently active
     private bool _glowDimmed;                // window inactive → halo dimmed
     private int _animGen;                    // invalidates stale hide-completion callbacks
+    private bool _staggerNext = true;        // v1.4 — stagger only on show/empty→results, not every keystroke
+    private string _prevQuery = "";
 
     private const double GlowActiveOpacity = 0.50;
     private const double GlowDimOpacity = 0.16;
@@ -56,17 +59,24 @@ public partial class LauncherWindow : Window
     /// <summary>Raised when the user asks for the settings window (gear, Settings row).</summary>
     public event Action? SettingsRequested;
 
-    public LauncherWindow(Settings settings)
+    /// <summary>v1.4 — user asked to create/edit a shortcut (row in /sc mode).</summary>
+    public event Action<string?>? ShortcutEditorRequested;
+
+    /// <summary>v1.4 — user asked to manage shortcuts (opens settings → Shortcuts).</summary>
+    public event Action? ManageShortcutsRequested;
+
+    public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null)
     {
         InitializeComponent();
         _settings = settings;
+        _shortcuts = shortcuts;
         _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
-        _engine = new SearchEngine(_apps, _files, _settings);
+        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts);
 
         _debounce = new DispatcherTimer(DispatcherPriority.Background)
         {
-            Interval = TimeSpan.FromMilliseconds(80),
+            Interval = TimeSpan.FromMilliseconds(60),   // v1.4 — snappier than 80 ms
         };
         _debounce.Tick += (_, _) => { try { _debounce.Stop(); RunSearch(); } catch (Exception ex) { DiagnosticLogger.LogException("Window.Debounce", ex); } };
 
@@ -189,6 +199,7 @@ public partial class LauncherWindow : Window
             RootScale.ScaleX = RootScale.ScaleY = 0.94;
             RootShift.Y = 14;
             GlowHalo.Opacity = 0;
+            _staggerNext = true;   // v1.4 — cascade the fresh result list on (re)open
 
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
 
@@ -396,10 +407,12 @@ public partial class LauncherWindow : Window
         try
         {
             var t = Input.Text.Trim();
-            bool prefix = t.Length >= 2 && t[1] == '/' && char.IsLetter(t[0]);
-            PrefixBadge.Text = prefix ? char.ToUpperInvariant(t[0]).ToString() : "L";
-            PrefixBadge.Visibility = prefix ? Visibility.Visible : Visibility.Collapsed;
-            MagnifierIcon.Visibility = prefix ? Visibility.Collapsed : Visibility.Visible;
+            bool letterPrefix = t.Length >= 2 && t[1] == '/' && char.IsLetter(t[0]);
+            bool slashMode = t.StartsWith("/");   // v1.4 — shortcut mode
+            PrefixBadge.Text = letterPrefix ? char.ToUpperInvariant(t[0]).ToString() :
+                               slashMode ? "⚡" : "L";
+            PrefixBadge.Visibility = letterPrefix || slashMode ? Visibility.Visible : Visibility.Collapsed;
+            MagnifierIcon.Visibility = letterPrefix || slashMode ? Visibility.Collapsed : Visibility.Visible;
         }
         catch { }
     }
@@ -428,7 +441,15 @@ public partial class LauncherWindow : Window
                 Results.SelectedIndex = 0;
                 Results.ScrollIntoView(Results.SelectedItem);
             }
-            PlayStaggeredEntrance();
+
+            // v1.4 smoothing — cascade in only when the view *changes shape*
+            // (window just opened, or left the default rows). Typing updates bind
+            // instantly, which feels snappier than re-animating every keystroke.
+            string q = Input.Text.Trim();
+            bool stagger = _staggerNext || _prevQuery.Length == 0 || q.Length == 0;
+            _staggerNext = false;
+            _prevQuery = q;
+            if (stagger) PlayStaggeredEntrance();
         }
         catch (Exception ex)
         {
@@ -493,6 +514,22 @@ public partial class LauncherWindow : Window
                 return;
             }
 
+            // v1.4 — shortcut management rows in /sc mode
+            if (item.RunArgument == "cmd:new-shortcut" || item.RunArgument.StartsWith("cmd:new-shortcut:"))
+            {
+                string? preset = item.RunArgument.StartsWith("cmd:new-shortcut:")
+                    ? item.RunArgument["cmd:new-shortcut:".Length..].Trim() : null;
+                HideAnimated();
+                ShortcutEditorRequested?.Invoke(string.IsNullOrWhiteSpace(preset) ? null : preset);
+                return;
+            }
+            if (item.RunArgument == "cmd:manage-shortcuts")
+            {
+                HideAnimated();
+                ManageShortcutsRequested?.Invoke();
+                return;
+            }
+
             switch (item.Kind)
             {
                 case ResultKind.Hint:
@@ -515,6 +552,7 @@ public partial class LauncherWindow : Window
                 case ResultKind.Web:
                 case ResultKind.Image:
                 case ResultKind.Tool:
+                case ResultKind.Shortcut:
                     PauseGlow();
                     var error = _engine.Execute(item); // launch first, then hide on success
                     if (error is null) Hide();

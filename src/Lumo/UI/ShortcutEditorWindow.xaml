@@ -1,0 +1,224 @@
+<Window x:Class="Lumo.UI.ShortcutEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Lumo Shortcut"
+        Width="500" SizeToContent="Height"
+        MaxHeight="640"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        PreviewKeyDown="OnWindowPreviewKeyDown">
+
+    <Window.Resources>
+        <!-- rounded text field (Apple settings look) -->
+        <Style x:Key="FieldBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource FieldBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}"
+                                CornerRadius="8" BorderThickness="1"
+                                BorderBrush="{TemplateBinding BorderBrush}">
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}" Focusable="False"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TypeRadio" TargetType="RadioButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="12,6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SegSelBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{DynamicResource FieldBrush}" CornerRadius="8"
+                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource GhostButton}">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{DynamicResource AccentBrush}" CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="Margin" Value="2,0,0,6"/>
+        </Style>
+
+        <Style x:Key="FieldHint" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Margin" Value="2,6,0,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="14">
+        <Border x:Name="ShadowHost" CornerRadius="16" Margin="0,3,0,5" IsHitTestVisible="False">
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="24" ShadowDepth="6" Direction="270" Opacity="0.30"/>
+            </Border.Effect>
+            <Border Background="#33000000" CornerRadius="12" Margin="8"/>
+        </Border>
+
+        <Border x:Name="Root" CornerRadius="14" BorderThickness="1"
+                BorderBrush="{DynamicResource BorderLineBrush}" Background="#FF1C1C1E"
+                TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Arial"
+                RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1"/>
+            </Border.RenderTransform>
+
+            <StackPanel Margin="22,18,22,18">
+
+                <!-- header -->
+                <Grid>
+                    <TextBlock x:Name="HeaderText" Text="New shortcut" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TitleBrush}"/>
+                    <TextBlock Text="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                               HorizontalAlignment="Right" VerticalAlignment="Center" Cursor="Hand"
+                               Foreground="{DynamicResource SubtitleBrush}" MouseLeftButtonUp="OnCloseClick"
+                               ToolTip="Close (Esc)"/>
+                </Grid>
+
+                <TextBlock Text="Run it any time by typing  /sc name  in Lumo" FontSize="11.5"
+                           Foreground="{DynamicResource SubtitleBrush}" Margin="1,4,0,14"/>
+
+                <!-- name -->
+                <TextBlock Text="NAME" Style="{StaticResource FieldLabel}"/>
+                <TextBox x:Name="NameBox" Style="{StaticResource FieldBox}"/>
+
+                <!-- type -->
+                <TextBlock Text="TYPE" Style="{StaticResource FieldLabel}" Margin="2,14,0,6"/>
+                <Border Background="{DynamicResource SegTrackBrush}" CornerRadius="9" Padding="3"
+                        HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="TypeUrl" Content="URL" Style="{StaticResource TypeRadio}"
+                                     GroupName="SType" IsChecked="True" Checked="OnTypeChanged"/>
+                        <RadioButton x:Name="TypeFile" Content="File" Style="{StaticResource TypeRadio}"
+                                     GroupName="SType" Checked="OnTypeChanged"/>
+                        <RadioButton x:Name="TypeFolder" Content="Folder" Style="{StaticResource TypeRadio}"
+                                     GroupName="SType" Checked="OnTypeChanged"/>
+                        <RadioButton x:Name="TypeMacro" Content="Macro" Style="{StaticResource TypeRadio}"
+                                     GroupName="SType" Checked="OnTypeChanged"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- single target (url / file / folder) -->
+                <StackPanel x:Name="TargetPanel" Margin="0,14,0,0">
+                    <TextBlock x:Name="TargetLabel" Text="TARGET" Style="{StaticResource FieldLabel}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="TargetBox" Style="{StaticResource FieldBox}" MinHeight="36"/>
+                        <Button x:Name="BrowseButton" Grid.Column="1" Content="Browse…"
+                                Style="{StaticResource GhostButton}" Margin="8,0,0,0" Click="OnBrowseClick"/>
+                    </Grid>
+                    <TextBlock x:Name="TargetHint" Style="{StaticResource FieldHint}"
+                               Text="e.g.  github.com  or  https://mail.google.com"/>
+                </StackPanel>
+
+                <!-- macro steps -->
+                <StackPanel x:Name="MacroPanel" Margin="0,14,0,0" Visibility="Collapsed">
+                    <TextBlock Text="STEPS — ONE TARGET PER LINE" Style="{StaticResource FieldLabel}"/>
+                    <TextBox x:Name="StepsBox" Style="{StaticResource FieldBox}" AcceptsReturn="True"
+                             TextWrapping="Wrap" Height="88" FontSize="12.5"
+                             VerticalScrollBarVisibility="Auto"
+                             VerticalContentAlignment="Top"/>
+                    <TextBlock Style="{StaticResource FieldHint}"
+                               Text="Each line opens when the macro runs — URLs, files or folders, up to 12."/>
+                </StackPanel>
+
+                <!-- keywords -->
+                <TextBlock Text="KEYWORDS (OPTIONAL)" Style="{StaticResource FieldLabel}" Margin="2,14,0,6"/>
+                <TextBox x:Name="KeywordsBox" Style="{StaticResource FieldBox}"/>
+                <TextBlock Style="{StaticResource FieldHint}"
+                           Text="Extra words that should find this shortcut, comma separated."/>
+
+                <!-- validation + buttons -->
+                <TextBlock x:Name="ErrorText" FontSize="11.5" Foreground="#FF6A6A" Margin="2,10,0,0"
+                           Visibility="Collapsed" TextWrapping="Wrap"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                    <Button Content="Cancel" Style="{StaticResource GhostButton}" Click="OnCancelClick"/>
+                    <Button Content="Save shortcut" Style="{StaticResource AccentButton}" Margin="10,0,0,0"
+                            Click="OnSaveClick"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

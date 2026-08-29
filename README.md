@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.1-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.4.0-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -23,7 +23,8 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | | Feature | Detail |
 |---|---------|--------|
 | ⌨️ | **Keyboard-first** | Global hotkey (default `Alt+Space`) summons a centered search window anywhere in Windows |
-| 🚀 | **Command prefixes** | `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `U/` utilities |
+| 🚀 | **Command prefixes** | `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `U/` utilities · `/sc` your shortcuts |
+| ⚡ | **Shortcuts & macros** | Save your own one-tap launches — a URL, a file, a folder, or a multi-step macro — and run them with `/sc name` |
 | 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
 | 🎛️ | **Advanced Settings UI** | macOS-style sidebar settings window: General · Appearance · Hotkey · Search · About — all live-apply |
@@ -33,10 +34,29 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🌗 | **Dark / light / auto theme** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
 | ⏰ | **Start with Windows** | One toggle in Settings (per-user Run key, no admin rights) |
 | 🧳 | **Truly portable** | One ~260 KB exe, no installer |
-| 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 80 ms debounce, every handler exception-guarded |
+| 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
-## 🆕 What's new in v1.3 — Apple-clean UI & fluid motion
+## 🆕 What's new in v1.4 — Shortcuts, macros & a smoother ride
+
+1. **Shortcuts & macros (the big one)** — create named one-tap launches and run them
+   by typing `/sc <name>` (or just `/` to browse them all). Four kinds:
+   **URL** (`/sc mail` → opens gmail.com), **File**, **Folder**, and **Macro** —
+   up to 12 targets that open one after another ("morning": work mail + docs + team board).
+2. **Create anywhere** — type `/sc` then anything: press Enter on *“Create shortcut …”*
+   and the editor opens with the name pre-filled. A friendly editor window handles
+   name, type, target (with a **Browse** button), optional extra keywords, validation,
+   and `Ctrl+Enter` to save. Shortcuts live in `%APPDATA%\Lumo\shortcuts.json`.
+3. **Manage in Settings** — a new **Shortcuts** page lists everything with
+   Edit / Delete, and the launcher picks up changes live (no restart).
+4. **Quick hits without the prefix** — type a shortcut's name in the default view and
+   it appears right under matching apps; the empty view also lists your three
+   most-used shortcuts. A `⚡` prefix badge shows when you're in shortcut mode.
+5. **Smoother motion** — result rows no longer re-animate on every keystroke: the
+   full cascade now plays when the launcher opens or the view changes shape, while
+   typing updates bind **instantly** for a snappier feel. Debounce tightened to 60 ms.
+
+## ✨ What landed in v1.3 — Apple-clean UI & fluid motion
 
 1. **Redesigned launcher** — iOS system-grey palettes, larger result rows with
    **kind chips** (App / File / Web / Tool), a search-row magnifier + placeholder +
@@ -106,6 +126,7 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | `W/weather tomorrow` | web search — `W/example.com` opens a URL |
 | `I/aurora borealis` | image search |
 | `U/lock` | utilities: `lock` · `sleep` · `empty bin` · `restart` · `shutdown` · `settings` · `log` |
+| `/sc` or `/sc name` | **shortcuts & macros** — run a saved launch, or press Enter on *New shortcut* to create one |
 | `↑ ↓` / `Enter` / `Esc` | select / run / hide |
 
 ## ⚙️ Settings — `%APPDATA%\Lumo\settings.json`
@@ -131,6 +152,26 @@ The Settings window writes this file for you; every key can still be edited by h
 `Theme` accepts `dark`, `light` or `auto` (follows the Windows colour mode).
 `Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24`, `Space` or `` ` ``.
 
+## ⚡ Shortcuts & macros — `%APPDATA%\Lumo\shortcuts.json`
+
+Saved shortcuts live next to `settings.json` and are managed from the launcher
+(`/sc` → *New shortcut* / *Manage shortcuts*) or **Settings → Shortcuts**. Each entry:
+
+```json
+{
+  "Id": "8f4c1d2b6a09",
+  "Name": "mail",
+  "Type": "url",
+  "Target": "https://mail.google.com",
+  "Steps": [],
+  "Keywords": "gmail work"
+}
+```
+
+`Type` is `url`, `file`, `folder` or `macro` — for a macro, put one target per line in
+`Steps` (URLs and paths, up to 12); they all open when the shortcut runs.
+`Keywords` are optional extra terms that help `/sc` find it.
+
 ## 🛠️ Building from source
 
 ```bash
@@ -140,7 +181,7 @@ dotnet publish src/Lumo/Lumo.csproj -c Release
 
 CI is active (`.github/workflows/build.yml`): every push to `main` builds the portable zip
 and uploads it as a build artifact, and pushing a `v*` tag
-(e.g. `git tag v1.3.0 && git push --tags`) publishes a new GitHub Release
+(e.g. `git tag v1.4.0 && git push --tags`) publishes a new GitHub Release
 with the zip attached automatically.
 
 ## 🗺️ Roadmap
@@ -148,6 +189,7 @@ with the zip attached automatically.
 - [x] Configurable hotkey UI (v1.2 — hotkey recorder in Settings)
 - [x] Glow border / visual customization (v1.2)
 - [x] Apple-clean UI + fluid motion + auto theme (v1.3)
+- [x] User shortcuts & macros with `/sc` (v1.4)
 - [ ] Plugin API for custom commands
 - [ ] Everything SDK backend for instant full-disk search
 - [ ] Result icons extracted from real shortcuts

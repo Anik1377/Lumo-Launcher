@@ -1,41 +1,35 @@
 ======================================================
-  LUMO v1.3.1  —  universal launcher for Windows
+  LUMO v1.4.0  —  universal launcher for Windows
 ======================================================
 
-WHAT'S NEW IN v1.3 (Apple-clean UI + motion)
---------------------------------------------
-1. REDESIGNED LAUNCHER
-   * iOS-style dark/light palettes (system greys, softer
-     separators, Apple text colours)
-   * Accent-tinted hover & selection highlights - your
-     accent colour now drives the whole highlight system
-   * Larger result rows with kind chips (App / File /
-     Web / Tool / =) on the right
-   * Search-row magnifier icon + placeholder text +
-     clear button (Ctrl+Backspace also clears)
-   * Keyboard-style hint chips in the status bar
+WHAT'S NEW IN v1.4 (Shortcuts & macros + smoother motion)
+---------------------------------------------------------
+1. SHORTCUTS & MACROS - your own one-tap launches
+   * Type /sc to browse your saved shortcuts
+   * Run one with /sc name  (e.g.  /sc mail)
+   * Four kinds: URL, file, folder, and MACRO
+     (a macro opens several targets at once -
+      one per line, up to 12)
+   * Create: type /sc + any name, press Enter on
+     "Create shortcut ..." - the editor opens with
+     the name pre-filled (Browse button included,
+     Ctrl+Enter saves)
+   * Manage: Settings -> Shortcuts (edit / delete);
+     the launcher picks up changes live
+   * Stored in %APPDATA%\Lumo\shortcuts.json
+   * Shortcut names also surface in the default view
+     while you type, and the empty view lists a few
 
-2. MOTION, EVERYWHERE
-   * Spring-in: the window scales + fades + slides open
-   * Cascading results: rows fade up one by one
-   * Smooth hover/selection colour transitions
-   * Quick fade-out when hiding
-   * The glow border now PAUSES when the window is
-     hidden or inactive - zero idle CPU
-   * "UI animations" master switch in Settings ->
-     Appearance turns ALL motion off (reduced motion)
+2. SMOOTHER MOTION
+   * Result rows no longer re-animate on every
+     keystroke - the cascade plays when the launcher
+     opens or the view changes shape; typing updates
+     instantly (feels snappier)
+   * Input debounce tightened 80 ms -> 60 ms
 
-3. REDESIGNED SETTINGS (macOS System Settings style)
-   * Sidebar with coloured icon tiles
-   * Segmented controls, iOS-style animated switches
-   * Theme: Light / Dark / AUTO (follows Windows)
-   * Animated page transitions between sections
-
-4. NEW CUSTOMIZATION
-   * "UI animations" on/off
-   * Theme "Auto" mode
-   * 9 accent presets now including iOS blue, green,
-     orange and purple
+3. FIXED IN v1.3.1 (kept)
+   * Startup crash caused by the new animations in
+     v1.3.0 - sorry about that!
 
 HOTKEY NOTE (please read)
 -------------------------
@@ -57,6 +51,7 @@ USAGE
    I/<text>            image search              e.g.  I/aurora
    U/<tool>            utilities: lock, sleep, empty bin, restart,
                        shutdown, settings window, settings file, log
+   /sc [name]          shortcuts & macros        e.g.  /sc mail
    Up/Down             select result
    Enter               run selected result (calculator copies to clipboard)
    Esc                 hide window
