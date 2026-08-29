@@ -1,46 +1,50 @@
 ======================================================
-  LUMO v1.2  —  universal launcher for Windows
+  LUMO v1.3  —  universal launcher for Windows
 ======================================================
 
-WHAT'S NEW IN v1.2 (advanced settings + glow border)
-----------------------------------------------------
-1. FULL SETTINGS WINDOW
-   Open it from any of these places:
-     * the "Settings" row in the launcher's default view
-     * the small "⚙ settings" text in the launcher status bar
-     * the tray icon right-click menu -> "Settings…"
-     * type  U/settings  and press Enter
-   Sections:
-     General    start with Windows, hide-on-focus-loss, web engine
-     Appearance theme, accent colour (8 presets + custom hex),
-                glow border on/off, 6 border styles, 3 speeds,
-                with a live preview strip
-     Hotkey     click-and-press hotkey recorder (no more manual
-                JSON editing), Apply button tests it immediately
-     Search     max indexed files slider (10k - 300k),
-                rebuild index now, open log / settings folders
-     About      version info + project links
+WHAT'S NEW IN v1.3 (Apple-clean UI + motion)
+--------------------------------------------
+1. REDESIGNED LAUNCHER
+   * iOS-style dark/light palettes (system greys, softer
+     separators, Apple text colours)
+   * Accent-tinted hover & selection highlights - your
+     accent colour now drives the whole highlight system
+   * Larger result rows with kind chips (App / File /
+     Web / Tool / =) on the right
+   * Search-row magnifier icon + placeholder text +
+     clear button (Ctrl+Backspace also clears)
+   * Keyboard-style hint chips in the status bar
 
-2. GLOW BORDER EFFECT (the chat-bubble look)
-   The launcher window now has an animated multi-colour gradient
-   border that slowly rotates, plus a soft glow halo bleeding out
-   behind the window. Styles: Aurora, Sunset, Ocean, Ember, Mint,
-   Solid accent. Speed: Fast / Normal / Slow. Turn it off any time
-   in Settings -> Appearance.
+2. MOTION, EVERYWHERE
+   * Spring-in: the window scales + fades + slides open
+   * Cascading results: rows fade up one by one
+   * Smooth hover/selection colour transitions
+   * Quick fade-out when hiding
+   * The glow border now PAUSES when the window is
+     hidden or inactive - zero idle CPU
+   * "UI animations" master switch in Settings ->
+     Appearance turns ALL motion off (reduced motion)
 
-3. NEW IN THIS BUILD
-   * Start Lumo when Windows starts (per-user Run key, no admin)
-   * Accent colour theming across the whole UI
-   * Tunable file-index cap + "Rebuild index now"
-   * Small fade/slide-in animation when the launcher appears
+3. REDESIGNED SETTINGS (macOS System Settings style)
+   * Sidebar with coloured icon tiles
+   * Segmented controls, iOS-style animated switches
+   * Theme: Light / Dark / AUTO (follows Windows)
+   * Animated page transitions between sections
+
+4. NEW CUSTOMIZATION
+   * "UI animations" on/off
+   * Theme "Auto" mode
+   * 9 accent presets now including iOS blue, green,
+     orange and purple
 
 HOTKEY NOTE (please read)
 -------------------------
-   Win + Space is RESERVED BY WINDOWS for switching keyboard
-   layouts - no application can register it. That was the cause
-   of the v1.0 "hotkey never works" report. The default is
-   Alt+Space and it works everywhere. Change it any time in
-   Settings -> Hotkey (click the box, press the combo, Apply).
+   Win + Space is RESERVED BY WINDOWS for switching
+   keyboard layouts - no application can register it.
+   That was the cause of the v1.0 "hotkey never works"
+   report. The default is Alt+Space and it works
+   everywhere. Change it any time in Settings -> Hotkey
+   (click the box, press the combo, Apply).
 
 USAGE
 -----
@@ -56,6 +60,7 @@ USAGE
    Up/Down             select result
    Enter               run selected result (calculator copies to clipboard)
    Esc                 hide window
+   Ctrl+Backspace      clear the search box
 
 SETTINGS (%APPDATA%\Lumo\settings.json)
 ---------------------------------------
@@ -63,13 +68,14 @@ SETTINGS (%APPDATA%\Lumo\settings.json)
    can also be edited by hand:
    "Hotkey":            "Alt+Space"   (Ctrl/Alt/Shift/Win + letter,
                                       digit, F1-F24, Space, `)
-   "Theme":             "dark" | "light"
+   "Theme":             "dark" | "light" | "auto"
    "WebEngine":         "google" | "bing" | "duckduckgo"
    "HideOnFocusLoss":   false
    "AccentColor":       "#7C6CFF"     (any #RRGGBB)
    "BorderEffect":      true          (animated glow border)
    "BorderStyle":       "Aurora"      (Aurora|Sunset|Ocean|Ember|Mint|Solid)
    "BorderSpeedSec":    3.5           (seconds per rotation; lower = faster)
+   "AnimationsEnabled": true          (master motion switch, v1.3)
    "StartWithWindows":  false         (applied on Save)
    "MaxIndexedFiles":   150000        (applied on next index rebuild)
 

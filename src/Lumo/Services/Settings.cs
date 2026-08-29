@@ -9,11 +9,13 @@ namespace Lumo.Services;
 ///
 /// v1.2 — advanced customization: accent colour, animated "glow border" effect
 /// (style + speed), start-with-Windows and the file-index size cap.
+/// v1.3 — Apple-style refinement: auto (system) theme and a global
+/// "reduce motion" switch that disables every animation for snappiness.
 /// </summary>
 public sealed class Settings
 {
     public string Hotkey { get; set; } = "Alt+Space";
-    public string Theme { get; set; } = "dark";            // "dark" | "light"
+    public string Theme { get; set; } = "dark";            // "dark" | "light" | "auto"
     public string WebEngine { get; set; } = "google";      // google | bing | duckduckgo
     public bool HideOnFocusLoss { get; set; } = false;
 
@@ -24,6 +26,9 @@ public sealed class Settings
     public double BorderSpeedSec { get; set; } = 3.5;      // seconds per full rotation (2 = fast, 6 = slow)
     public bool StartWithWindows { get; set; } = false;    // HKCU Run key (applied on Save)
     public int MaxIndexedFiles { get; set; } = 150_000;    // file-index cap (applied on next rebuild)
+
+    // ---- v1.3 customization -------------------------------------------------
+    public bool AnimationsEnabled { get; set; } = true;    // master switch for every animation
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
@@ -71,5 +76,17 @@ public sealed class Settings
         BorderSpeedSec = o.BorderSpeedSec;
         StartWithWindows = o.StartWithWindows;
         MaxIndexedFiles = o.MaxIndexedFiles;
+        AnimationsEnabled = o.AnimationsEnabled;
     }
+
+    /// <summary>
+    /// Resolves the effective dark/light decision: "auto" follows the Windows
+    /// personalization setting, otherwise the explicit choice wins.
+    /// </summary>
+    public bool EffectiveDark() =>
+        Theme?.Equals("light", StringComparison.OrdinalIgnoreCase) == false
+            ? Theme?.Equals("auto", StringComparison.OrdinalIgnoreCase) == true
+                ? Appearance.IsSystemDark()
+                : true
+            : false;
 }

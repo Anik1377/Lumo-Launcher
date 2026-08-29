@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.2.0-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.3.0-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -26,19 +26,38 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🚀 | **Command prefixes** | `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `U/` utilities |
 | 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
-| 🎛️ | **Advanced Settings UI** | Sidebar settings window: General · Appearance · Hotkey · Search · About — all live-apply |
-| 🌈 | **Glow border effect** | Chat-bubble style animated gradient border + halo: 5 colour presets, solid accent, 3 speeds |
-| 🎨 | **Accent theming** | 8 accent presets + custom hex, applied across the launcher and settings window |
-| 🌗 | **Dark / light theme** | Toggle from the tray menu or Settings, persisted in `settings.json` |
+| 🎛️ | **Advanced Settings UI** | macOS-style sidebar settings window: General · Appearance · Hotkey · Search · About — all live-apply |
+| 🌈 | **Glow border effect** | Chat-bubble style animated gradient border + halo: 5 colour presets, solid accent, 3 speeds — pauses when hidden |
+| 🎬 | **Fluid motion** | Spring-in window, cascading result rows, smooth hover transitions — with a reduced-motion master switch |
+| 🎨 | **Accent theming** | 9 accent presets + custom hex, driving the whole highlight system (accent-tinted selection) |
+| 🌗 | **Dark / light / auto theme** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
 | ⏰ | **Start with Windows** | One toggle in Settings (per-user Run key, no admin rights) |
 | 🧳 | **Truly portable** | One ~260 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 80 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
-## 🆕 What's new in v1.2 — Advanced settings & customization
+## 🆕 What's new in v1.3 — Apple-clean UI & fluid motion
+
+1. **Redesigned launcher** — iOS system-grey palettes, larger result rows with
+   **kind chips** (App / File / Web / Tool), a search-row magnifier + placeholder +
+   clear button (`Ctrl+Backspace`), and keyboard-style hint chips in the status bar.
+2. **Accent-tinted highlights** — hover and selection colours are now derived from
+   your accent colour (the macOS way), so every accent choice stays coherent.
+3. **Motion everywhere** — the window springs in (scale + fade + slide), results
+   cascade in with a 22 ms stagger, hover/selection colours cross-fade, and hiding
+   fades out. The glow border now **pauses whenever the window is hidden or inactive**
+   — zero idle CPU.
+4. **Reduced-motion switch** — *Settings → Appearance → UI animations* turns off
+   every animation for a snappier experience.
+5. **Auto theme** — *Light / Dark / Auto*; Auto follows the Windows personalization
+   colour mode.
+6. **Settings, macOS-style** — coloured sidebar tiles, segmented controls,
+   iOS-style animated switches, and gentle page transitions.
+
+## ✨ What landed in v1.2 — Advanced settings & customization
 
 1. **Full settings window** — open it from the launcher's `Settings` row, the
-   `⚙ settings` link in the status bar, the tray menu (`Settings…`), or type `U/settings`.
+   gear icon in the status bar, the tray menu (`Settings…`), or type `U/settings`.
    Five sections: **General** (start with Windows, hide on focus loss, web engine),
    **Appearance** (theme, accent, glow border), **Hotkey**, **Search & Index**, **About**.
 2. **Glow border effect** — the animated multi-colour border around the launcher
@@ -103,11 +122,13 @@ The Settings window writes this file for you; every key can still be edited by h
   "BorderEffect": true,
   "BorderStyle": "Aurora",
   "BorderSpeedSec": 3.5,
+  "AnimationsEnabled": true,
   "StartWithWindows": false,
   "MaxIndexedFiles": 150000
 }
 ```
 
+`Theme` accepts `dark`, `light` or `auto` (follows the Windows colour mode).
 `Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24`, `Space` or `` ` ``.
 
 ## 🛠️ Building from source
@@ -119,13 +140,14 @@ dotnet publish src/Lumo/Lumo.csproj -c Release
 
 CI is active (`.github/workflows/build.yml`): every push to `main` builds the portable zip
 and uploads it as a build artifact, and pushing a `v*` tag
-(e.g. `git tag v1.2.0 && git push --tags`) publishes a new GitHub Release
+(e.g. `git tag v1.3.0 && git push --tags`) publishes a new GitHub Release
 with the zip attached automatically.
 
 ## 🗺️ Roadmap
 
 - [x] Configurable hotkey UI (v1.2 — hotkey recorder in Settings)
 - [x] Glow border / visual customization (v1.2)
+- [x] Apple-clean UI + fluid motion + auto theme (v1.3)
 - [ ] Plugin API for custom commands
 - [ ] Everything SDK backend for instant full-disk search
 - [ ] Result icons extracted from real shortcuts

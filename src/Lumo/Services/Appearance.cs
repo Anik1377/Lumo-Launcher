@@ -8,12 +8,16 @@ using Point = System.Windows.Point;
 namespace Lumo.Services;
 
 /// <summary>
-/// Shared appearance helpers (v1.2).
+/// Shared appearance helpers.
 ///
 /// • Glow-border gradient presets — the animated border around the launcher, in the
 ///   style of modern chat UIs: a multi-colour gradient stroke that slowly rotates,
 ///   plus a blurred "halo" copy of the same gradient bleeding out behind the window.
-/// • A shared dark/light palette so the launcher and the settings window look alike.
+/// • A shared Apple-flavoured palette (iOS system greys, Apple text colours) so the
+///   launcher and the settings window look like one product.
+/// • v1.3 — selection/hover tints are now derived from the user's accent colour
+///   (macOS-style translucent accent tints) and "auto" theme can read the Windows
+///   personalization setting.
 /// </summary>
 public static class Appearance
 {
@@ -22,12 +26,13 @@ public static class Appearance
     public static readonly string[] AccentPresets =
     {
         "#7C6CFF", // violet (classic Lumo)
+        "#0A84FF", // iOS blue
         "#22D3EE", // cyan
-        "#34D399", // mint green
+        "#30D158", // iOS green
         "#F472B6", // pink
-        "#F59E0B", // amber
+        "#FF9F0A", // iOS orange
         "#EF4444", // red
-        "#60A5FA", // blue
+        "#BF5AF2", // iOS purple
         "#A78BFA", // lavender
     };
 
@@ -109,8 +114,12 @@ public static class Appearance
 
     // ---------------------------------------------------------------- palette
 
+    /// <summary>
+    /// The effective palette. Hover/Selected are translucent tints of the accent colour
+    /// (the macOS way) so every accent choice produces a coherent highlight system.
+    /// </summary>
     public sealed record Palette(
-        Color Panel, Color Border, Color Title, Color Subtitle,
+        Color Panel, Color Field, Color Border, Color Title, Color Subtitle,
         Color Hover, Color Selected, Color GlyphBox, Color Accent, Color Separator);
 
     public static Palette PaletteFor(bool dark, string? accentHex)
@@ -118,26 +127,50 @@ public static class Appearance
         var accent = ParseAccent(accentHex);
         return dark
             ? new Palette(
-                Panel: FromRgb(0x1E, 0x1F, 0x26),
-                Border: FromRgb(0x33, 0x36, 0x4A),
-                Title: FromRgb(0xF2, 0xF3, 0xF7),
-                Subtitle: FromRgb(0x8A, 0x8F, 0xA3),
-                Hover: FromRgb(0x2E, 0x31, 0x40),
-                Selected: FromRgb(0x3A, 0x3E, 0x52),
-                GlyphBox: FromRgb(0x2E, 0x31, 0x40),
-                Accent: accent,
-                Separator: FromRgb(0x2A, 0x2C, 0x38))
+                Panel:    FromRgb(0x1C, 0x1C, 0x1E),   // iOS systemBackground dark
+                Field:    FromRgb(0x2C, 0x2C, 0x2E),   // iOS secondarySystemBackground
+                Border:   FromRgb(0x38, 0x38, 0x3A),   // iOS separator
+                Title:    FromRgb(0xF5, 0xF5, 0xF7),   // Apple marketing white
+                Subtitle: FromRgb(0x98, 0x98, 0x9D),   // iOS secondaryLabel
+                Hover:    Tint(accent, 0x16),          // accent @ 9%
+                Selected: Tint(accent, 0x2A),          // accent @ 16%
+                GlyphBox: FromRgb(0x2C, 0x2C, 0x2E),
+                Accent:   accent,
+                Separator: FromRgb(0x38, 0x38, 0x3A))
             : new Palette(
-                Panel: Colors.White,
-                Border: FromRgb(0xE2, 0xE4, 0xEC),
-                Title: FromRgb(0x1B, 0x1D, 0x27),
-                Subtitle: FromRgb(0x7A, 0x7F, 0x92),
-                Hover: FromRgb(0xF0, 0xF1, 0xF7),
-                Selected: FromRgb(0xE4, 0xE6, 0xFB),
-                GlyphBox: FromRgb(0xEF, 0xF0, 0xF8),
-                Accent: accent,
-                Separator: FromRgb(0xEC, 0xEC, 0xF2));
+                Panel:    Colors.White,
+                Field:    FromRgb(0xF5, 0xF5, 0xF7),   // Apple site grey
+                Border:   FromRgb(0xE5, 0xE5, 0xEA),   // iOS separator light
+                Title:    FromRgb(0x1D, 0x1D, 0x1F),   // Apple near-black
+                Subtitle: FromRgb(0x86, 0x86, 0x8B),   // Apple grey text
+                Hover:    Tint(accent, 0x0F),
+                Selected: Tint(accent, 0x22),
+                GlyphBox: FromRgb(0xF5, 0xF5, 0xF7),
+                Accent:   accent,
+                Separator: FromRgb(0xE8, 0xE8, 0xED));
     }
 
+    /// <summary>accent with the given alpha — the base for tinted highlights.</summary>
+    public static Color Tint(Color accent, byte alpha) => Color.FromArgb(alpha, accent.R, accent.G, accent.B);
+
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
+
+    // ---------------------------------------------------------------- system theme
+
+    /// <summary>
+    /// Reads the Windows personalization setting (Settings → Personalization → Colors →
+    /// "Choose your mode"). Returns true when Windows apps are set to dark.
+    /// </summary>
+    public static bool IsSystemDark()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            if (key?.GetValue("AppsUseLightTheme") is int v)
+                return v == 0;
+        }
+        catch { }
+        return true; // default to dark — Lumo's signature look
+    }
 }

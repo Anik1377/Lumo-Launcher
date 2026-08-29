@@ -36,7 +36,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.2 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v1.3 starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -92,7 +92,7 @@ public partial class App : Application
         }
     }
 
-    /// <summary>Open (or focus) the v1.2 settings window — singleton per app lifetime.</summary>
+    /// <summary>Open (or focus) the settings window — singleton per app lifetime.</summary>
     private void OpenSettings()
     {
         try
@@ -109,7 +109,7 @@ public partial class App : Application
                 applyHotkey: () =>
                 {
                     string active = _window?.ReapplyHotkey() ?? "(none)";
-                    try { _tray?.UpdateText($"Lumo v1.2 — press {active}"); } catch { }
+                    try { _tray?.UpdateText($"Lumo v1.3 — press {active}"); } catch { }
                     return active;
                 },
                 rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } });

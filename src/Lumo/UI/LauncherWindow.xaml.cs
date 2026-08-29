@@ -18,13 +18,15 @@ using KeyEventArgs = System.Windows.Input.KeyEventArgs;
 namespace Lumo.UI;
 
 /// <summary>
-/// The launcher window.
+/// The launcher window — v1.3 "Apple-clean" refresh.
 ///
-/// FIX (v1.1) — "typing any character freezes then crashes": the search pipeline is now
-/// fully synchronous, in-memory and bounded; results arrive via an 80 ms debounce; every
-/// event handler is wrapped in try/catch that logs instead of throwing; there are no
-/// blocking waits (.Result/.Wait), no cross-thread UI access and no recursion in matching.
-/// Any residual dispatcher exception is caught in App and logged — the app no longer dies.
+/// Design language: iOS system greys, accent-tinted selection, soft layered shadow,
+/// staggered result-row entrances, spring-ish scale-in, and the rotating glow border
+/// that dims + pauses whenever the window is hidden or inactive (zero idle CPU).
+///
+/// FIX (v1.1, kept) — the search pipeline is fully synchronous, in-memory and bounded;
+/// results arrive via an 80 ms debounce; every event handler is wrapped in try/catch
+/// that logs instead of throwing.
 /// </summary>
 public partial class LauncherWindow : Window
 {
@@ -40,6 +42,13 @@ public partial class LauncherWindow : Window
     private Brush _themeBorderBrush = Brushes.DimGray;
     private RotateTransform? _rotBorder;
     private RotateTransform? _rotHalo;
+    private Storyboard? _borderStoryboard;
+    private bool _glowRunning;               // animation clock currently active
+    private bool _glowDimmed;                // window inactive → halo dimmed
+    private int _animGen;                    // invalidates stale hide-completion callbacks
+
+    private const double GlowActiveOpacity = 0.50;
+    private const double GlowDimOpacity = 0.16;
 
     /// <summary>Human-readable description of the hotkey that actually registered.</summary>
     public string? ActiveHotkeyDescription => _hotkey?.ActiveDescription;
@@ -126,7 +135,7 @@ public partial class LauncherWindow : Window
         if (!_allowClose)
         {
             e.Cancel = true;
-            try { Hide(); } catch { }
+            try { HideAnimated(); } catch { }
             return;
         }
 
@@ -144,7 +153,12 @@ public partial class LauncherWindow : Window
     {
         try
         {
+            _animGen++; // cancel any pending hide-completion
+            Root.BeginAnimation(OpacityProperty, null);
+
             if (!IsVisible) { CenterNearCursor(); AnimateShow(); }
+            else if (_settings.AnimationsEnabled) { RestoreVisualState(); }
+
             if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 
             Activate();
@@ -157,23 +171,77 @@ public partial class LauncherWindow : Window
         }
     }
 
-    /// <summary>Small fade + slide-in animation — the launcher feels light, not like a popup.</summary>
+    /// <summary>Fade + slide + gentle scale-in — the launcher springs open, Spotlight-style.</summary>
     private void AnimateShow()
     {
         try
         {
-            Root.Opacity = 0;
-            RootShift.Y = -12;
             Show();
+
+            if (!_settings.AnimationsEnabled)
+            {
+                RestoreVisualState();
+                ResumeGlow();
+                return;
+            }
+
+            Root.Opacity = 0;
+            RootScale.ScaleX = RootScale.ScaleY = 0.94;
+            RootShift.Y = 14;
+            GlowHalo.Opacity = 0;
+
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(130)) { EasingFunction = ease };
-            var slide = new DoubleAnimation(-12, 0, TimeSpan.FromMilliseconds(150)) { EasingFunction = ease };
+
+            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)) { EasingFunction = ease };
+            var scale = new DoubleAnimation(0.94, 1, TimeSpan.FromMilliseconds(230)) { EasingFunction = ease };
+            var slide = new DoubleAnimation(14, 0, TimeSpan.FromMilliseconds(230)) { EasingFunction = ease };
+            var glow = new DoubleAnimation(0, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(420)) { EasingFunction = ease };
+
             Root.BeginAnimation(UIElement.OpacityProperty, fade);
+            RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+            RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
             RootShift.BeginAnimation(TranslateTransform.YProperty, slide);
+            GlowHalo.BeginAnimation(UIElement.OpacityProperty, glow);
+
+            ResumeGlow();
         }
         catch
         {
-            try { Root.Opacity = 1; RootShift.Y = 0; Show(); } catch { }
+            try { RestoreVisualState(); Show(); } catch { }
+        }
+    }
+
+    private void RestoreVisualState()
+    {
+        Root.Opacity = 1;
+        RootScale.ScaleX = RootScale.ScaleY = 1;
+        RootShift.Y = 0;
+        GlowHalo.Opacity = _glowDimmed ? GlowDimOpacity : CurrentGlowOpacity();
+    }
+
+    /// <summary>Quick fade-out, then really hide. Safe against rapid toggle races.</summary>
+    private void HideAnimated()
+    {
+        try
+        {
+            PauseGlow();
+            if (!_settings.AnimationsEnabled || !IsVisible) { Hide(); return; }
+
+            int gen = ++_animGen;
+            var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(90))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
+            };
+            fade.Completed += (_, _) =>
+            {
+                if (gen != _animGen) return; // user re-summoned mid-fade
+                try { Hide(); } catch { }
+            };
+            Root.BeginAnimation(UIElement.OpacityProperty, fade);
+        }
+        catch
+        {
+            try { Hide(); } catch { }
         }
     }
 
@@ -182,7 +250,7 @@ public partial class LauncherWindow : Window
         try
         {
             if (IsVisible && NativeMethods.GetForegroundWindow() == _hwnd)
-                Hide();
+                HideAnimated();
             else
                 ActivateLauncher();
         }
@@ -218,8 +286,40 @@ public partial class LauncherWindow : Window
 
     private void OnDeactivated(object sender, EventArgs e)
     {
-        if (!_settings.HideOnFocusLoss) return;
-        try { Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(Hide)); } catch { }
+        try
+        {
+            if (_settings.HideOnFocusLoss) { Hide(); return; }
+
+            // stays visible → dim the glow + pause the border animation (no idle CPU)
+            _glowDimmed = true;
+            PauseGlow();
+            if (_settings.AnimationsEnabled && IsVisible)
+                GlowHalo.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(GlowHalo.Opacity, GlowDimOpacity, TimeSpan.FromMilliseconds(300)));
+            else
+                GlowHalo.Opacity = GlowDimOpacity;
+        }
+        catch { }
+    }
+
+    private void OnWindowActivated(object sender, EventArgs e)
+    {
+        try
+        {
+            _glowDimmed = false;
+            if (_settings.AnimationsEnabled && IsVisible)
+            {
+                GlowHalo.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(GlowHalo.Opacity, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(300)));
+                ResumeGlow();
+            }
+            else
+            {
+                GlowHalo.Opacity = CurrentGlowOpacity();
+                ResumeGlow();
+            }
+        }
+        catch { }
     }
 
     // ---------------------------------------------------------------- input & search
@@ -257,7 +357,11 @@ public partial class LauncherWindow : Window
                     e.Handled = true;
                     break;
                 case Key.Escape:
-                    Hide();
+                    HideAnimated();
+                    e.Handled = true;
+                    break;
+                case Key.Back when Keyboard.Modifiers == ModifierKeys.Control && Input.Text.Length > 0:
+                    Input.Clear();
                     e.Handled = true;
                     break;
             }
@@ -272,7 +376,17 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            if (e.Key == Key.Escape) { Hide(); e.Handled = true; }
+            if (e.Key == Key.Escape) { HideAnimated(); e.Handled = true; }
+        }
+        catch { }
+    }
+
+    private void OnClearClick(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            Input.Clear();
+            Input.Focus();
         }
         catch { }
     }
@@ -282,9 +396,10 @@ public partial class LauncherWindow : Window
         try
         {
             var t = Input.Text.Trim();
-            PrefixBadge.Text = t.Length >= 2 && t[1] == '/' && char.IsLetter(t[0])
-                ? char.ToUpperInvariant(t[0]).ToString()
-                : "L";
+            bool prefix = t.Length >= 2 && t[1] == '/' && char.IsLetter(t[0]);
+            PrefixBadge.Text = prefix ? char.ToUpperInvariant(t[0]).ToString() : "L";
+            PrefixBadge.Visibility = prefix ? Visibility.Visible : Visibility.Collapsed;
+            MagnifierIcon.Visibility = prefix ? Visibility.Collapsed : Visibility.Visible;
         }
         catch { }
     }
@@ -313,11 +428,43 @@ public partial class LauncherWindow : Window
                 Results.SelectedIndex = 0;
                 Results.ScrollIntoView(Results.SelectedItem);
             }
+            PlayStaggeredEntrance();
         }
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("Window.BindResults", ex);
         }
+    }
+
+    /// <summary>
+    /// v1.3 — results cascade in: each row fades + slides up with a 22 ms stagger,
+    /// the Raycast/Spotlight feel. Runs on the dispatcher after containers exist.
+    /// </summary>
+    private void PlayStaggeredEntrance()
+    {
+        if (!_settings.AnimationsEnabled) return;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
+        {
+            try
+            {
+                int n = Math.Min(Results.Items.Count, 10);
+                var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+                var dur = TimeSpan.FromMilliseconds(170);
+                for (int i = 0; i < n; i++)
+                {
+                    if (Results.ItemContainerGenerator.ContainerFromIndex(i) is not FrameworkElement fe) continue;
+
+                    var tt = new TranslateTransform(0, 8);
+                    fe.RenderTransform = tt;
+                    var delay = TimeSpan.FromMilliseconds(i * 22);
+                    tt.BeginAnimation(TranslateTransform.YProperty,
+                        new DoubleAnimation(8, 0, dur) { EasingFunction = ease, BeginTime = delay });
+                    fe.BeginAnimation(UIElement.OpacityProperty,
+                        new DoubleAnimation(0, 1, dur) { EasingFunction = ease, BeginTime = delay });
+                }
+            }
+            catch (Exception ex) { DiagnosticLogger.LogException("Window.Stagger", ex); }
+        });
     }
 
     private void MoveSelection(int delta)
@@ -339,7 +486,7 @@ public partial class LauncherWindow : Window
         {
             if (Results.SelectedItem is not ResultItem item) return;
 
-            // v1.2: open the in-app settings window (not the settings folder)
+            // open the in-app settings window (not the settings folder)
             if (item.RunArgument == "cmd:app-settings")
             {
                 SettingsRequested?.Invoke();
@@ -360,7 +507,7 @@ public partial class LauncherWindow : Window
                 case ResultKind.Calculator:
                     _engine.Execute(item); // copies result
                     StatusText.Text = "Copied: " + item.RunArgument;
-                    Hide();
+                    HideAnimated();
                     break;
 
                 case ResultKind.App:
@@ -368,6 +515,7 @@ public partial class LauncherWindow : Window
                 case ResultKind.Web:
                 case ResultKind.Image:
                 case ResultKind.Tool:
+                    PauseGlow();
                     Hide();               // hide first so focus returns before the launched app takes over
                     _engine.Execute(item);
                     break;
@@ -400,7 +548,7 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            bool dark = !string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase);
+            bool dark = _settings.EffectiveDark();
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
 
             Resources["TitleBrush"] = new SolidColorBrush(p.Title);
@@ -409,11 +557,18 @@ public partial class LauncherWindow : Window
             Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
             Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
             Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
+            Resources["ChipBrush"] = new SolidColorBrush(dark ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
+            Resources["ChipTextBrush"] = new SolidColorBrush(p.Subtitle);
+            Resources["PlaceholderBrush"] = new SolidColorBrush(dark ? FromRgb(0x63, 0x63, 0x66) : FromRgb(0xC7, 0xC7, 0xCC));
+            Resources["IconBrush"] = new SolidColorBrush(p.Subtitle);
+            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
 
             Root.Background = new SolidColorBrush(p.Panel);
             _themeBorderBrush = new SolidColorBrush(p.Border);
             Input.Foreground = new SolidColorBrush(p.Title);
             Input.CaretBrush = new SolidColorBrush(p.Accent);
+            Input.SelectionBrush = new SolidColorBrush(Appearance.Tint(p.Accent, 0x55));
+            Input.SelectionTextBrush = new SolidColorBrush(p.Title);
             Separator.Background = new SolidColorBrush(p.Separator);
             PrefixBadge.Foreground = new SolidColorBrush(p.Accent);
         }
@@ -423,16 +578,23 @@ public partial class LauncherWindow : Window
         }
     }
 
+    private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
+
+    private double CurrentGlowOpacity() => _glowDimmed ? GlowDimOpacity : GlowActiveOpacity;
+
     /// <summary>
-    /// v1.2 — the "chat box" glow border: a rotating multi-colour gradient stroke on the
-    /// card plus a blurred copy of the same gradient glowing out behind the window.
-    /// Style / speed / on-off all come from Settings; when off we fall back to the
-    /// classic solid theme border.
+    /// The "chat box" glow border: a rotating multi-colour gradient stroke on the card
+    /// plus a blurred halo copy behind the window. v1.3 runs it through a controllable
+    /// storyboard so it can pause whenever the window is hidden or inactive.
     /// </summary>
     public void ApplyBorderEffect()
     {
         try
         {
+            _borderStoryboard?.Remove(this);
+            _borderStoryboard = null;
+            _glowRunning = false;
+
             if (_settings.BorderEffect)
             {
                 var borderBrush = Appearance.BuildBorderBrush(_settings.BorderStyle, _settings.AccentColor, out var rotBorder);
@@ -444,15 +606,27 @@ public partial class LauncherWindow : Window
 
                 double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 3.5 : _settings.BorderSpeedSec;
                 sec = Math.Clamp(sec, 1.0, 12.0);
-                var anim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(sec))
+
+                var sb = new Storyboard();
+                var anim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(sec)) { RepeatBehavior = RepeatBehavior.Forever };
+                Storyboard.SetTarget(anim, rotBorder);
+                Storyboard.SetTargetProperty(anim, new PropertyPath(RotateTransform.AngleProperty));
+                sb.Children.Add(anim);
+
+                if (rotHalo is not null)
                 {
-                    RepeatBehavior = RepeatBehavior.Forever,
-                };
+                    var anim2 = anim.Clone();
+                    Storyboard.SetTarget(anim2, rotHalo);
+                    Storyboard.SetTargetProperty(anim2, new PropertyPath(RotateTransform.AngleProperty));
+                    sb.Children.Add(anim2);
+                }
 
                 _rotBorder = rotBorder;
                 _rotHalo = rotHalo;
-                rotBorder?.BeginAnimation(RotateTransform.AngleProperty, anim);
-                rotHalo?.BeginAnimation(RotateTransform.AngleProperty, anim.Clone());
+                _borderStoryboard = sb;
+                sb.Begin(this, true); // isControllable → pause/resume supported
+                _glowRunning = true;
+                GlowHalo.Opacity = CurrentGlowOpacity();
             }
             else
             {
@@ -471,12 +645,33 @@ public partial class LauncherWindow : Window
     {
         try
         {
+            _borderStoryboard?.Remove(this);
             _rotBorder?.BeginAnimation(RotateTransform.AngleProperty, null);
             _rotHalo?.BeginAnimation(RotateTransform.AngleProperty, null);
         }
         catch { }
         _rotBorder = null;
         _rotHalo = null;
+        _borderStoryboard = null;
+        _glowRunning = false;
+    }
+
+    private void PauseGlow()
+    {
+        try
+        {
+            if (_borderStoryboard is { } sb && _glowRunning) { sb.Pause(this); _glowRunning = false; }
+        }
+        catch { }
+    }
+
+    private void ResumeGlow()
+    {
+        try
+        {
+            if (_borderStoryboard is { } sb && !_glowRunning) { sb.Resume(this); _glowRunning = true; }
+        }
+        catch { }
     }
 
     /// <summary>Re-apply theme + border effect (used live by the settings window).</summary>
@@ -523,7 +718,4 @@ public partial class LauncherWindow : Window
         try { SettingsRequested?.Invoke(); }
         catch (Exception ex) { DiagnosticLogger.LogException("Window.Gear", ex); }
     }
-
-    private static Color FromHex(string hex) =>
-        (Color)ColorConverter.ConvertFromString(hex);
 }

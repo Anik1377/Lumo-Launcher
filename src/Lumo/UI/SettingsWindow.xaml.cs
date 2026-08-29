@@ -18,11 +18,12 @@ using RadioButton = System.Windows.Controls.RadioButton;
 namespace Lumo.UI;
 
 /// <summary>
-/// Advanced settings &amp; customization window (v1.2).
+/// Advanced settings &amp; customization window (v1.3, macOS System Settings style).
 ///
 /// Appearance edits apply LIVE (theme, accent, glow border style/speed) so the user
 /// sees the effect immediately on the launcher behind and in the preview strip.
 /// Everything is persisted only on Save; Cancel restores the snapshot taken at open.
+/// v1.3 — auto theme, UI-animations master switch, and animated page transitions.
 /// </summary>
 public partial class SettingsWindow : Window
 {
@@ -52,12 +53,31 @@ public partial class SettingsWindow : Window
         ApplySelfTheme();
         UpdatePreview();
         StartOwnBorder();
+        PlayEntrance();
 
         LogPathText.Text = "Log: " + AppPaths.LogFile;
         var ver = typeof(SettingsWindow).Assembly.GetName().Version;
-        string vs = ver is null ? "v1.2" : $"v{ver.Major}.{ver.Minor}";
+        string vs = ver is null ? "v1.3" : $"v{ver.Major}.{ver.Minor}";
         VersionText.Text = vs;
         AboutVersion.Text = vs;
+    }
+
+    /// <summary>Window springs in — fade + gentle scale, matching the launcher.</summary>
+    private void PlayEntrance()
+    {
+        try
+        {
+            if (!_settings.AnimationsEnabled) return;
+            RootScale.ScaleX = RootScale.ScaleY = 0.97;
+            Root.Opacity = 0;
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = ease };
+            var scale = new DoubleAnimation(0.97, 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = ease };
+            Root.BeginAnimation(OpacityProperty, fade);
+            RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+            RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.Entrance", ex); }
     }
 
     // ---------------------------------------------------------------- own chrome
@@ -65,6 +85,7 @@ public partial class SettingsWindow : Window
     /// <summary>The settings window itself gets the chat-style rotating border.</summary>
     private void StartOwnBorder()
     {
+        if (!_settings.AnimationsEnabled) return; // respect reduce-motion
         try
         {
             var anim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(7))
@@ -80,12 +101,14 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            bool dark = !string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase);
+            bool dark = _settings.EffectiveDark();
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
 
-            Color field = dark ? FromRgb(0x26, 0x29, 0x35) : FromRgb(0xF3, 0xF4, 0xF9);
-            Color card = dark ? FromRgb(0x23, 0x25, 0x30) : FromRgb(0xFB, 0xFB, 0xFE);
-            Color sidebar = dark ? FromRgb(0x1A, 0x1B, 0x22) : FromRgb(0xF2, 0xF3, 0xF8);
+            Color field = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xF5, 0xF5, 0xF7);
+            Color card = dark ? FromRgb(0x24, 0x24, 0x26) : Colors.White;
+            Color sidebar = dark ? FromRgb(0x1A, 0x1A, 0x1C) : FromRgb(0xF2, 0xF2, 0xF7);
+            Color segTrack = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xE9, 0xE9, 0xEB);
+            Color segSel = dark ? FromRgb(0x48, 0x48, 0x4A) : Colors.White;
 
             Resources["TitleBrush"] = new SolidColorBrush(p.Title);
             Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
@@ -93,9 +116,12 @@ public partial class SettingsWindow : Window
             Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
             Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
             Resources["SeparatorBrush"] = new SolidColorBrush(p.Separator);
+            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
             Resources["FieldBrush"] = new SolidColorBrush(field);
             Resources["CardBrush"] = new SolidColorBrush(card);
             Resources["SidebarBrush"] = new SolidColorBrush(sidebar);
+            Resources["SegTrackBrush"] = new SolidColorBrush(segTrack);
+            Resources["SegSelBrush"] = new SolidColorBrush(segSel);
 
             Root.Background = new SolidColorBrush(p.Panel);
             SettingsHalo.Background = new SolidColorBrush(Color.FromArgb(0x66, p.Accent.R, p.Accent.G, p.Accent.B));
@@ -115,6 +141,7 @@ public partial class SettingsWindow : Window
             _pendingStartWithWindows = StartupManager.IsEnabled();
             StartWithWindowsToggle.IsChecked = _pendingStartWithWindows;
             HideOnFocusLossToggle.IsChecked = _settings.HideOnFocusLoss;
+            AnimationsToggle.IsChecked = _settings.AnimationsEnabled;
 
             switch (_settings.WebEngine?.ToLowerInvariant())
             {
@@ -141,6 +168,8 @@ public partial class SettingsWindow : Window
 
             if (string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase))
                 ThemeLight.IsChecked = true;
+            else if (string.Equals(_settings.Theme, "auto", StringComparison.OrdinalIgnoreCase))
+                ThemeAuto.IsChecked = true;
             else
                 ThemeDark.IsChecked = true;
 
@@ -163,6 +192,17 @@ public partial class SettingsWindow : Window
                 _settings.HideOnFocusLoss = HideOnFocusLossToggle.IsChecked == true;
                 FooterHint.Text = "Saved on next launch · press Save to keep it";
             };
+            AnimationsToggle.Click += (_, _) =>
+            {
+                if (_suppress) return;
+                _settings.AnimationsEnabled = AnimationsToggle.IsChecked == true;
+                // restart or stop the settings window's own border animation live
+                if (_settings.AnimationsEnabled) StartOwnBorder();
+                else SettingsRotation.BeginAnimation(RotateTransform.AngleProperty, null);
+                FooterHint.Text = _settings.AnimationsEnabled
+                    ? "Animations on — press Save to keep them"
+                    : "Reduced motion — press Save to keep it";
+            };
             EngineGoogle.Checked += (_, _) => { if (!_suppress) _settings.WebEngine = "google"; };
             EngineBing.Checked += (_, _) => { if (!_suppress) _settings.WebEngine = "bing"; };
             EngineDdg.Checked += (_, _) => { if (!_suppress) _settings.WebEngine = "duckduckgo"; };
@@ -170,6 +210,7 @@ public partial class SettingsWindow : Window
             BorderEffectToggle.Click += (_, _) => SyncLiveAppearance();
             ThemeDark.Checked += (_, _) => SyncLiveAppearance();
             ThemeLight.Checked += (_, _) => SyncLiveAppearance();
+            ThemeAuto.Checked += (_, _) => SyncLiveAppearance();
             StyleAurora.Checked += (_, _) => SyncLiveAppearance();
             StyleSunset.Checked += (_, _) => SyncLiveAppearance();
             StyleOcean.Checked += (_, _) => SyncLiveAppearance();
@@ -196,7 +237,9 @@ public partial class SettingsWindow : Window
         if (_suppress) return;
         try
         {
-            _settings.Theme = ThemeLight.IsChecked == true ? "light" : "dark";
+            _settings.Theme =
+                ThemeLight.IsChecked == true ? "light" :
+                ThemeAuto.IsChecked == true ? "auto" : "dark";
             _settings.BorderEffect = BorderEffectToggle.IsChecked == true;
             _settings.BorderStyle =
                 StyleSunset.IsChecked == true ? "Sunset" :
@@ -509,13 +552,8 @@ public partial class SettingsWindow : Window
         if (_suppress || PanelGeneral is null) return;
         try
         {
-            string content = (sender as RadioButton)?.Content?.ToString() ?? "";
-            int idx =
-                content.Contains("Appearance") ? 1 :
-                content.Contains("Hotkey") ? 2 :
-                content.Contains("Search") ? 3 :
-                content.Contains("About") ? 4 : 0;
-            ShowPanel(idx);
+            if (sender is RadioButton { Tag: string raw } && int.TryParse(raw, out int idx))
+                ShowPanel(idx);
         }
         catch { }
     }
@@ -527,6 +565,30 @@ public partial class SettingsWindow : Window
         PanelHotkey.Visibility = idx == 2 ? Visibility.Visible : Visibility.Collapsed;
         PanelSearch.Visibility = idx == 3 ? Visibility.Visible : Visibility.Collapsed;
         PanelAbout.Visibility = idx == 4 ? Visibility.Visible : Visibility.Collapsed;
+
+        // v1.3 — gentle page transition: the incoming panel fades + slides up a touch
+        if (!_settings.AnimationsEnabled) return;
+        try
+        {
+            if (idx switch
+            {
+                0 => PanelGeneral,
+                1 => PanelAppearance,
+                2 => PanelHotkey,
+                3 => PanelSearch,
+                _ => (ScrollViewer?)PanelAbout,
+            } is not { } panel) return;
+
+            var tt = new TranslateTransform(0, 10);
+            panel.RenderTransform = tt;
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var dur = TimeSpan.FromMilliseconds(190);
+            tt.BeginAnimation(TranslateTransform.YProperty,
+                new DoubleAnimation(10, 0, dur) { EasingFunction = ease });
+            panel.BeginAnimation(UIElement.OpacityProperty,
+                new DoubleAnimation(0, 1, dur) { EasingFunction = ease });
+        }
+        catch { }
     }
 
     private void OnDragWindow(object sender, MouseButtonEventArgs e)

@@ -11,6 +11,19 @@ public sealed class ResultItem
     public string Glyph { get; init; } = "·";
     public string RunArgument { get; init; } = "";   // file path / url / shell command / expression result
     public ResultKind Kind { get; init; }
+
+    /// <summary>v1.3 — short label shown in the right-hand chip of a result row.</summary>
+    public string KindLabel => Kind switch
+    {
+        ResultKind.App => "App",
+        ResultKind.File => "File",
+        ResultKind.Calculator => "=",
+        ResultKind.Web => "Web",
+        ResultKind.Image => "Image",
+        ResultKind.Tool => "Tool",
+        ResultKind.Hint => "Tip",
+        _ => "",
+    };
 }
 
 public enum ResultKind
@@ -196,7 +209,7 @@ public sealed class SearchEngine
             new() { Title = "Empty Recycle Bin",   Subtitle = "No confirmation",                        Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:emptybin" },
             new() { Title = "Restart computer",    Subtitle = "shutdown /r /t 0",                       Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:restart" },
             new() { Title = "Shut down computer",  Subtitle = "shutdown /s /t 0",                       Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:shutdown" },
-            new() { Title = "Open settings window", Subtitle = "full customization UI (v1.2)",              Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
+            new() { Title = "Open settings window", Subtitle = "full customization UI (v1.3)",              Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
             new() { Title = "Open settings file",  Subtitle = "edit settings.json directly",               Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:settings" },
             new() { Title = "Open diagnostics log",Subtitle = AppPaths.LogFile,                         Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:log" },
         };
