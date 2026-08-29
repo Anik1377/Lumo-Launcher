@@ -93,6 +93,7 @@ public sealed class SearchEngine
             new() { Title = "W/  Web search", Subtitle = "e.g.  W/weather tomorrow", Glyph = "W", Kind = ResultKind.Hint, RunArgument = "W/" },
             new() { Title = "I/  Image search", Subtitle = "e.g.  I/mountain sunrise", Glyph = "I", Kind = ResultKind.Hint, RunArgument = "I/" },
             new() { Title = "U/  Utilities", Subtitle = "lock · sleep · restart · shutdown · empty bin", Glyph = "U", Kind = ResultKind.Hint, RunArgument = "U/" },
+            new() { Title = "Settings — customize Lumo", Subtitle = "themes · accent colour · glow border · hotkey · index", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
         };
 
         foreach (var app in _apps.Query("", 6))
@@ -195,7 +196,8 @@ public sealed class SearchEngine
             new() { Title = "Empty Recycle Bin",   Subtitle = "No confirmation",                        Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:emptybin" },
             new() { Title = "Restart computer",    Subtitle = "shutdown /r /t 0",                       Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:restart" },
             new() { Title = "Shut down computer",  Subtitle = "shutdown /s /t 0",                       Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:shutdown" },
-            new() { Title = "Open settings file",  Subtitle = "edit hotkey / theme / web engine",       Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:settings" },
+            new() { Title = "Open settings window", Subtitle = "full customization UI (v1.2)",              Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
+            new() { Title = "Open settings file",  Subtitle = "edit settings.json directly",               Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:settings" },
             new() { Title = "Open diagnostics log",Subtitle = AppPaths.LogFile,                         Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:log" },
         };
 

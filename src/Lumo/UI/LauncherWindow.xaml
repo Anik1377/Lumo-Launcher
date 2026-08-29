@@ -14,11 +14,28 @@
         Deactivated="OnDeactivated"
         PreviewKeyDown="OnPreviewKeyDown">
 
-    <Border x:Name="Root" CornerRadius="12" BorderThickness="1" Margin="8"
-            Background="#FF1E1F26" BorderBrush="#FF33364A">
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.45"/>
-        </Border.Effect>
+    <!-- v1.2: the outer grid leaves room for the glow halo that bleeds out behind the card -->
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- glow halo: same rotating gradient as the border, blurred, sitting behind the card -->
+        <Border x:Name="GlowHalo" CornerRadius="18" Margin="-6,-4" Opacity="0.42" IsHitTestVisible="False">
+            <Border.Effect>
+                <BlurEffect Radius="24"/>
+            </Border.Effect>
+        </Border>
+
+        <!-- main card -->
+        <Border x:Name="Root" CornerRadius="12" BorderThickness="1.4" Background="#FF1E1F26"
+                RenderTransformOrigin="0.5,0.5">
+            <Border.RenderTransform>
+                <TranslateTransform x:Name="RootShift" Y="0"/>
+            </Border.RenderTransform>
+            <Border.Effect>
+                <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.35"/>
+            </Border.Effect>
 
         <Grid Margin="0">
             <Grid.RowDefinitions>
@@ -106,9 +123,26 @@
                 <TextBlock x:Name="StatusText" Grid.Column="0" FontSize="11"
                            Foreground="{DynamicResource SubtitleBrush}"
                            Text="Starting…" TextTrimming="CharacterEllipsis"/>
-                <TextBlock Grid.Column="1" FontSize="11" Foreground="{DynamicResource SubtitleBrush}"
-                           Text="↑↓ select   Enter run   Esc close"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="SettingsGear" FontSize="11" Text="⚙ settings"
+                               Foreground="{DynamicResource SubtitleBrush}" Cursor="Hand"
+                               Background="Transparent" Padding="4,0"
+                               MouseLeftButtonUp="OnGearClick" Margin="0,0,12,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <TextBlock FontSize="11" Foreground="{DynamicResource SubtitleBrush}"
+                               Text="↑↓ select   Enter run   Esc close"/>
+                </StackPanel>
             </Grid>
         </Grid>
-    </Border>
+        </Border>
+    </Grid>
 </Window>

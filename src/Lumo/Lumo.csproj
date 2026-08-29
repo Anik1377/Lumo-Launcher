@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>1.1.0</Version>
-    <InformationalVersion>Lumo 1.1</InformationalVersion>
+    <Version>1.2.0</Version>
+    <InformationalVersion>Lumo 1.2</InformationalVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
@@ -20,5 +20,13 @@
     <DebugSymbols>false</DebugSymbols>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
+
+  <!-- UseWindowsForms injects global System.Drawing / System.Windows.Forms usings which
+       collide with WPF types (Brush, Color, Appearance, KeyEventArgs, ...). We only need
+       WinForms for the NotifyIcon tray icon, and TrayController imports it explicitly. -->
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
 
 </Project>

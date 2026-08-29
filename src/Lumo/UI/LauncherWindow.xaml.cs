@@ -3,10 +3,14 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Lumo.Core;
 using Lumo.Native;
 using Lumo.Services;
+using Appearance = Lumo.Services.Appearance;
+using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
 using Color = System.Windows.Media.Color;
 using ColorConverter = System.Windows.Media.ColorConverter;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
@@ -33,14 +37,21 @@ public partial class LauncherWindow : Window
     private HotkeyService? _hotkey;
     private bool _allowClose;
     private IntPtr _hwnd;
+    private Brush _themeBorderBrush = Brushes.DimGray;
+    private RotateTransform? _rotBorder;
+    private RotateTransform? _rotHalo;
 
     /// <summary>Human-readable description of the hotkey that actually registered.</summary>
     public string? ActiveHotkeyDescription => _hotkey?.ActiveDescription;
+
+    /// <summary>Raised when the user asks for the settings window (gear, Settings row).</summary>
+    public event Action? SettingsRequested;
 
     public LauncherWindow(Settings settings)
     {
         InitializeComponent();
         _settings = settings;
+        _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
         _engine = new SearchEngine(_apps, _files, _settings);
 
@@ -54,6 +65,7 @@ public partial class LauncherWindow : Window
         _statusTimer.Tick += (_, _) => { try { UpdateStatusText(); } catch { } };
 
         ApplyTheme();
+        ApplyBorderEffect();
     }
 
     // ---------------------------------------------------------------- lifecycle
@@ -132,7 +144,7 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            if (!IsVisible) { CenterNearCursor(); Show(); }
+            if (!IsVisible) { CenterNearCursor(); AnimateShow(); }
             if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 
             Activate();
@@ -142,6 +154,26 @@ public partial class LauncherWindow : Window
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("Window.ActivateLauncher", ex);
+        }
+    }
+
+    /// <summary>Small fade + slide-in animation — the launcher feels light, not like a popup.</summary>
+    private void AnimateShow()
+    {
+        try
+        {
+            Root.Opacity = 0;
+            RootShift.Y = -12;
+            Show();
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(130)) { EasingFunction = ease };
+            var slide = new DoubleAnimation(-12, 0, TimeSpan.FromMilliseconds(150)) { EasingFunction = ease };
+            Root.BeginAnimation(UIElement.OpacityProperty, fade);
+            RootShift.BeginAnimation(TranslateTransform.YProperty, slide);
+        }
+        catch
+        {
+            try { Root.Opacity = 1; RootShift.Y = 0; Show(); } catch { }
         }
     }
 
@@ -307,6 +339,13 @@ public partial class LauncherWindow : Window
         {
             if (Results.SelectedItem is not ResultItem item) return;
 
+            // v1.2: open the in-app settings window (not the settings folder)
+            if (item.RunArgument == "cmd:app-settings")
+            {
+                SettingsRequested?.Invoke();
+                return;
+            }
+
             switch (item.Kind)
             {
                 case ResultKind.Hint:
@@ -362,35 +401,127 @@ public partial class LauncherWindow : Window
         try
         {
             bool dark = !string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase);
+            var p = Appearance.PaletteFor(dark, _settings.AccentColor);
 
-            Color panel = dark ? FromHex("#FF1E1F26") : Colors.White;
-            Color border = dark ? FromHex("#FF33364A") : FromHex("#FFE2E4EC");
-            Color title = dark ? FromHex("#FFF2F3F7") : FromHex("#FF1B1D27");
-            Color subtitle = dark ? FromHex("#FF8A8FA3") : FromHex("#FF7A7F92");
-            Color hover = dark ? FromHex("#FF2E3140") : FromHex("#FFF0F1F7");
-            Color selected = dark ? FromHex("#FF3A3E52") : FromHex("#FFE4E6FB");
-            Color glyphBox = dark ? FromHex("#FF2E3140") : FromHex("#FFEFF0F8");
-            Color accent = FromHex("#FF7C6CFF");
-            Color separator = dark ? FromHex("#FF2A2C38") : FromHex("#FFECECF2");
+            Resources["TitleBrush"] = new SolidColorBrush(p.Title);
+            Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
+            Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
+            Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
+            Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
+            Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
 
-            Resources["TitleBrush"] = new SolidColorBrush(title);
-            Resources["SubtitleBrush"] = new SolidColorBrush(subtitle);
-            Resources["HoverBrush"] = new SolidColorBrush(hover);
-            Resources["SelectedBrush"] = new SolidColorBrush(selected);
-            Resources["GlyphBoxBrush"] = new SolidColorBrush(glyphBox);
-            Resources["AccentBrush"] = new SolidColorBrush(accent);
-
-            Root.Background = new SolidColorBrush(panel);
-            Root.BorderBrush = new SolidColorBrush(border);
-            Input.Foreground = new SolidColorBrush(title);
-            Input.CaretBrush = new SolidColorBrush(accent);
-            Separator.Background = new SolidColorBrush(separator);
-            PrefixBadge.Foreground = new SolidColorBrush(accent);
+            Root.Background = new SolidColorBrush(p.Panel);
+            _themeBorderBrush = new SolidColorBrush(p.Border);
+            Input.Foreground = new SolidColorBrush(p.Title);
+            Input.CaretBrush = new SolidColorBrush(p.Accent);
+            Separator.Background = new SolidColorBrush(p.Separator);
+            PrefixBadge.Foreground = new SolidColorBrush(p.Accent);
         }
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("Window.ApplyTheme", ex);
         }
+    }
+
+    /// <summary>
+    /// v1.2 — the "chat box" glow border: a rotating multi-colour gradient stroke on the
+    /// card plus a blurred copy of the same gradient glowing out behind the window.
+    /// Style / speed / on-off all come from Settings; when off we fall back to the
+    /// classic solid theme border.
+    /// </summary>
+    public void ApplyBorderEffect()
+    {
+        try
+        {
+            if (_settings.BorderEffect)
+            {
+                var borderBrush = Appearance.BuildBorderBrush(_settings.BorderStyle, _settings.AccentColor, out var rotBorder);
+                var haloBrush = Appearance.BuildHaloBrush(_settings.BorderStyle, _settings.AccentColor, out var rotHalo);
+
+                Root.BorderBrush = borderBrush;
+                GlowHalo.Background = haloBrush;
+                GlowHalo.Visibility = Visibility.Visible;
+
+                double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 3.5 : _settings.BorderSpeedSec;
+                sec = Math.Clamp(sec, 1.0, 12.0);
+                var anim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(sec))
+                {
+                    RepeatBehavior = RepeatBehavior.Forever,
+                };
+
+                _rotBorder = rotBorder;
+                _rotHalo = rotHalo;
+                rotBorder?.BeginAnimation(RotateTransform.AngleProperty, anim);
+                rotHalo?.BeginAnimation(RotateTransform.AngleProperty, anim.Clone());
+            }
+            else
+            {
+                StopBorderAnimation();
+                Root.BorderBrush = _themeBorderBrush;
+                GlowHalo.Visibility = Visibility.Collapsed;
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.ApplyBorderEffect", ex);
+        }
+    }
+
+    private void StopBorderAnimation()
+    {
+        try
+        {
+            _rotBorder?.BeginAnimation(RotateTransform.AngleProperty, null);
+            _rotHalo?.BeginAnimation(RotateTransform.AngleProperty, null);
+        }
+        catch { }
+        _rotBorder = null;
+        _rotHalo = null;
+    }
+
+    /// <summary>Re-apply theme + border effect (used live by the settings window).</summary>
+    public void RefreshAppearance()
+    {
+        ApplyTheme();
+        ApplyBorderEffect();
+    }
+
+    /// <summary>Re-register the global hotkey after the user changed it in Settings.</summary>
+    public string ReapplyHotkey()
+    {
+        try
+        {
+            if (_hotkey is null) return "(none)";
+            bool ok = _hotkey.TryRegister(out var active);
+            UpdateStatusText();
+            return ok ? active : "(none)";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.ReapplyHotkey", ex);
+            return "(none)";
+        }
+    }
+
+    /// <summary>Re-crawl the file system with the current index cap (Settings → Search).</summary>
+    public void RebuildIndex()
+    {
+        try
+        {
+            _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
+            _files.BeginIndexInBackground();
+            UpdateStatusText();
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.RebuildIndex", ex);
+        }
+    }
+
+    private void OnGearClick(object sender, MouseButtonEventArgs e)
+    {
+        try { SettingsRequested?.Invoke(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("Window.Gear", ex); }
     }
 
     private static Color FromHex(string hex) =>

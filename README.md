@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.1.0-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.2.0-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -14,7 +14,7 @@ calculations, web searches and system utilities — entirely from the keyboard.
 
 > 💾 **Download the ready-to-run exe from the
 > [Releases page](https://github.com/Anik1377/Lumo-Launcher/releases/latest)**
-> — extract `Lumo-launcher-x.y.z.zip` and run `Lumo\Lumo.exe`. No installer needed.
+> — extract the zip and run `Lumo.exe`. No installer needed.
 
 ---
 
@@ -24,26 +24,49 @@ calculations, web searches and system utilities — entirely from the keyboard.
 |---|---------|--------|
 | ⌨️ | **Keyboard-first** | Global hotkey (default `Alt+Space`) summons a centered search window anywhere in Windows |
 | 🚀 | **Command prefixes** | `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `U/` utilities |
-| 🔍 | **Hybrid file index** | Background crawl (up to 150,000 files) with instant quick-scan fallback while indexing |
+| 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
-| 🌗 | **Dark / light theme** | Toggle from the tray menu, persisted in `settings.json` |
-| 🧳 | **Truly portable** | One 228 KB exe, no installer, no registry changes |
+| 🎛️ | **Advanced Settings UI** | Sidebar settings window: General · Appearance · Hotkey · Search · About — all live-apply |
+| 🌈 | **Glow border effect** | Chat-bubble style animated gradient border + halo: 5 colour presets, solid accent, 3 speeds |
+| 🎨 | **Accent theming** | 8 accent presets + custom hex, applied across the launcher and settings window |
+| 🌗 | **Dark / light theme** | Toggle from the tray menu or Settings, persisted in `settings.json` |
+| ⏰ | **Start with Windows** | One toggle in Settings (per-user Run key, no admin rights) |
+| 🧳 | **Truly portable** | One ~260 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 80 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
+## 🆕 What's new in v1.2 — Advanced settings & customization
+
+1. **Full settings window** — open it from the launcher's `Settings` row, the
+   `⚙ settings` link in the status bar, the tray menu (`Settings…`), or type `U/settings`.
+   Five sections: **General** (start with Windows, hide on focus loss, web engine),
+   **Appearance** (theme, accent, glow border), **Hotkey**, **Search & Index**, **About**.
+2. **Glow border effect** — the animated multi-colour border around the launcher
+   (like modern chat bubbles): rotating gradient stroke + soft halo. Choose
+   Aurora / Sunset / Ocean / Ember / Mint / Solid accent, Fast / Normal / Slow,
+   or switch it off — everything applies **live** with a preview strip in Settings.
+3. **Hotkey recorder** — click the box, press your combo, hit *Apply*. No manual JSON
+   editing. Lumo tests the registration instantly and tells you the combo that won.
+4. **Accent colour** — 8 presets plus custom `#RRGGBB`, tinting badges, caret,
+   highlights and buttons across both windows.
+5. **Start with Windows** toggle and a **tunable index cap** (10k–300k) with
+   *Rebuild index now*.
+6. The launcher now fades/slides in when summoned.
+
+> ℹ️ **Why can't I use `Win+Space`?** It is reserved by Windows itself for switching
+> keyboard layouts — no application can register it (this was the v1.0 "hotkey never
+> works" report). Use Settings → Hotkey to pick any other combo, e.g. `Alt+Space`,
+> `Ctrl+Alt+Space` or `Win+Q`.
+
 ## 🐞 What was fixed in v1.1
 
-1. **Hotkey now works** — the old default `Win+Space` is reserved by Windows for input-language
-   switching, so it never fired. v1.1 defaults to `Alt+Space` and auto-falls back through
+1. **Hotkey now works** — the old default `Win+Space` is reserved by Windows; v1.1
+   defaults to `Alt+Space` and auto-falls back through
    `Ctrl+Alt+Space → Ctrl+Shift+Space → Ctrl+Alt+M → Win+Q`, logging every attempt.
-   The live combo is always shown in the window's status bar.
-2. **Shortcut launch fixed** — the window now appears immediately at first launch, and
-   double-clicking the shortcut while running pops up the existing instance via named-pipe
-   activation (no more "second launch does nothing").
-3. **Tray single-click** — one left-click on the tray icon opens the launcher; double-click
-   and a full right-click menu (Open / Theme / Settings / Exit) are also available.
-4. **No more freeze-crash on typing** — search was rebuilt as a bounded, synchronous,
-   in-memory pipeline; no blocking calls, no recursion in matching, all handlers guarded.
+2. **Shortcut launch fixed** — the window appears immediately, and re-running the
+   shortcut while Lumo runs pops up the existing instance via named-pipe activation.
+3. **Tray single-click** — one left-click opens the launcher; full right-click menu.
+4. **No more freeze-crash on typing** — bounded, synchronous, in-memory search pipeline.
 
 ## 📦 Installation
 
@@ -63,21 +86,29 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | `C/(1920*1080)/3` | calculator (Enter copies the result) |
 | `W/weather tomorrow` | web search — `W/example.com` opens a URL |
 | `I/aurora borealis` | image search |
-| `U/lock` | utilities: `lock` · `sleep` · `empty bin` · `restart` · `shutdown` · `open settings` · `open log` |
+| `U/lock` | utilities: `lock` · `sleep` · `empty bin` · `restart` · `shutdown` · `settings` · `log` |
 | `↑ ↓` / `Enter` / `Esc` | select / run / hide |
 
 ## ⚙️ Settings — `%APPDATA%\Lumo\settings.json`
+
+The Settings window writes this file for you; every key can still be edited by hand:
 
 ```json
 {
   "Hotkey": "Alt+Space",
   "Theme": "dark",
   "WebEngine": "google",
-  "HideOnFocusLoss": false
+  "HideOnFocusLoss": false,
+  "AccentColor": "#7C6CFF",
+  "BorderEffect": true,
+  "BorderStyle": "Aurora",
+  "BorderSpeedSec": 3.5,
+  "StartWithWindows": false,
+  "MaxIndexedFiles": 150000
 }
 ```
 
-`Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24` or `Space`.
+`Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24`, `Space` or `` ` ``.
 
 ## 🛠️ Building from source
 
@@ -93,7 +124,8 @@ with the zip attached automatically.
 
 ## 🗺️ Roadmap
 
-- [ ] Configurable hotkey UI (no manual JSON editing)
+- [x] Configurable hotkey UI (v1.2 — hotkey recorder in Settings)
+- [x] Glow border / visual customization (v1.2)
 - [ ] Plugin API for custom commands
 - [ ] Everything SDK backend for instant full-disk search
 - [ ] Result icons extracted from real shortcuts

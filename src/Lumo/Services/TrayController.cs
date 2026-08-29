@@ -7,27 +7,29 @@ namespace Lumo.Services;
 /// <summary>
 /// Tray icon controller.
 ///
-/// FIX (v1.1): previously only a DOUBLE-click on the tray icon opened the window.
-/// Now a single left-click opens/focuses it too; the right-click menu offers Open,
-/// theme toggle, the settings folder and Exit.
+/// v1.1: single left-click opens the window; right-click menu offers Open, theme toggle,
+/// the settings folder and Exit.
+/// v1.2: added a “Settings…” item that opens the full customization window.
 /// </summary>
 public sealed class TrayController : IDisposable
 {
     private readonly NotifyIcon _icon;
     private readonly Settings _settings;
     private readonly Action _openLauncher;
+    private readonly Action? _openSettings;
     private readonly Action _exit;
 
-    public TrayController(Settings settings, Action openLauncher, Action exit)
+    public TrayController(Settings settings, Action openLauncher, Action? openSettings, Action exit)
     {
         _settings = settings;
         _openLauncher = openLauncher;
+        _openSettings = openSettings;
         _exit = exit;
 
         _icon = new NotifyIcon
         {
             Icon = IconFactory.CreateAppIcon(32),
-            Text = "Lumo v1.1 — press Alt+Space",
+            Text = $"Lumo v1.2 — press {settings.Hotkey}",
             Visible = true,
         };
 
@@ -37,6 +39,7 @@ public sealed class TrayController : IDisposable
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open Lumo", null, (_, _) => Safe(_openLauncher));
+        menu.Items.Add("Settings…", null, (_, _) => { if (_openSettings is not null) Safe(_openSettings); });
         menu.Items.Add(new ToolStripSeparator());
 
         var themeItem = new ToolStripMenuItem("Toggle light/dark theme");
@@ -57,6 +60,12 @@ public sealed class TrayController : IDisposable
 
     /// <summary>Raised when the user toggles the theme from the tray menu.</summary>
     public event Action? ThemeChanged;
+
+    /// <summary>Update the tray tooltip (e.g. after the hotkey changed in Settings).</summary>
+    public void UpdateText(string text)
+    {
+        try { _icon.Text = text.Length > 63 ? text[..63] : text; } catch { }
+    }
 
     private void OnMouseClick(object? sender, MouseEventArgs e)
     {

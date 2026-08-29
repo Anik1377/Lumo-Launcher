@@ -12,6 +12,7 @@ public partial class App : Application
     private Mutex? _mutex;
     private TrayController? _tray;
     private LauncherWindow? _window;
+    private SettingsWindow? _settingsWindow;
     private Settings _settings = new();
 
     protected override void OnStartup(StartupEventArgs e)
@@ -35,7 +36,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.1 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v1.2 starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -53,12 +54,18 @@ public partial class App : Application
             _window = new LauncherWindow(_settings);
             MainWindow = _window;
 
+            _window.SettingsRequested += () =>
+            {
+                try { OpenSettings(); } catch (Exception ex) { DiagnosticLogger.LogException("App.OpenSettings", ex); }
+            };
+
             SingleInstance.StartShowServer(() =>
                 Dispatcher.InvokeAsync(() => _window.ActivateLauncher()));
 
             _tray = new TrayController(
                 _settings,
                 openLauncher: () => Dispatcher.InvokeAsync(() => _window.ActivateLauncher()),
+                openSettings: () => Dispatcher.InvokeAsync(OpenSettings),
                 exit: () => Dispatcher.InvokeAsync(() =>
                 {
                     _window.PrepareForExit();
@@ -82,6 +89,39 @@ public partial class App : Application
                 "Details were written to:\n" + AppPaths.LogFile + "\n\n" + ex.Message,
                 "Lumo", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(-1);
+        }
+    }
+
+    /// <summary>Open (or focus) the v1.2 settings window — singleton per app lifetime.</summary>
+    private void OpenSettings()
+    {
+        try
+        {
+            if (_settingsWindow is { IsLoaded: true })
+            {
+                _settingsWindow.Activate();
+                return;
+            }
+
+            _settingsWindow = new SettingsWindow(
+                _settings,
+                applyAppearance: () => { try { _window?.RefreshAppearance(); } catch { } },
+                applyHotkey: () =>
+                {
+                    string active = _window?.ReapplyHotkey() ?? "(none)";
+                    try { _tray?.UpdateText($"Lumo v1.2 — press {active}"); } catch { }
+                    return active;
+                },
+                rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } });
+
+            _settingsWindow.Topmost = true; // stay above other apps while customizing
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsWindow.Show();
+            _settingsWindow.Activate();
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("App.OpenSettings", ex);
         }
     }
 

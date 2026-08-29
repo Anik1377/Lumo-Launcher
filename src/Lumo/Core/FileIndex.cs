@@ -13,7 +13,9 @@ public sealed record FileEntry(string Name, string FullPath);
 /// </summary>
 public sealed class FileIndex
 {
-    private const int MaxEntries = 150_000;
+    /// <summary>Cap on indexed files — user-tunable from Settings → Search (v1.2).</summary>
+    public int MaxEntries { get; set; } = 150_000;
+
     private const int MaxDepth = 14;
 
     private static readonly string[] SkippedDirNames =
