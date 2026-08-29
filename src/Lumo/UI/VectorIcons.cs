@@ -81,6 +81,10 @@ public static class VectorIcons
         // equal — "=" calculator result
         ["equal"] = "M5.5 9.5 h13 M5.5 14.5 h13",
 
+        // close — "✕" clear / cancel rows (v1.7.1: the glyph mapped to a "close" key
+        // that never existed in this dictionary, so those rows rendered an empty tile)
+        ["close"] = CloseData,
+
         // alert — "!" errors
         ["alert"] = "M12 4.5 v9 M10.7 17.5 a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0",
 

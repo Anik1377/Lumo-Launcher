@@ -1,6 +1,21 @@
 ======================================================
-  LUMO v1.7.0  —  universal launcher for Windows
+  LUMO v1.7.1  —  universal launcher for Windows
 ======================================================
+
+WHAT'S NEW IN v1.7.1 (Enter-key fixes)
+--------------------------------------
+1. FIXED - pressing Enter on a clipboard-history
+   entry (H/) did nothing. It now copies the entry
+   and hides the launcher, ready to paste.
+2. FIXED - after typing, the launcher pre-selected
+   the section header row ("APPS"), so Enter did
+   nothing until you pressed Down once. The first
+   actionable result is selected automatically now.
+3. FIXED - Up/Down arrows skip the section header
+   rows instead of highlighting them.
+4. FIXED - "Clear clipboard history" and other "x"
+   rows showed an empty icon tile (missing vector
+   icon mapping).
 
 WHAT'S NEW IN v1.7 (the Glass update)
 -------------------------------------

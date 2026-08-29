@@ -468,9 +468,13 @@ public partial class LauncherWindow : Window
         try
         {
             Results.ItemsSource = items;
+            // v1.7.1 — never pre-select a section header ("APPS", "CLIPBOARD HISTORY"…):
+            // Enter is a no-op there, so the launcher felt dead right after typing.
+            // Land on the first actionable row instead.
             if (items.Count > 0)
             {
-                Results.SelectedIndex = 0;
+                int sel = items.FindIndex(i => i.Kind != ResultKind.Header);
+                Results.SelectedIndex = sel >= 0 ? sel : 0;
                 Results.ScrollIntoView(Results.SelectedItem);
             }
 
@@ -523,7 +527,15 @@ public partial class LauncherWindow : Window
     private void MoveSelection(int delta)
     {
         if (Results.Items.Count == 0) return;
-        int next = Math.Clamp(Results.SelectedIndex + delta, 0, Results.Items.Count - 1);
+        int n = Results.Items.Count;
+        int next = Results.SelectedIndex;
+        // v1.7.1 — step over section header rows; they are labels, not selectable actions
+        do
+        {
+            next += delta;
+            if (next < 0 || next >= n) return;   // hit the end — stay where we are
+        }
+        while (Results.Items[next] is ResultItem { Kind: ResultKind.Header });
         Results.SelectedIndex = next;
         Results.ScrollIntoView(Results.SelectedItem);
     }
@@ -619,6 +631,18 @@ public partial class LauncherWindow : Window
                     StatusText.Text = "Copied: " + item.RunArgument;
                     HideAnimated();
                     break;
+
+                // v1.7.1 — clipboard rows had NO Enter case: pressing Enter on an
+                // H/ entry silently did nothing (the subtitle even promised "Enter
+                // to copy again"). Route it like the calculator: copy, confirm, hide.
+                case ResultKind.Clipboard:
+                    _engine.Execute(item); // copies the entry back to the clipboard
+                    StatusText.Text = "Copied to clipboard";
+                    HideAnimated();
+                    break;
+
+                case ResultKind.Header:
+                    break;   // section labels are not actions — ignore Enter on them
 
                 case ResultKind.App:
                 case ResultKind.File:

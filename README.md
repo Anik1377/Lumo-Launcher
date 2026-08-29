@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.0-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.7.1-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -41,6 +41,21 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~340 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v1.7.1 — Enter-key fixes
+
+1. **Enter on a clipboard-history entry now actually copies** — the `H/` list
+   promised "Enter to copy again" but the Enter key had no route for clipboard
+   rows (silent no-op since v1.6). Picking an entry now copies it and hides the
+   launcher, ready to paste.
+2. **Enter works on the first result again** — typed searches open with a Raycast-style
+   section header ("APPS"…) as row zero, and the launcher pre-selected *it*, so
+   pressing Enter did nothing until you arrowed down once. The first actionable
+   row is now selected automatically.
+3. **Arrow keys skip section headers** — Up/Down no longer land the selection on
+   "APPS" / "FILES" / "CLIPBOARD HISTORY" title rows.
+4. **Fixed empty icon tiles** — rows using the "✕" glyph (e.g. *Clear clipboard
+   history*) mapped to a vector-icon key that didn't exist, rendering a blank tile.
 
 ## 🆕 What's new in v1.7 — the Glass update
 
