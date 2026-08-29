@@ -15,6 +15,7 @@ public partial class App : Application
     private SettingsWindow? _settingsWindow;
     private Settings _settings = new();
     private ShortcutStore? _shortcuts;
+    private MacroRecorder? _recorder;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -37,7 +38,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.4.1 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v1.5 starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -53,7 +54,8 @@ public partial class App : Application
 
             _settings = Settings.Load();
             _shortcuts = new ShortcutStore();
-            _window = new LauncherWindow(_settings, _shortcuts);
+            _recorder = new MacroRecorder();
+            _window = new LauncherWindow(_settings, _shortcuts, _recorder);
             MainWindow = _window;
 
             _window.SettingsRequested += () =>
@@ -69,6 +71,20 @@ public partial class App : Application
             _window.ManageShortcutsRequested += () =>
             {
                 try { OpenSettings(initialPage: 4); } catch (Exception ex) { DiagnosticLogger.LogException("App.ManageShortcuts", ex); }
+            };
+
+            // v1.5 — a finished recording opens the visual builder with the captured steps
+            _window.RecordFinishRequested += (steps, name) =>
+            {
+                try
+                {
+                    if (_shortcuts is null) return;
+                    var dlg = new ShortcutEditorWindow(_shortcuts, _settings, existing: null,
+                                                       presetName: name, presetSteps: steps);
+                    dlg.Owner = _window is { IsLoaded: true } ? _window : null;
+                    dlg.ShowDialog();
+                }
+                catch (Exception ex) { DiagnosticLogger.LogException("App.RecordFinish", ex); }
             };
 
             SingleInstance.StartShowServer(() =>
@@ -122,11 +138,12 @@ public partial class App : Application
                 applyHotkey: () =>
                 {
                     string active = _window?.ReapplyHotkey() ?? "(none)";
-                    try { _tray?.UpdateText($"Lumo v1.4.1 — press {active}"); } catch { }
+                    try { _tray?.UpdateText($"Lumo v1.5 — press {active}"); } catch { }
                     return active;
                 },
                 rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } },
                 shortcuts: _shortcuts,
+                recordMacro: StartRecording,
                 initialPage: initialPage);
 
             _settingsWindow.Topmost = true; // stay above other apps while customizing
@@ -140,13 +157,15 @@ public partial class App : Application
         }
     }
 
-    /// <summary>v1.4 — open the shortcut editor (optionally pre-filling a name).</summary>
-    private void OpenShortcutEditor(string? presetName)
+    /// <summary>v1.4/1.5 — open the shortcut editor (optionally pre-filling a name
+    /// and/or the steps captured by the macro recorder).</summary>
+    private void OpenShortcutEditor(string? presetName, List<MacroStep>? presetSteps = null, string? nameOverride = null)
     {
         try
         {
             if (_shortcuts is null) return;
-            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, existing: null, presetName);
+            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, existing: null,
+                                               presetName: nameOverride ?? presetName, presetSteps: presetSteps);
             dlg.Owner = _window is { IsLoaded: true } ? _window : null;
             dlg.ShowDialog();
         }
@@ -154,6 +173,28 @@ public partial class App : Application
         {
             DiagnosticLogger.LogException("App.OpenShortcutEditor", ex);
         }
+    }
+
+    /// <summary>v1.5 — start a macro recording and surface the launcher to capture launches.</summary>
+    private void StartRecording()
+    {
+        try
+        {
+            _recorder?.Start();
+            Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    _window?.ActivateLauncher();
+                    if (_window is not null)
+                    {
+                        _window.RefreshStatusForRecording();
+                    }
+                }
+                catch { }
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("App.StartRecording", ex); }
     }
 
     protected override void OnExit(ExitEventArgs e)

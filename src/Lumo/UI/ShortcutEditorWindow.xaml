@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Lumo Shortcut"
-        Width="500" SizeToContent="Height"
-        MaxHeight="640"
+        Width="520" SizeToContent="Height"
+        MaxHeight="700"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -111,6 +111,33 @@
             </Setter>
         </Style>
 
+        <!-- tiny round icon button for step cards (▲ ▼ ✕) -->
+        <Style x:Key="StepMiniButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="13">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="FieldLabel" TargetType="TextBlock">
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -153,7 +180,7 @@
                                ToolTip="Close (Esc)"/>
                 </Grid>
 
-                <TextBlock Text="Run it any time by typing  /sc name  in Lumo" FontSize="11.5"
+                <TextBlock x:Name="SubtitleText" Text="Run it any time by typing  /sc name  in Lumo" FontSize="11.5"
                            Foreground="{DynamicResource SubtitleBrush}" Margin="1,4,0,14"/>
 
                 <!-- name -->
@@ -192,15 +219,122 @@
                                Text="e.g.  github.com  or  https://mail.google.com"/>
                 </StackPanel>
 
-                <!-- macro steps -->
+                <!-- ================= macro visual builder (v1.5) ================= -->
                 <StackPanel x:Name="MacroPanel" Margin="0,14,0,0" Visibility="Collapsed">
-                    <TextBlock Text="STEPS — ONE TARGET PER LINE" Style="{StaticResource FieldLabel}"/>
-                    <TextBox x:Name="StepsBox" Style="{StaticResource FieldBox}" AcceptsReturn="True"
-                             TextWrapping="Wrap" Height="88" FontSize="12.5"
-                             VerticalScrollBarVisibility="Auto"
-                             VerticalContentAlignment="Top"/>
-                    <TextBlock Style="{StaticResource FieldHint}"
-                               Text="Each line opens when the macro runs — URLs, files or folders, up to 12."/>
+
+                    <TextBlock Text="ACTIONS" Style="{StaticResource FieldLabel}"/>
+
+                    <!-- steps card list -->
+                    <Border Background="{DynamicResource SegTrackBrush}" CornerRadius="12" Padding="7">
+                        <Grid>
+                            <ScrollViewer x:Name="StepsScroll" MaxHeight="210" VerticalScrollBarVisibility="Auto">
+                                <ItemsControl x:Name="StepsList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border x:Name="CardBd" Background="{DynamicResource FieldBrush}"
+                                                    CornerRadius="9" Padding="9,7" Margin="0,0,0,6" Cursor="Hand"
+                                                    BorderBrush="Transparent" BorderThickness="1"
+                                                    MouseLeftButtonUp="OnStepCardClick">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+
+                                                    <Border Width="26" Height="26" CornerRadius="7"
+                                                            Background="{DynamicResource SegTrackBrush}">
+                                                        <TextBlock Text="{Binding Glyph}" FontFamily="Segoe MDL2 Assets"
+                                                                   FontSize="11.5" Foreground="{DynamicResource AccentBrush}"
+                                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                    </Border>
+
+                                                    <StackPanel Grid.Column="1" Margin="9,0,6,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding TypeLabel}" FontSize="10" FontWeight="SemiBold"
+                                                                   Foreground="{DynamicResource SubtitleBrush}"/>
+                                                        <TextBlock Text="{Binding Describe}" FontSize="12"
+                                                                   Foreground="{DynamicResource TitleBrush}"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Button Style="{StaticResource StepMiniButton}" Content="&#xE74A;"
+                                                                ToolTip="Move up" Click="OnStepUp"/>
+                                                        <Button Style="{StaticResource StepMiniButton}" Content="&#xE74B;"
+                                                                ToolTip="Move down" Click="OnStepDown"/>
+                                                        <Button Style="{StaticResource StepMiniButton}" Content="&#xE74D;"
+                                                                ToolTip="Remove" Click="OnStepDelete"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                    <Setter TargetName="CardBd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+
+                            <TextBlock x:Name="StepsEmpty" Text="No actions yet — tap “Add action” below, or record steps from the launcher."
+                                       FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}"
+                                       Margin="6,10,6,10" TextWrapping="Wrap"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- add / test row -->
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="AddActionButton" Content="＋  Add action" Style="{StaticResource GhostButton}"
+                                HorizontalAlignment="Stretch" Click="OnAddActionClick"/>
+                        <Button Grid.Column="1" Content="▶  Test run" Style="{StaticResource GhostButton}"
+                                Margin="8,0,0,0" Click="OnTestRunClick" ToolTip="Runs the macro now"/>
+                    </Grid>
+
+                    <!-- inline action editor -->
+                    <Border x:Name="StepEditorPanel" Background="{DynamicResource SegTrackBrush}" CornerRadius="12"
+                            Padding="10" Margin="0,8,0,0" Visibility="Collapsed">
+                        <StackPanel>
+                            <WrapPanel>
+                                <RadioButton x:Name="StepApp" Content="Open App" Style="{StaticResource TypeRadio}"
+                                             GroupName="StepType" IsChecked="True" Checked="OnStepTypeChanged"/>
+                                <RadioButton x:Name="StepUrl" Content="Open URL" Style="{StaticResource TypeRadio}"
+                                             GroupName="StepType" Checked="OnStepTypeChanged"/>
+                                <RadioButton x:Name="StepFile" Content="Open File" Style="{StaticResource TypeRadio}"
+                                             GroupName="StepType" Checked="OnStepTypeChanged"/>
+                                <RadioButton x:Name="StepFolder" Content="Open Folder" Style="{StaticResource TypeRadio}"
+                                             GroupName="StepType" Checked="OnStepTypeChanged"/>
+                                <RadioButton x:Name="StepWait" Content="Wait" Style="{StaticResource TypeRadio}"
+                                             GroupName="StepType" Checked="OnStepTypeChanged"/>
+                                <RadioButton x:Name="StepClip" Content="Clipboard" Style="{StaticResource TypeRadio}"
+                                             GroupName="StepType" Checked="OnStepTypeChanged"/>
+                            </WrapPanel>
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="StepArgBox" Style="{StaticResource FieldBox}" MinHeight="34" FontSize="12.5"/>
+                                <Button x:Name="StepBrowseButton" Grid.Column="1" Content="Browse…"
+                                        Style="{StaticResource GhostButton}" Margin="8,0,0,0" Click="OnStepBrowseClick"/>
+                            </Grid>
+
+                            <TextBlock x:Name="StepArgHint" Style="{StaticResource FieldHint}"
+                                       Text="Path to the program, document or shortcut (.lnk). %ENV% supported."/>
+
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                                <Button x:Name="CancelEditButton" Content="Cancel" Style="{StaticResource GhostButton}"
+                                        Visibility="Collapsed" Click="OnCancelEditClick"/>
+                                <Button x:Name="AddStepButton" Content="Add step" Style="{StaticResource AccentButton}"
+                                        Margin="8,0,0,0" Click="OnAddStepConfirmClick"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- keywords -->
@@ -212,6 +346,8 @@
                 <!-- validation + buttons -->
                 <TextBlock x:Name="ErrorText" FontSize="11.5" Foreground="#FF6A6A" Margin="2,10,0,0"
                            Visibility="Collapsed" TextWrapping="Wrap"/>
+                <TextBlock x:Name="RunInfoText" FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}"
+                           Margin="2,10,0,0" Visibility="Collapsed" TextWrapping="Wrap"/>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
                     <Button Content="Cancel" Style="{StaticResource GhostButton}" Click="OnCancelClick"/>

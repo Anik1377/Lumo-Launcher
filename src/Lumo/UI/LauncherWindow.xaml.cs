@@ -35,6 +35,7 @@ public partial class LauncherWindow : Window
     private readonly FileIndex _files = new();
     private readonly SearchEngine _engine;
     private readonly ShortcutStore? _shortcuts;   // v1.4
+    private readonly MacroRecorder? _recorder;    // v1.5
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
     private HotkeyService? _hotkey;
@@ -65,14 +66,18 @@ public partial class LauncherWindow : Window
     /// <summary>v1.4 — user asked to manage shortcuts (opens settings → Shortcuts).</summary>
     public event Action? ManageShortcutsRequested;
 
-    public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null)
+    /// <summary>v1.5 — recording finished; App opens the builder with the captured steps.</summary>
+    public event Action<List<MacroStep>, string?>? RecordFinishRequested;
+
+    public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null)
     {
         InitializeComponent();
         _settings = settings;
         _shortcuts = shortcuts;
+        _recorder = recorder;
         _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
-        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts);
+        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder);
 
         _debounce = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -530,6 +535,39 @@ public partial class LauncherWindow : Window
                 return;
             }
 
+            // v1.5 — macro recording flow
+            if (item.RunArgument == "cmd:record-macro")
+            {
+                _recorder?.Start();
+                UpdateStatusText();
+                RunSearch();
+                StatusText.Text = "● Recording — launch apps, files or URLs; finish with “Stop & save”";
+                return;
+            }
+            if (item.RunArgument == "cmd:record-stop")
+            {
+                var steps = _recorder?.Stop() ?? new List<MacroStep>();
+                string? name = _recorder?.Name;
+                UpdateStatusText();
+                RunSearch();
+                if (steps.Count == 0)
+                {
+                    StatusText.Text = "Nothing recorded — launch apps, files or URLs while recording";
+                    return;
+                }
+                HideAnimated();
+                RecordFinishRequested?.Invoke(steps, name);
+                return;
+            }
+            if (item.RunArgument == "cmd:record-cancel")
+            {
+                _recorder?.Cancel();
+                UpdateStatusText();
+                RunSearch();
+                StatusText.Text = "Recording cancelled";
+                return;
+            }
+
             switch (item.Kind)
             {
                 case ResultKind.Hint:
@@ -555,7 +593,16 @@ public partial class LauncherWindow : Window
                 case ResultKind.Shortcut:
                     PauseGlow();
                     var error = _engine.Execute(item); // launch first, then hide on success
-                    if (error is null) Hide();
+                    if (error is null)
+                    {
+                        if (_recorder is { Active: true })
+                        {
+                            // v1.5 — during a recording the launcher stays open and counts steps
+                            StatusText.Text = $"● Recorded {_recorder.Count} — launch more, or “Stop & save”";
+                            if (item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web) RunSearch();
+                        }
+                        else Hide();
+                    }
                     else
                     {
                         StatusText.Text = error; // stay open and tell the user what failed
@@ -576,6 +623,14 @@ public partial class LauncherWindow : Window
     {
         try
         {
+            if (_recorder is { Active: true })
+            {
+                StatusText.Text = $"● REC — {_recorder.Count} step{(_recorder.Count == 1 ? "" : "s")} captured · launch apps / files / URLs";
+                StatusText.Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x5A, 0x5A));
+                return;
+            }
+            StatusText.Foreground = (Brush)FindResource("SubtitleBrush");
+
             string hotkey = _hotkey?.ActiveDescription ?? "—";
             string fallback = _hotkey is { UsedFallback: true } ? " (fallback)" : "";
             string files = _files.Ready
@@ -585,6 +640,12 @@ public partial class LauncherWindow : Window
             StatusText.Text = $"Hotkey {hotkey}{fallback} · {files} · apps {_apps.Entries.Count:N0}";
         }
         catch { }
+    }
+
+    /// <summary>v1.5 — App started a recording (e.g. from Settings): refresh status + rows.</summary>
+    public void RefreshStatusForRecording()
+    {
+        try { UpdateStatusText(); RunSearch(); } catch { }
     }
 
     public void ApplyTheme()

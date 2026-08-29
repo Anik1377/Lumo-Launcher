@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.4.1-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.5.0-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -36,6 +36,21 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~260 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v1.5 — macro recorder & visual builder
+
+1. **⏺ Record macros** — hit *Record a macro* (empty view, `/` view, or Settings →
+   Shortcuts), then just launch apps, files and URLs through Lumo. Every launch is
+   captured as a step. *Stop & save* opens the builder with everything you did —
+   no key logging, no global hooks, only Lumo's own launches.
+2. **Visual builder (Apple Shortcuts style)** — macros are now editable action
+   cards: tap to edit, reorder with ▲▼, remove with ✕, add actions from a type
+   palette. **▶ Test run** executes the draft instantly.
+3. **New action types** — beyond Open App / URL / File / Folder, macros now
+   support **Wait** (100–60000 ms pause) and **Clipboard** (copy text). Up to
+   **30 steps** per macro (was 12).
+4. **Safer runs** — macros validate before running and execute on a background
+   thread, so waits never freeze the launcher; one failing step doesn't stop the rest.
 
 ## 🆕 What's new in v1.4.1 — real app icons in results
 

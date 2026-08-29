@@ -33,6 +33,7 @@ public partial class SettingsWindow : Window
     private readonly Func<string> _applyHotkey;
     private readonly Action _rebuildIndex;
     private readonly ShortcutStore _shortcuts;   // v1.4
+    private readonly Action? _recordMacro;       // v1.5
     private int _initialPage = 0;
 
     private readonly List<(Border Box, string Hex)> _swatches = new();
@@ -42,7 +43,7 @@ public partial class SettingsWindow : Window
     private RotateTransform? _previewRotation;
 
     public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex,
-                          ShortcutStore? shortcuts = null, int initialPage = 0)
+                          ShortcutStore? shortcuts = null, Action? recordMacro = null, int initialPage = 0)
     {
         InitializeComponent();
         _settings = settings;
@@ -51,6 +52,7 @@ public partial class SettingsWindow : Window
         _applyHotkey = applyHotkey;
         _rebuildIndex = rebuildIndex;
         _shortcuts = shortcuts ?? new ShortcutStore();
+        _recordMacro = recordMacro;
         _initialPage = initialPage;
 
         BuildAccentSwatches();
@@ -111,6 +113,17 @@ public partial class SettingsWindow : Window
             LoadShortcutList();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.NewShortcut", ex); }
+    }
+
+    /// <summary>v1.5 — record a macro from Settings: start the recorder, surface the launcher.</summary>
+    private void OnRecordMacro(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (Owner is { } o) o.Activate();
+            _recordMacro?.Invoke();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.RecordMacro", ex); }
     }
 
     private void OnEditShortcut(object sender, RoutedEventArgs e)

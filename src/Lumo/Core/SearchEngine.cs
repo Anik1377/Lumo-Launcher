@@ -56,10 +56,11 @@ public sealed class SearchEngine
     private readonly FileIndex _files;
     private readonly Settings _settings;
     private readonly ShortcutStore? _shortcuts;   // v1.4
+    private readonly MacroRecorder? _recorder;    // v1.5
 
-    public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null)
+    public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null)
     {
-        _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts;
+        _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts; _recorder = recorder;
     }
 
     public List<ResultItem> Search(string rawQuery)
@@ -126,6 +127,9 @@ public sealed class SearchEngine
             new() { Title = "Settings — customize Lumo", Subtitle = "themes · accent colour · glow border · hotkey · index", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
         };
 
+        // v1.5 — record a macro straight from the empty view
+        AddRecordRows(rows, "");
+
         // v1.4 — surface the most useful saved shortcuts right on the empty view
         if (_shortcuts is { Count: > 0 })
         {
@@ -141,6 +145,37 @@ public sealed class SearchEngine
 
     // ---------------------------------------------------------------- shortcuts (v1.4)
 
+    /// <summary>v1.5 — record rows for the default and /sc views.</summary>
+    private void AddRecordRows(List<ResultItem> rows, string q)
+    {
+        if (_recorder is null) return;
+        if (_recorder.Active)
+        {
+            int n = _recorder.Count;
+            rows.Add(new ResultItem
+            {
+                Title = $"⏺ Stop & save ({n} step{(n == 1 ? "" : "s")})",
+                Subtitle = "open the builder with everything you just launched",
+                Glyph = "⏺", Kind = ResultKind.Tool, RunArgument = "cmd:record-stop",
+            });
+            rows.Add(new ResultItem
+            {
+                Title = "✕ Cancel recording",
+                Subtitle = "throw the captured steps away",
+                Glyph = "✕", Kind = ResultKind.Tool, RunArgument = "cmd:record-cancel",
+            });
+        }
+        else
+        {
+            rows.Add(new ResultItem
+            {
+                Title = "⏺ Record a macro",
+                Subtitle = "launch things in Lumo — they become the steps (Apple-Shortcuts style)",
+                Glyph = "⏺", Kind = ResultKind.Tool, RunArgument = "cmd:record-macro",
+            });
+        }
+    }
+
     private static ResultItem ShortcutRow(ShortcutDef def) => new()
     {
         Title = def.Name,
@@ -154,6 +189,9 @@ public sealed class SearchEngine
     private List<ResultItem> ShortcutRows(string q)
     {
         var rows = new List<ResultItem>();
+
+        // v1.5 — recording controls on top
+        AddRecordRows(rows, q);
 
         // management rows always available
         rows.Add(string.IsNullOrWhiteSpace(q)
@@ -339,10 +377,12 @@ public sealed class SearchEngine
             {
                 case ResultKind.App or ResultKind.File:
                     OpenPath(item.RunArgument);
+                    _recorder?.Capture(item);           // v1.5 — feed the macro recorder
                     break;
 
                 case ResultKind.Web or ResultKind.Image:
                     OpenUrl(item.RunArgument);
+                    if (item.Kind == ResultKind.Web) _recorder?.Capture(item);   // v1.5
                     break;
 
                 case ResultKind.Calculator:
@@ -389,13 +429,14 @@ public sealed class SearchEngine
         {
             if (def.IsMacro)
             {
-                int launched = 0;
-                foreach (var step in def.Steps.Where(s => !string.IsNullOrWhiteSpace(s)).Take(12))
-                {
-                    OpenAnyTarget(step.Trim());
-                    launched++;
-                }
-                return launched == 0 ? "Macro has no valid steps — edit it in Settings → Shortcuts" : null;
+                var steps = MacroProgram.FromDef(def);
+                string? invalid = MacroProgram.Validate(steps);
+                if (invalid is not null)
+                    return $"Macro “{def.Name}” — {invalid} (edit it in Settings → Shortcuts)";
+
+                // waits / many launches must never freeze the launcher — run on a worker
+                _ = Task.Run(() => RunMacroSteps(steps));
+                return null;
             }
 
             OpenAnyTarget(def.Target);
@@ -406,6 +447,58 @@ public sealed class SearchEngine
             Services.DiagnosticLogger.LogException("SearchEngine.RunShortcut", ex);
             return $"Shortcut “{def.Name}” failed — {ex.InnerException?.Message ?? ex.Message}";
         }
+    }
+
+    // ---------------------------------------------------------------- macro engine (v1.5)
+
+    /// <summary>
+    /// Runs a parsed macro program on a worker thread. Each step is isolated:
+    /// one failure is logged and the remaining steps still run. Clipboard steps
+    /// hop to the UI thread (STA requirement).
+    /// </summary>
+    public static void RunMacroSteps(IReadOnlyList<MacroStep> steps)
+    {
+        for (int i = 0; i < steps.Count; i++)
+        {
+            var s = steps[i];
+            try
+            {
+                switch (s.Type)
+                {
+                    case "wait":
+                        Thread.Sleep(s.WaitMs);
+                        break;
+
+                    case "clip":
+                        var disp = System.Windows.Application.Current?.Dispatcher;
+                        if (disp is null) TrySetClipboard(s.Arg);
+                        else disp.Invoke(() => TrySetClipboard(s.Arg));
+                        break;
+
+                    case "app":
+                    case "file":
+                    case "folder":
+                    case "auto":
+                    case "url":
+                    default:
+                        OpenAnyTarget(Environment.ExpandEnvironmentVariables(s.Arg));
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Services.DiagnosticLogger.Log($"Macro step {i + 1}", $"{s.Type}:{s.Arg} → {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>v1.5 — lets the visual builder test-run the macro being edited.</summary>
+    public static string? TestRunSteps(IReadOnlyList<MacroStep> steps)
+    {
+        string? invalid = MacroProgram.Validate(steps);
+        if (invalid is not null) return invalid;
+        _ = Task.Run(() => RunMacroSteps(steps));
+        return null;
     }
 
     /// <summary>Opens a URL or a file/folder path, whichever the target looks like.</summary>

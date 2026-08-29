@@ -1,5 +1,5 @@
 ======================================================
-  LUMO v1.4.1  —  universal launcher for Windows
+  LUMO v1.5.0  —  universal launcher for Windows
 ======================================================
 
 WHAT'S NEW IN v1.4 (Shortcuts & macros + smoother motion)
