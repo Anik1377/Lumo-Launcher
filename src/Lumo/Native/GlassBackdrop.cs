@@ -55,7 +55,9 @@ internal static class GlassBackdrop
             }
 
             // 2) composition-attribute acrylic (Windows 10 / early Win11)
-            uint tint = dark ? 0xB0141414u : 0xA0F7F7F9u; // ABGR — dark smoke / light frost
+            //    v1.8 — tint alpha lowered (~56%) so the blur reads much more strongly;
+            //    the translucent glass palette on top keeps text readable.
+            uint tint = dark ? 0x8F141414u : 0x96F7F7F9u; // ABGR — dark smoke / light frost
             Applied = SetAccent(hwnd, new NativeMethods.ACCENT_POLICY
             {
                 AccentState = NativeMethods.ACCENT_ENABLE_ACRYLICBLURBEHIND,

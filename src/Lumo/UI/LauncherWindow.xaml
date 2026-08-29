@@ -71,6 +71,10 @@
             <Border x:Name="GlowHalo" CornerRadius="8" IsHitTestVisible="False" Opacity="0"
                     VerticalAlignment="Top" Height="150"/>
 
+            <!-- v1.8 — top refraction hairline: bright light catching the rim of the glass -->
+            <Border x:Name="TopLight" Height="1.2" VerticalAlignment="Top" Margin="14,0,14,0"
+                    CornerRadius="1" IsHitTestVisible="False" Opacity="0.85"/>
+
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -361,6 +365,10 @@
                     </StackPanel>
                 </Grid>
             </Grid>
+
+            <!-- v1.8 — diagonal frost sheen: the light band that sells the glass.
+                 Topmost, non-interactive, painted only when the backdrop is live. -->
+            <Border x:Name="Sheen" CornerRadius="8" IsHitTestVisible="False" Visibility="Collapsed"/>
         </Grid>
     </Border>
 </Window>

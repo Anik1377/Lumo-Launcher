@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using Lumo.Core;
+using Lumo.Native;
 using Lumo.Services;
 using Appearance = Lumo.Services.Appearance;
 using Clipboard = System.Windows.Clipboard;
@@ -42,6 +43,7 @@ public partial class SettingsWindow : Window
     private string _pendingHotkey = "";
     private bool _pendingStartWithWindows;
     private RotateTransform? _previewRotation;
+    private bool _sourceReady;                // v1.8 — glass needs the HWND; set in OnSourceInitialized
 
     public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex,
                           ShortcutStore? shortcuts = null, Action? recordMacro = null,
@@ -77,6 +79,19 @@ public partial class SettingsWindow : Window
 
         // open directly on the requested page (e.g. Shortcuts from the launcher)
         if (_initialPage > 0) SelectPage(_initialPage);
+    }
+
+    /// <summary>
+    /// v1.8 — the HWND now exists: enable the acrylic glass backdrop for the settings
+    /// window too, then repaint so the surfaces go translucent (or stay opaque when
+    /// the system can't provide blur).
+    /// </summary>
+    protected override void OnSourceInitialized(EventArgs e)
+    {
+        base.OnSourceInitialized(e);
+        _sourceReady = true;
+        try { ApplySelfTheme(); }   // re-applies the backdrop itself, then repaints
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OnSourceInitialized", ex); }
     }
 
     /// <summary>Selects a sidebar page by index (checks the matching nav radio).</summary>
@@ -218,6 +233,14 @@ public partial class SettingsWindow : Window
         try
         {
             bool dark = _settings.EffectiveDark();
+
+            // v1.8 — keep the settings window's own glass backdrop in sync (theme or
+            // Glass-toggle changes arrive through SyncLive → ApplySelfTheme).
+            if (_sourceReady)
+                GlassBackdrop.Apply(this, dark, _settings.GlassEffect);
+            bool glass = GlassBackdrop.Applied;
+            var g = Appearance.GlassFor(dark);
+
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
 
             Color field = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xF5, 0xF5, 0xF7);
@@ -231,15 +254,27 @@ public partial class SettingsWindow : Window
             Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
             Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
             Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["SeparatorBrush"] = new SolidColorBrush(p.Separator);
-            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
-            Resources["FieldBrush"] = new SolidColorBrush(field);
-            Resources["CardBrush"] = new SolidColorBrush(card);
-            Resources["SidebarBrush"] = new SolidColorBrush(sidebar);
-            Resources["SegTrackBrush"] = new SolidColorBrush(segTrack);
-            Resources["SegSelBrush"] = new SolidColorBrush(segSel);
+            Resources["SeparatorBrush"] = new SolidColorBrush(glass ? g.Separator : p.Separator);
+            Resources["BorderLineBrush"] = new SolidColorBrush(glass ? g.Border : p.Border);
 
-            Root.Background = new SolidColorBrush(p.Panel);
+            // v1.8 — on glass the big static surfaces go translucent so the acrylic
+            // blur carries through; interactive controls keep enough body to stay legible.
+            Resources["FieldBrush"] = new SolidColorBrush(glass
+                ? (dark ? Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)) : field);
+            Resources["CardBrush"] = new SolidColorBrush(glass
+                ? (dark ? Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF)) : card);
+            Resources["SidebarBrush"] = new SolidColorBrush(glass
+                ? (dark ? Color.FromArgb(0x4D, 0x00, 0x00, 0x00) : Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)) : sidebar);
+            Resources["SegTrackBrush"] = new SolidColorBrush(glass
+                ? (dark ? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x59, 0xFF, 0xFF, 0xFF)) : segTrack);
+            Resources["SegSelBrush"] = new SolidColorBrush(glass
+                ? (dark ? Color.FromArgb(0xB4, 0x62, 0x62, 0x66) : Color.FromArgb(0xD9, 0xFF, 0xFF, 0xFF)) : segSel);
+
+            // glass → translucent panel over the acrylic; fallback → opaque panel and a
+            // square card (unpainted corners would otherwise show raw DWM frame).
+            Root.Background = new SolidColorBrush(glass ? g.Panel : p.Panel);
+            Root.CornerRadius = new CornerRadius(glass ? 8 : 0);
+            Root.BorderBrush = new SolidColorBrush(glass ? g.Border : p.Border);
             SettingsHalo.Background = new SolidColorBrush(Color.FromArgb(0x66, p.Accent.R, p.Accent.G, p.Accent.B));
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.ApplySelfTheme", ex); }

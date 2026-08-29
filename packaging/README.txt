@@ -1,6 +1,20 @@
 ======================================================
-  LUMO v1.7.2  —  universal launcher for Windows
+  LUMO v1.8.0  —  universal launcher for Windows
 ======================================================
+
+WHAT'S NEW IN v1.8.0 (the Fully Glass update)
+---------------------------------------------
+1. MUCH DEEPER GLASS - the panel opacity dropped
+   to ~47% (dark) / ~62% (light), so the acrylic
+   blur really shows your desktop through.
+2. FROST SHEEN + REFRACTION EDGE - a diagonal
+   light band and a bright top hairline sell the
+   glass look (painted only when blur is live).
+3. GLASS SETTINGS WINDOW - the settings window
+   now sits on the same real acrylic backdrop,
+   with translucent sidebar, cards and fields.
+4. Includes all v1.7.x fixes (launch crash,
+   Enter-key dead zones, icons).
 
 WHAT'S NEW IN v1.7.2 (critical launch fix)
 ------------------------------------------

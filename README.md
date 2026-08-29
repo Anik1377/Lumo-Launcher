@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.2-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.8.0-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -41,6 +41,22 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~340 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v1.8.0 — the Fully Glass update
+
+1. **🪟 Much deeper glass** — the glass panels dropped from ~76% to ~47% (dark) /
+   ~62% (light) opacity, so the acrylic blur is now the star: your desktop really
+   glows through the launcher. The Windows-10 acrylic fallback tint was lightened
+   to match.
+2. **✨ Frost sheen + refraction edge** — a diagonal white light-band sweeps the card
+   and a bright hairline catches the top rim: the two details that make glass read
+   as *glass* instead of a tinted rectangle. Both paint only when the backdrop is
+   actually live (zero cost on fallback systems).
+3. **🧊 The Settings window is glass now too** — same real acrylic backdrop as the
+   launcher (it was a layered window before, which can't show blur), with translucent
+   sidebar/cards/fields that keep every control legible, and DWM rounded corners.
+4. Everything else from v1.7.x is untouched: Enter-key fixes, vector icons, live
+   glass toggle in Settings → Appearance.
 
 ## 🆕 What's new in v1.7.2 — critical launch fix
 

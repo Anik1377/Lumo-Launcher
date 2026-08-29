@@ -751,6 +751,14 @@ public partial class LauncherWindow : Window
             Input.SelectionTextBrush = new SolidColorBrush(p.Title);
             Separator.Background = new SolidColorBrush(glass ? g.Separator : p.Separator);
             PrefixBadge.Foreground = new SolidColorBrush(p.Accent);
+
+            // v1.8 — the fully-glass dressing: diagonal frost sheen + top refraction
+            // hairline. Only meaningful when the acrylic backdrop is actually live;
+            // on the opaque fallback they'd just look like noise on a solid card.
+            Sheen.Background = glass ? Appearance.BuildSheenBrush() : null;
+            Sheen.Visibility = glass ? Visibility.Visible : Visibility.Collapsed;
+            TopLight.Background = glass ? Appearance.BuildEdgeHighlightBrush() : Brushes.Transparent;
+            TopLight.Opacity = glass ? 0.85 : 0;
         }
         catch (Exception ex)
         {

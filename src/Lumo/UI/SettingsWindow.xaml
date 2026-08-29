@@ -6,10 +6,22 @@
         MinWidth="780" MinHeight="520"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        AllowsTransparency="True"
+        ResizeMode="CanResize"
         Background="Transparent"
         ShowInTaskbar="True"
         PreviewKeyDown="OnWindowPreviewKeyDown">
+
+    <!--
+        v1.8 — glassified settings. Layered windows (AllowsTransparency) can't show the
+        DWM acrylic backdrop, so like the launcher this window extends the DWM frame
+        across its whole surface (GlassFrameThickness="-1") and GlassBackdrop applies
+        the system acrylic; ApplySelfTheme paints translucent surfaces on top.
+        Dragging still works via the existing title-bar DragMove handler.
+    -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome GlassFrameThickness="-1" CaptionHeight="0" CornerRadius="0"
+                      UseAeroCaptionButtons="False" ResizeBorderThickness="6"/>
+    </WindowChrome.WindowChrome>
 
     <Window.Resources>
         <!-- iOS-style toggle switch with animated thumb -->

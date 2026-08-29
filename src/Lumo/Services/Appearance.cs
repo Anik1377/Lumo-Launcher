@@ -160,22 +160,64 @@ public static class Appearance
     /// ON TOP of the acrylic backdrop, so they carry real alpha (the blur shines through);
     /// when the backdrop is unavailable the launcher falls back to the opaque values from
     /// <see cref="PaletteFor"/>.
+    /// v1.8 — "fully glass": panels dropped to ~47–62% opacity so the acrylic blur is the
+    /// star of the show, with a stronger white refraction edge and more translucent chips.
     /// </summary>
     public sealed record GlassPalette(Color Panel, Color Border, Color Separator, Color Chip, Color GlyphBox);
 
     public static GlassPalette GlassFor(bool dark) => dark
         ? new GlassPalette(
-            Panel:     Color.FromArgb(0xC2, 0x18, 0x18, 0x1C),  // deep smoked glass
-            Border:    Color.FromArgb(0x30, 0xFF, 0xFF, 0xFF),  // 19% white edge highlight
-            Separator: Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF),
-            Chip:      Color.FromArgb(0x1A, 0xFF, 0xFF, 0xFF),
-            GlyphBox:  Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF))
+            Panel:     Color.FromArgb(0x78, 0x14, 0x14, 0x18),  // deep smoked glass — desktop glows through
+            Border:    Color.FromArgb(0x59, 0xFF, 0xFF, 0xFF),  // 35% white refraction edge
+            Separator: Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF),
+            Chip:      Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF),
+            GlyphBox:  Color.FromArgb(0x20, 0xFF, 0xFF, 0xFF))
         : new GlassPalette(
-            Panel:     Color.FromArgb(0xC8, 0xFA, 0xFA, 0xFC),  // light frost
-            Border:    Color.FromArgb(0x2E, 0x00, 0x00, 0x00),
-            Separator: Color.FromArgb(0x22, 0x00, 0x00, 0x00),
-            Chip:      Color.FromArgb(0x12, 0x00, 0x00, 0x00),
-            GlyphBox:  Color.FromArgb(0x10, 0x00, 0x00, 0x00));
+            Panel:     Color.FromArgb(0x9E, 0xFA, 0xFA, 0xFC),  // light frost — enough body to keep text crisp
+            Border:    Color.FromArgb(0x3D, 0x00, 0x00, 0x00),
+            Separator: Color.FromArgb(0x33, 0x00, 0x00, 0x00),
+            Chip:      Color.FromArgb(0x1A, 0x00, 0x00, 0x00),
+            GlyphBox:  Color.FromArgb(0x16, 0x00, 0x00, 0x00));
+
+    /// <summary>
+    /// v1.8 — the diagonal frost sheen sweeping across the glass card: a soft white band
+    /// that reads as light catching the surface. Static (no idle cost), painted only when
+    /// the glass backdrop is actually applied.
+    /// </summary>
+    public static Brush BuildSheenBrush()
+    {
+        var b = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 1),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+        };
+        b.GradientStops.Add(new GradientStop(Colors.Transparent, 0.0));
+        b.GradientStops.Add(new GradientStop(Color.FromArgb(0x24, 0xFF, 0xFF, 0xFF), 0.30));
+        b.GradientStops.Add(new GradientStop(Color.FromArgb(0x0A, 0xFF, 0xFF, 0xFF), 0.58));
+        b.GradientStops.Add(new GradientStop(Colors.Transparent, 0.88));
+        b.Freeze();
+        return b;
+    }
+
+    /// <summary>
+    /// v1.8 — the bright hairline along the top edge of the glass card (the classic
+    /// "light refracting along the rim" highlight of frosted-glass UI).
+    /// </summary>
+    public static Brush BuildEdgeHighlightBrush()
+    {
+        var b = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 0),
+            MappingMode = BrushMappingMode.RelativeToBoundingBox,
+        };
+        b.GradientStops.Add(new GradientStop(Colors.Transparent, 0.0));
+        b.GradientStops.Add(new GradientStop(Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF), 0.5));
+        b.GradientStops.Add(new GradientStop(Colors.Transparent, 1.0));
+        b.Freeze();
+        return b;
+    }
 
     /// <summary>
     /// v1.7 — the ambient colour wash inside the top of the glass card. Replaces the old
@@ -196,8 +238,8 @@ public static class Appearance
             EndPoint = new Point(0, 1),
             MappingMode = BrushMappingMode.RelativeToBoundingBox,
         };
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x5E, tint.R, tint.G, tint.B), 0.0));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x16, tint.R, tint.G, tint.B), 0.45));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x72, tint.R, tint.G, tint.B), 0.0));
+        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x1E, tint.R, tint.G, tint.B), 0.45));
         brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1.0));
         brush.Freeze();
         return brush;
