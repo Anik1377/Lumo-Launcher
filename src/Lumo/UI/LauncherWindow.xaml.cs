@@ -392,7 +392,20 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            if (e.Key == Key.Escape) { HideAnimated(); e.Handled = true; }
+            if (e.Key == Key.Escape)
+            {
+                // v1.5.1 — Escape during a recording cancels it first.
+                // Before, the window hid but the recorder stayed live invisibly.
+                if (_recorder is { Active: true })
+                {
+                    _recorder.Cancel();
+                    UpdateStatusText();
+                    RunSearch();
+                    StatusText.Text = "Recording cancelled";
+                }
+                HideAnimated();
+                e.Handled = true;
+            }
         }
         catch { }
     }
@@ -535,13 +548,17 @@ public partial class LauncherWindow : Window
                 return;
             }
 
-            // v1.5 — macro recording flow
+            // v1.5 — macro recording flow (v1.5.1: always hand focus back to the
+            // input box — clicking a row moved keyboard focus to the list, so the
+            // keyboard appeared dead right after starting a recording)
             if (item.RunArgument == "cmd:record-macro")
             {
-                _recorder?.Start();
+                if (_recorder is { Active: false }) _recorder.Start();
+                Input.Clear();
                 UpdateStatusText();
                 RunSearch();
-                StatusText.Text = "● Recording — launch apps, files or URLs; finish with “Stop & save”";
+                StatusText.Text = "● Recording — type to open an app / file / URL; every launch is captured";
+                FocusInput();
                 return;
             }
             if (item.RunArgument == "cmd:record-stop")
@@ -549,10 +566,12 @@ public partial class LauncherWindow : Window
                 var steps = _recorder?.Stop() ?? new List<MacroStep>();
                 string? name = _recorder?.Name;
                 UpdateStatusText();
+                Input.Clear();
                 RunSearch();
                 if (steps.Count == 0)
                 {
                     StatusText.Text = "Nothing recorded — launch apps, files or URLs while recording";
+                    FocusInput();
                     return;
                 }
                 HideAnimated();
@@ -563,8 +582,10 @@ public partial class LauncherWindow : Window
             {
                 _recorder?.Cancel();
                 UpdateStatusText();
+                Input.Clear();
                 RunSearch();
                 StatusText.Text = "Recording cancelled";
+                FocusInput();
                 return;
             }
 
@@ -597,9 +618,13 @@ public partial class LauncherWindow : Window
                     {
                         if (_recorder is { Active: true })
                         {
-                            // v1.5 — during a recording the launcher stays open and counts steps
+                            // v1.5.1 — during a recording the launcher stays open, clears
+                            // the used-up query and hands the keyboard back, so the next
+                            // launch is one keystroke away
+                            Input.Clear();
                             StatusText.Text = $"● Recorded {_recorder.Count} — launch more, or “Stop & save”";
-                            if (item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web) RunSearch();
+                            RunSearch();
+                            FocusInput();
                         }
                         else Hide();
                     }

@@ -37,6 +37,20 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
+## 🆕 What's new in v1.5.1 — recorder usability fixes
+
+1. **Keyboard always works** — clicking *Record a macro* (or any row) used to leave
+   keyboard focus on the list, so typing went nowhere and the recorder felt broken.
+   Lumo now hands focus back to the input box after every recording action and every
+   captured launch, and clears the used-up query so the next launch is one keystroke away.
+2. **Guidance banner while recording** — the result list now leads with a clear
+   "● Recording — type to open an app, file or URL" banner above *Stop & save* / *Cancel*.
+3. **Escape cancels the recording** — before, Esc hid the window but the recorder kept
+   running invisibly. Now it stops cleanly and tells you.
+4. **Settings button tells the truth** — the button reads *"⏹ Recording live — finish in
+   the Lumo bar"* while a recording runs, and clicking it again no longer silently wipes
+   the steps captured so far.
+
 ## 🆕 What's new in v1.5 — macro recorder & visual builder
 
 1. **⏺ Record macros** — hit *Record a macro* (empty view, `/` view, or Settings →

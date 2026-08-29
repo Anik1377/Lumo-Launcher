@@ -626,7 +626,7 @@
                                                        Text="Save a URL, file, folder or a multi-step macro — then type  /sc name  in Lumo (or just  /  to browse)."/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Content="⏺ Record macro" Style="{StaticResource GhostButton}"
+                                            <Button x:Name="RecordMacroButton" Content="⏺ Record macro" Style="{StaticResource GhostButton}"
                                                     VerticalAlignment="Center" Margin="0,0,8,0" Click="OnRecordMacro"
                                                     ToolTip="Capture what you launch in Lumo as macro steps"/>
                                             <Button Content="＋ New shortcut" Style="{StaticResource AccentButton}"

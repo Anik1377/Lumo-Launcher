@@ -34,6 +34,7 @@ public partial class SettingsWindow : Window
     private readonly Action _rebuildIndex;
     private readonly ShortcutStore _shortcuts;   // v1.4
     private readonly Action? _recordMacro;       // v1.5
+    private readonly Func<bool>? _recordingActive; // v1.5.1 — is a recording live right now?
     private int _initialPage = 0;
 
     private readonly List<(Border Box, string Hex)> _swatches = new();
@@ -43,7 +44,8 @@ public partial class SettingsWindow : Window
     private RotateTransform? _previewRotation;
 
     public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex,
-                          ShortcutStore? shortcuts = null, Action? recordMacro = null, int initialPage = 0)
+                          ShortcutStore? shortcuts = null, Action? recordMacro = null,
+                          Func<bool>? recordingActive = null, int initialPage = 0)
     {
         InitializeComponent();
         _settings = settings;
@@ -53,11 +55,13 @@ public partial class SettingsWindow : Window
         _rebuildIndex = rebuildIndex;
         _shortcuts = shortcuts ?? new ShortcutStore();
         _recordMacro = recordMacro;
+        _recordingActive = recordingActive;
         _initialPage = initialPage;
 
         BuildAccentSwatches();
         LoadFromSettings();
         ApplySelfTheme();
+        UpdateRecordButton();   // v1.5.1 — reflect live recording state on open
         UpdatePreview();
         StartOwnBorder();
         PlayEntrance();
@@ -115,15 +119,35 @@ public partial class SettingsWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.NewShortcut", ex); }
     }
 
-    /// <summary>v1.5 — record a macro from Settings: start the recorder, surface the launcher.</summary>
+    /// <summary>v1.5 — record a macro from Settings: start the recorder, surface the launcher.
+    /// v1.5.1 — the button reflects the live state; clicking while recording just
+    /// surfaces the launcher (App.StartRecording no longer resets captures).</summary>
     private void OnRecordMacro(object sender, RoutedEventArgs e)
     {
         try
         {
+            UpdateRecordButton();
             if (Owner is { } o) o.Activate();
             _recordMacro?.Invoke();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.RecordMacro", ex); }
+    }
+
+    /// <summary>v1.5.1 — keep the record button honest about the recorder state.</summary>
+    private void UpdateRecordButton()
+    {
+        try
+        {
+            if (RecordMacroButton is null) return;
+            bool live = _recordingActive?.Invoke() ?? false;
+            RecordMacroButton.Content = live
+                ? "⏹ Recording live — finish in the Lumo bar"
+                : "⏺ Record macro";
+            RecordMacroButton.ToolTip = live
+                ? "A recording is running — open Lumo, launch a few things, then “Stop & save”"
+                : "Capture what you launch in Lumo as macro steps";
+        }
+        catch { }
     }
 
     private void OnEditShortcut(object sender, RoutedEventArgs e)

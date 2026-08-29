@@ -152,6 +152,13 @@ public sealed class SearchEngine
         if (_recorder.Active)
         {
             int n = _recorder.Count;
+            // v1.5.1 — guidance banner first: what recording does and what to do next
+            rows.Add(new ResultItem
+            {
+                Title = "● Recording — type to open an app, file or URL",
+                Subtitle = "every launch through Lumo is captured as a step of your macro",
+                Glyph = "⏺", Kind = ResultKind.Hint,
+            });
             rows.Add(new ResultItem
             {
                 Title = $"⏺ Stop & save ({n} step{(n == 1 ? "" : "s")})",

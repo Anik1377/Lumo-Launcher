@@ -38,7 +38,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.5 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v1.5.1 starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -138,12 +138,13 @@ public partial class App : Application
                 applyHotkey: () =>
                 {
                     string active = _window?.ReapplyHotkey() ?? "(none)";
-                    try { _tray?.UpdateText($"Lumo v1.5 — press {active}"); } catch { }
+                    try { _tray?.UpdateText($"Lumo v1.5.1 — press {active}"); } catch { }
                     return active;
                 },
                 rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } },
                 shortcuts: _shortcuts,
                 recordMacro: StartRecording,
+                recordingActive: () => _recorder is { Active: true },
                 initialPage: initialPage);
 
             _settingsWindow.Topmost = true; // stay above other apps while customizing
@@ -175,12 +176,14 @@ public partial class App : Application
         }
     }
 
-    /// <summary>v1.5 — start a macro recording and surface the launcher to capture launches.</summary>
+    /// <summary>v1.5 — start a macro recording and surface the launcher to capture launches.
+    /// v1.5.1: if a recording is already live, never restart it — that silently wiped
+    /// everything captured so far; just surface the launcher instead.</summary>
     private void StartRecording()
     {
         try
         {
-            _recorder?.Start();
+            if (_recorder is not { Active: true }) _recorder?.Start();
             Dispatcher.InvokeAsync(() =>
             {
                 try
