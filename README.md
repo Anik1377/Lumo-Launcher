@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.4.0-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.4.1-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -36,6 +36,16 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~260 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v1.4.1 — real app icons in results
+
+1. **Real logos beside names** — app results now show the application's actual
+   icon (extracted from the Start Menu shortcut's target) instead of the "A"
+   letter tile. File rows show their file-type icon, folders show the folder
+   icon, and file/folder shortcuts do too.
+2. **Fast & light** — icons are resolved once per path on the search's
+   background thread and cached in memory; rows without an icon fall back to
+   the familiar letter glyph.
 
 ## 🆕 What's new in v1.4 — Shortcuts, macros & a smoother ride
 

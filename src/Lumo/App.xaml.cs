@@ -37,7 +37,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.4 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v1.4.1 starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -122,7 +122,7 @@ public partial class App : Application
                 applyHotkey: () =>
                 {
                     string active = _window?.ReapplyHotkey() ?? "(none)";
-                    try { _tray?.UpdateText($"Lumo v1.4 — press {active}"); } catch { }
+                    try { _tray?.UpdateText($"Lumo v1.4.1 — press {active}"); } catch { }
                     return active;
                 },
                 rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } },

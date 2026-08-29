@@ -12,6 +12,9 @@ public sealed class ResultItem
     public string RunArgument { get; init; } = "";   // file path / url / shell command / expression result
     public ResultKind Kind { get; init; }
 
+    /// <summary>v1.4.1 — real shell icon (app/logo/file type). Null → the row shows Glyph instead.</summary>
+    public System.Windows.Media.ImageSource? Icon { get; init; }
+
     /// <summary>v1.3 — short label shown in the right-hand chip of a result row.</summary>
     public string KindLabel => Kind switch
     {
@@ -131,7 +134,7 @@ public sealed class SearchEngine
         }
 
         foreach (var app in _apps.Query("", 6))
-            rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path });
+            rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
 
         return rows;
     }
@@ -145,6 +148,7 @@ public sealed class SearchEngine
         Glyph = "⚡",
         Kind = ResultKind.Shortcut,
         RunArgument = def.Id,
+        Icon = def.IsMacro ? null : Services.AppIcons.ForPath(def.Target), // real icon for file/folder targets
     };
 
     private List<ResultItem> ShortcutRows(string q)
@@ -180,12 +184,12 @@ public sealed class SearchEngine
         if (q.Length == 0)
         {
             foreach (var app in _apps.Query("", MaxResults))
-                rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path });
+                rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
             return rows;
         }
 
         foreach (var app in _apps.Query(q, MaxResults))
-            rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application — " + app.Path, Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path });
+            rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application — " + app.Path, Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
 
         if (rows.Count == 0)
             rows.Add(new ResultItem { Title = $"No apps matching \"{q}\"", Subtitle = "Tip: use F/ to search files instead", Glyph = "?", Kind = ResultKind.Hint });
@@ -209,7 +213,7 @@ public sealed class SearchEngine
             rows.Add(new ResultItem { Title = "Building file index…", Subtitle = $"{_files.IndexedCount:N0} files found so far — showing quick scan results", Glyph = "…", Kind = ResultKind.Hint });
 
         foreach (var f in matches)
-            rows.Add(new ResultItem { Title = f.Name, Subtitle = f.FullPath, Glyph = "F", Kind = ResultKind.File, RunArgument = f.FullPath });
+            rows.Add(new ResultItem { Title = f.Name, Subtitle = f.FullPath, Glyph = "F", Kind = ResultKind.File, RunArgument = f.FullPath, Icon = Services.AppIcons.ForPath(f.FullPath) });
 
         if (matches.Count == 0)
             rows.Add(new ResultItem { Title = $"No files matching \"{q}\"", Subtitle = _files.Ready ? "" : "index still building", Glyph = "?", Kind = ResultKind.Hint });
@@ -287,7 +291,7 @@ public sealed class SearchEngine
     {
         var rows = new List<ResultItem>();
         foreach (var app in _apps.Query(q, 8))
-            rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path });
+            rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
 
         if (Calculator.TryEvaluate(q, out var value))
             rows.Add(new ResultItem { Title = value, Subtitle = $"{q}  —  press Enter to copy", Glyph = "=", Kind = ResultKind.Calculator, RunArgument = value });
@@ -302,7 +306,7 @@ public sealed class SearchEngine
         if (_files.Ready)
         {
             foreach (var f in _files.Query(q, 6))
-                rows.Add(new ResultItem { Title = f.Name, Subtitle = f.FullPath, Glyph = "F", Kind = ResultKind.File, RunArgument = f.FullPath });
+                rows.Add(new ResultItem { Title = f.Name, Subtitle = f.FullPath, Glyph = "F", Kind = ResultKind.File, RunArgument = f.FullPath, Icon = Services.AppIcons.ForPath(f.FullPath) });
         }
 
         rows.Add(new ResultItem
