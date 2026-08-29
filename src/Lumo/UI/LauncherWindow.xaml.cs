@@ -516,8 +516,13 @@ public partial class LauncherWindow : Window
                 case ResultKind.Image:
                 case ResultKind.Tool:
                     PauseGlow();
-                    Hide();               // hide first so focus returns before the launched app takes over
-                    _engine.Execute(item);
+                    var error = _engine.Execute(item); // launch first, then hide on success
+                    if (error is null) Hide();
+                    else
+                    {
+                        StatusText.Text = error; // stay open and tell the user what failed
+                        ResumeGlow();
+                    }
                     break;
             }
         }

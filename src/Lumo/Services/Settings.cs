@@ -34,16 +34,76 @@ public sealed class Settings
 
     public static Settings Load()
     {
+        var s = new Settings();
         try
         {
             if (File.Exists(AppPaths.SettingsFile))
             {
-                var s = JsonSerializer.Deserialize<Settings>(File.ReadAllText(AppPaths.SettingsFile));
-                if (s is not null) return s;
+                // Tolerant per-property read: one bad value (e.g. a hand-edited
+                // "Hotkey": { … } object) falls back to its default instead of
+                // throwing away every saved preference.
+                using var doc = JsonDocument.Parse(File.ReadAllText(AppPaths.SettingsFile));
+                var root = doc.RootElement;
+                if (root.ValueKind == JsonValueKind.Object)
+                {
+                    s.Hotkey            = GetStr(root, nameof(Hotkey), s.Hotkey);
+                    s.Theme             = GetStr(root, nameof(Theme), s.Theme);
+                    s.WebEngine         = GetStr(root, nameof(WebEngine), s.WebEngine);
+                    s.HideOnFocusLoss   = GetBool(root, nameof(HideOnFocusLoss), s.HideOnFocusLoss);
+                    s.AccentColor       = GetStr(root, nameof(AccentColor), s.AccentColor);
+                    s.BorderEffect      = GetBool(root, nameof(BorderEffect), s.BorderEffect);
+                    s.BorderStyle       = GetStr(root, nameof(BorderStyle), s.BorderStyle);
+                    s.BorderSpeedSec    = GetNum(root, nameof(BorderSpeedSec), s.BorderSpeedSec);
+                    s.StartWithWindows  = GetBool(root, nameof(StartWithWindows), s.StartWithWindows);
+                    s.MaxIndexedFiles   = (int)Math.Clamp(GetNum(root, nameof(MaxIndexedFiles), s.MaxIndexedFiles), 10_000, 500_000);
+                    s.AnimationsEnabled = GetBool(root, nameof(AnimationsEnabled), s.AnimationsEnabled);
+                }
             }
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.Load", ex); }
-        return new Settings();
+        return s;
+    }
+
+    private static string GetStr(JsonElement root, string name, string fallback)
+    {
+        try
+        {
+            if (root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String)
+                return v.GetString() ?? fallback;
+        }
+        catch { /* defensive */ }
+        DiagnosticLogger.Log("Settings.Load", $"Property '{name}' has an unexpected JSON type — using default");
+        return fallback;
+    }
+
+    private static bool GetBool(JsonElement root, string name, bool fallback)
+    {
+        try
+        {
+            if (root.TryGetProperty(name, out var v))
+            {
+                if (v.ValueKind is JsonValueKind.True or JsonValueKind.False) return v.GetBoolean();
+                if (v.ValueKind == JsonValueKind.String && bool.TryParse(v.GetString(), out var b)) return b;
+            }
+        }
+        catch { /* defensive */ }
+        DiagnosticLogger.Log("Settings.Load", $"Property '{name}' has an unexpected JSON type — using default");
+        return fallback;
+    }
+
+    private static double GetNum(JsonElement root, string name, double fallback)
+    {
+        try
+        {
+            if (root.TryGetProperty(name, out var v))
+            {
+                if (v.ValueKind == JsonValueKind.Number) return v.GetDouble();
+                if (v.ValueKind == JsonValueKind.String && double.TryParse(v.GetString(), out var d)) return d;
+            }
+        }
+        catch { /* defensive */ }
+        DiagnosticLogger.Log("Settings.Load", $"Property '{name}' has an unexpected JSON type — using default");
+        return fallback;
     }
 
     public void Save()

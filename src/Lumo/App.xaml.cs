@@ -36,7 +36,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.3 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v1.3.1 starting (PID {Environment.ProcessId})");
 
         try
         {

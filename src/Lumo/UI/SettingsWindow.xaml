@@ -34,22 +34,26 @@
                                 <Setter TargetName="Dot" Property="Margin" Value="22,0,0,0"/>
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
-                                        <ThicknessAnimation Storyboard.TargetName="Dot" Storyboard.TargetProperty="Margin"
-                                                            To="22,0,0,0" Duration="0:0:0.14">
-                                            <ThicknessAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </ThicknessAnimation.EasingFunction>
-                                        </ThicknessAnimation>
+                                        <Storyboard>
+                                            <ThicknessAnimation Storyboard.TargetName="Dot" Storyboard.TargetProperty="Margin"
+                                                                To="22,0,0,0" Duration="0:0:0.14">
+                                                <ThicknessAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </ThicknessAnimation.EasingFunction>
+                                            </ThicknessAnimation>
+                                        </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.EnterActions>
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
-                                        <ThicknessAnimation Storyboard.TargetName="Dot" Storyboard.TargetProperty="Margin"
-                                                            To="3,0,0,0" Duration="0:0:0.14">
-                                            <ThicknessAnimation.EasingFunction>
-                                                <CubicEase EasingMode="EaseOut"/>
-                                            </ThicknessAnimation.EasingFunction>
-                                        </ThicknessAnimation>
+                                        <Storyboard>
+                                            <ThicknessAnimation Storyboard.TargetName="Dot" Storyboard.TargetProperty="Margin"
+                                                                To="3,0,0,0" Duration="0:0:0.14">
+                                                <ThicknessAnimation.EasingFunction>
+                                                    <CubicEase EasingMode="EaseOut"/>
+                                                </ThicknessAnimation.EasingFunction>
+                                            </ThicknessAnimation>
+                                        </Storyboard>
                                     </BeginStoryboard>
                                 </Trigger.ExitActions>
                             </Trigger>

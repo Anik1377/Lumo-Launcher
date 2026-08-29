@@ -257,7 +257,11 @@ public sealed class SearchEngine
         item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web or ResultKind.Image
             or ResultKind.Tool or ResultKind.Calculator;
 
-    public void Execute(ResultItem item)
+    /// <summary>
+    /// Runs the item. Returns null on success, or a short human-readable
+    /// failure message so the UI can show feedback instead of failing silently.
+    /// </summary>
+    public string? Execute(ResultItem item)
     {
         try
         {
@@ -279,10 +283,12 @@ public sealed class SearchEngine
                     RunTool(item.RunArgument);
                     break;
             }
+            return null;
         }
         catch (Exception ex)
         {
             Services.DiagnosticLogger.LogException("SearchEngine.Execute", ex);
+            return $"Couldn't open “{item.Title}” — {ex.InnerException?.Message ?? ex.Message}";
         }
     }
 
@@ -314,7 +320,47 @@ public sealed class SearchEngine
             UseShellExecute = true,
             Verb = "open",
         };
-        Process.Start(psi);
+        try
+        {
+            Process.Start(psi);
+        }
+        catch (Exception)
+        {
+            // Some Start-Menu shortcuts (e.g. "WSL Settings.lnk") are special
+            // packaged-app items ShellExecuteEx refuses to spawn directly.
+            // Best effort: resolve the shortcut's real target and start that.
+            if (path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) && TryResolveShortcut(path, out var target))
+            {
+                Process.Start(new ProcessStartInfo { FileName = target, UseShellExecute = true });
+                return;
+            }
+            throw;
+        }
+    }
+
+    /// <summary>Reads a .lnk's TargetPath via the Windows Script Host shell COM object.</summary>
+    private static bool TryResolveShortcut(string lnkPath, out string target)
+    {
+        target = "";
+        try
+        {
+            var shellType = Type.GetTypeFromProgID("WScript.Shell");
+            if (shellType is null) return false;
+            dynamic? shell = Activator.CreateInstance(shellType);
+            if (shell is null) return false;
+            try
+            {
+                dynamic lnk = shell.CreateShortcut(lnkPath);
+                string tp = lnk.TargetPath as string ?? "";
+                if (!string.IsNullOrWhiteSpace(tp) && File.Exists(tp)) { target = tp; return true; }
+            }
+            finally
+            {
+                System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);
+            }
+        }
+        catch { /* best effort only */ }
+        return false;
     }
 
     private static void OpenUrl(string url)

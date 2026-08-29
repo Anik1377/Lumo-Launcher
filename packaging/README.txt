@@ -1,5 +1,5 @@
 ======================================================
-  LUMO v1.3  —  universal launcher for Windows
+  LUMO v1.3.1  —  universal launcher for Windows
 ======================================================
 
 WHAT'S NEW IN v1.3 (Apple-clean UI + motion)

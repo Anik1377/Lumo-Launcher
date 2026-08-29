@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.3.0-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.3.1-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
