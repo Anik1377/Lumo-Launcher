@@ -86,6 +86,7 @@ public sealed class Settings
             {
                 if (v.ValueKind is JsonValueKind.True or JsonValueKind.False) return v.GetBoolean();
                 if (v.ValueKind == JsonValueKind.String && bool.TryParse(v.GetString(), out var b)) return b;
+                if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n)) return n != 0;  // tolerate hand-edited 1/0
             }
         }
         catch { /* defensive */ }

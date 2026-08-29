@@ -143,7 +143,7 @@
                         <ContentControl.Template>
                             <ControlTemplate TargetType="ContentControl">
                                 <Grid Background="Transparent">
-                                    <Path x:Name="ClearGlyph" Data="{x:Static ui:VectorIcons.CloseData}"
+                                    <Path x:Name="ClearGlyph" Data="{x:Static ui:VectorIcons.CloseIcon}"
                                           Stroke="{DynamicResource SubtitleBrush}" StrokeThickness="2.2"
                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                           Width="11" Height="11" Stretch="Uniform"
@@ -344,7 +344,7 @@
                             <ContentControl.Template>
                                 <ControlTemplate TargetType="ContentControl">
                                     <Grid Background="Transparent">
-                                        <Path x:Name="GearGlyph" Data="{x:Static ui:VectorIcons.GearData}"
+                                        <Path x:Name="GearGlyph" Data="{x:Static ui:VectorIcons.GearIcon}"
                                               Stroke="{DynamicResource SubtitleBrush}" StrokeThickness="2"
                                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
                                               Width="14" Height="14" Stretch="Uniform"

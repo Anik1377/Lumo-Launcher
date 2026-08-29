@@ -21,8 +21,24 @@ public static class VectorIcons
         "M18.4 12 h2.4 M12 18.4 v2.4 M5.6 12 h-2.4 M12 5.6 v-2.4 " +
         "M16.53 16.53 l1.7 1.7 M7.47 16.53 l-1.7 1.7 M7.47 7.47 l-1.7 -1.7 M16.53 7.47 l1.7 -1.7";
 
-    /// <summary>Close/clear cross for the search box (exposed for direct XAML use).</summary>
+    /// <summary>Close/clear cross for the search box (code-side path data source).</summary>
     public const string CloseData = "M6.5 6.5 l11 11 M17.5 6.5 l-11 11";
+
+    /// <summary>
+    /// v1.7.2 — FATAL-FIX: Path.Data is a Geometry and WPF will NOT string-convert an
+    /// x:Static result at runtime ("Unable to cast String to Geometry" — crashed
+    /// v1.7.0/v1.7.1 on every launch at Window.Show). XAML must reference these frozen
+    /// Geometry fields, never the raw *Data strings (those stay for Geometry.Parse use).
+    /// </summary>
+    public static readonly Geometry GearIcon = Parse(GearData);
+    public static readonly Geometry CloseIcon = Parse(CloseData);
+
+    private static StreamGeometry Parse(string data)
+    {
+        var geo = (StreamGeometry)Geometry.Parse(data);   // Geometry.Parse produces a StreamGeometry
+        geo.Freeze();   // frozen → cross-thread safe, cheap to share across instances
+        return geo;
+    }
 
     private static readonly Dictionary<string, string> Data = new()
     {

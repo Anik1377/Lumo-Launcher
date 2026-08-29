@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.7.1-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-1.7.2-7C6CFF?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
@@ -41,6 +41,17 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~340 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v1.7.2 — critical launch fix
+
+1. **🛑 Fixed the startup crash in v1.7.0 / v1.7.1** — Lumo died at launch with
+   `InvalidCastException: Unable to cast 'System.String' to 'System.Windows.Media.Geometry'`
+   (the footer gear button's icon path was fed to WPF as raw text; WPF refuses to
+   convert `x:Static` strings into geometries at runtime). The gear and clear-button
+   icons are now proper frozen `Geometry` objects and Lumo starts cleanly again.
+   A new static lint rule now guards against this whole class of crash.
+2. Settings loader is now tolerant of hand-edited boolean values (`1`/`0`) in
+   `settings.json` — no more "unexpected JSON type" warning for those.
 
 ## 🆕 What's new in v1.7.1 — Enter-key fixes
 

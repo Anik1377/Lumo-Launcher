@@ -1,6 +1,13 @@
 ======================================================
-  LUMO v1.7.1  —  universal launcher for Windows
+  LUMO v1.7.2  —  universal launcher for Windows
 ======================================================
+
+WHAT'S NEW IN v1.7.2 (critical launch fix)
+------------------------------------------
+1. FIXED - Lumo crashed on launch in v1.7.0/v1.7.1
+   with "Unable to cast String to Geometry" (the
+   settings gear icon was fed to WPF as text).
+   Lumo now starts cleanly. Sorry about that!
 
 WHAT'S NEW IN v1.7.1 (Enter-key fixes)
 --------------------------------------
