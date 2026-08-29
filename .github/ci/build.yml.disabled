@@ -1,0 +1,51 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish (single-file, win-x64)
+        run: dotnet publish src/Lumo/Lumo.csproj -c Release
+
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          $tag = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF_NAME } else { 'dev-' + $env:GITHUB_SHA.Substring(0,7) }
+          New-Item -ItemType Directory -Path 'stage/Lumo' -Force | Out-Null
+          Copy-Item 'src/Lumo/bin/Release/net8.0-windows/win-x64/publish/Lumo.exe' 'stage/Lumo/'
+          Copy-Item 'packaging/README.txt' 'stage/Lumo/'
+          Compress-Archive -Path 'stage/Lumo' -DestinationPath "Lumo-launcher-$tag.zip"
+          Add-Content $env:GITHUB_ENV "ZIP_NAME=Lumo-launcher-$tag.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lumo-windows-x64-portable
+          path: ${{ env.ZIP_NAME }}
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}
+          generate_release_notes: true

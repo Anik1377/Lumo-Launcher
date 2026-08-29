@@ -1,0 +1,21 @@
+# .NET build output
+bin/
+obj/
+publish/
+artifacts/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+*.sln.docstates
+
+# OS noise
+Thumbs.db
+.DS_Store
+
+# Local packages & logs
+*.zip
+*.nupkg
+*.log

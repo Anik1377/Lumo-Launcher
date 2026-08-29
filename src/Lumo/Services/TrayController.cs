@@ -1,0 +1,95 @@
+using System.Windows.Forms;
+using Lumo.Core;
+using WinForms = System.Windows.Forms;
+
+namespace Lumo.Services;
+
+/// <summary>
+/// Tray icon controller.
+///
+/// FIX (v1.1): previously only a DOUBLE-click on the tray icon opened the window.
+/// Now a single left-click opens/focuses it too; the right-click menu offers Open,
+/// theme toggle, the settings folder and Exit.
+/// </summary>
+public sealed class TrayController : IDisposable
+{
+    private readonly NotifyIcon _icon;
+    private readonly Settings _settings;
+    private readonly Action _openLauncher;
+    private readonly Action _exit;
+
+    public TrayController(Settings settings, Action openLauncher, Action exit)
+    {
+        _settings = settings;
+        _openLauncher = openLauncher;
+        _exit = exit;
+
+        _icon = new NotifyIcon
+        {
+            Icon = IconFactory.CreateAppIcon(32),
+            Text = "Lumo v1.1 — press Alt+Space",
+            Visible = true,
+        };
+
+        // Single left-click opens the launcher (the known-good path is preserved too:
+        // a double click simply raises two MouseClicks which is idempotent "show").
+        _icon.MouseClick += OnMouseClick;
+
+        var menu = new ContextMenuStrip();
+        menu.Items.Add("Open Lumo", null, (_, _) => Safe(_openLauncher));
+        menu.Items.Add(new ToolStripSeparator());
+
+        var themeItem = new ToolStripMenuItem("Toggle light/dark theme");
+        themeItem.Click += (_, _) => Safe(() =>
+        {
+            _settings.Theme = _settings.Theme == "dark" ? "light" : "dark";
+            _settings.Save();
+            ThemeChanged?.Invoke();
+        });
+        menu.Items.Add(themeItem);
+
+        menu.Items.Add("Open settings folder", null, (_, _) => Safe(OpenSettingsFolder));
+        menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add("Exit Lumo", null, (_, _) => Safe(_exit));
+
+        _icon.ContextMenuStrip = menu;
+    }
+
+    /// <summary>Raised when the user toggles the theme from the tray menu.</summary>
+    public event Action? ThemeChanged;
+
+    private void OnMouseClick(object? sender, MouseEventArgs e)
+    {
+        if (e.Button == MouseButtons.Left) Safe(_openLauncher);
+    }
+
+    private static void OpenSettingsFolder()
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = AppPaths.SettingsDir,
+                UseShellExecute = true,
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Tray.OpenSettings", ex); }
+    }
+
+    private static void Safe(Action action)
+    {
+        try { action(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("Tray", ex); }
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            _icon.Visible = false;
+            _icon.Dispose();
+        }
+        catch { }
+    }
+}
