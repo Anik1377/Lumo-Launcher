@@ -200,6 +200,8 @@
                                      GroupName="SType" Checked="OnTypeChanged"/>
                         <RadioButton x:Name="TypeMacro" Content="Macro" Style="{StaticResource TypeRadio}"
                                      GroupName="SType" Checked="OnTypeChanged"/>
+                        <RadioButton x:Name="TypeSnippet" Content="Snippet" Style="{StaticResource TypeRadio}"
+                                     GroupName="SType" Checked="OnTypeChanged"/>
                     </StackPanel>
                 </Border>
 

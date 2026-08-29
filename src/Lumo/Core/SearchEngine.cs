@@ -26,6 +26,8 @@ public sealed class ResultItem
         ResultKind.Tool => "Tool",
         ResultKind.Hint => "Tip",
         ResultKind.Shortcut => "Shortcut",
+        ResultKind.Clipboard => "Copy",   // v1.6
+        ResultKind.Header => "",          // v1.6 — section title, no chip
         _ => "",
     };
 }
@@ -41,6 +43,8 @@ public enum ResultKind
     Hint,
     Error,
     Shortcut,   // v1.4 — user-defined /sc launch
+    Clipboard,  // v1.6 — one clipboard-history entry (Enter copies it back)
+    Header,     // v1.6 — section title row (Raycast "Favourites" style)
 }
 
 /// <summary>
@@ -55,12 +59,14 @@ public sealed class SearchEngine
     private readonly AppIndex _apps;
     private readonly FileIndex _files;
     private readonly Settings _settings;
-    private readonly ShortcutStore? _shortcuts;   // v1.4
-    private readonly MacroRecorder? _recorder;    // v1.5
+    private readonly ShortcutStore? _shortcuts;      // v1.4
+    private readonly MacroRecorder? _recorder;       // v1.5
+    private readonly ClipboardHistory? _clips;       // v1.6
 
-    public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null)
+    public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null,
+                        MacroRecorder? recorder = null, ClipboardHistory? clips = null)
     {
-        _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts; _recorder = recorder;
+        _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts; _recorder = recorder; _clips = clips;
     }
 
     public List<ResultItem> Search(string rawQuery)
@@ -87,6 +93,18 @@ public sealed class SearchEngine
 
             if (query.StartsWith("U/", StringComparison.OrdinalIgnoreCase))
                 return ToolRows(query[2..].Trim());
+
+            // v1.6 — H/ : Raycast-style clipboard history
+            if (query.StartsWith("H/", StringComparison.OrdinalIgnoreCase))
+                return ClipboardRows(query[2..].Trim());
+
+            // v1.6 — S/ : Raycast-style window management (snap / maximize / center)
+            if (query.StartsWith("S/", StringComparison.OrdinalIgnoreCase))
+                return WindowRows(query[2..].Trim());
+
+            // v1.6 — !keyword : snippet search (type ! and part of a snippet name)
+            if (query.StartsWith("!"))
+                return SnippetRows(query[1..].Trim());
 
             // v1.4 — /sc <name> : user shortcuts & macros. Any "/…" query enters
             // shortcut mode; a leading "sc" token is optional and stripped.
@@ -123,6 +141,9 @@ public sealed class SearchEngine
             new() { Title = "W/  Web search", Subtitle = "e.g.  W/weather tomorrow", Glyph = "W", Kind = ResultKind.Hint, RunArgument = "W/" },
             new() { Title = "I/  Image search", Subtitle = "e.g.  I/mountain sunrise", Glyph = "I", Kind = ResultKind.Hint, RunArgument = "I/" },
             new() { Title = "U/  Utilities", Subtitle = "lock · sleep · restart · shutdown · empty bin", Glyph = "U", Kind = ResultKind.Hint, RunArgument = "U/" },
+            new() { Title = "H/  Clipboard history", Subtitle = "everything you copied — pick one to copy again (Raycast style)", Glyph = "⧉", Kind = ResultKind.Hint, RunArgument = "H/" },
+            new() { Title = "S/  Snap window", Subtitle = "left/right half · maximize · center · restore — for the last window you used", Glyph = "▣", Kind = ResultKind.Hint, RunArgument = "S/" },
+            new() { Title = "!  Snippets", Subtitle = "type ! then a name — your paste-anywhere texts, e.g.  !email", Glyph = "S", Kind = ResultKind.Hint, RunArgument = "!" },
             new() { Title = "/sc  Shortcuts & macros", Subtitle = "your saved one-tap launches — e.g.  /sc work", Glyph = "⚡", Kind = ResultKind.Hint, RunArgument = "/sc" },
             new() { Title = "Settings — customize Lumo", Subtitle = "themes · accent colour · glow border · hotkey · index", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
         };
@@ -187,10 +208,10 @@ public sealed class SearchEngine
     {
         Title = def.Name,
         Subtitle = def.Describe(),
-        Glyph = "⚡",
+        Glyph = def.IsSnippet ? "S" : "⚡",
         Kind = ResultKind.Shortcut,
         RunArgument = def.Id,
-        Icon = def.IsMacro ? null : Services.AppIcons.ForPath(def.Target), // real icon for file/folder targets
+        Icon = def.IsMacro || def.IsSnippet ? null : Services.AppIcons.ForPath(def.Target), // real icon for file/folder targets
     };
 
     private List<ResultItem> ShortcutRows(string q)
@@ -335,8 +356,15 @@ public sealed class SearchEngine
     private List<ResultItem> MixedRows(string q)
     {
         var rows = new List<ResultItem>();
-        foreach (var app in _apps.Query(q, 8))
-            rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
+
+        // v1.6 — Raycast-style section headers
+        var apps = _apps.Query(q, 8).ToList();
+        if (apps.Count > 0)
+        {
+            rows.Add(new ResultItem { Title = "APPS", Kind = ResultKind.Header });
+            foreach (var app in apps)
+                rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
+        }
 
         if (Calculator.TryEvaluate(q, out var value))
             rows.Add(new ResultItem { Title = value, Subtitle = $"{q}  —  press Enter to copy", Glyph = "=", Kind = ResultKind.Calculator, RunArgument = value });
@@ -350,8 +378,13 @@ public sealed class SearchEngine
 
         if (_files.Ready)
         {
-            foreach (var f in _files.Query(q, 6))
-                rows.Add(new ResultItem { Title = f.Name, Subtitle = f.FullPath, Glyph = "F", Kind = ResultKind.File, RunArgument = f.FullPath, Icon = Services.AppIcons.ForPath(f.FullPath) });
+            var files = _files.Query(q, 6).ToList();
+            if (files.Count > 0)
+            {
+                rows.Add(new ResultItem { Title = "FILES", Kind = ResultKind.Header });
+                foreach (var f in files)
+                    rows.Add(new ResultItem { Title = f.Name, Subtitle = f.FullPath, Glyph = "F", Kind = ResultKind.File, RunArgument = f.FullPath, Icon = Services.AppIcons.ForPath(f.FullPath) });
+            }
         }
 
         rows.Add(new ResultItem
@@ -366,11 +399,105 @@ public sealed class SearchEngine
         return rows.Take(MaxResults).ToList();
     }
 
+    // ---------------------------------------------------------------- v1.6 — clipboard / windows / snippets
+
+    private static string Age(DateTime at)
+    {
+        var d = DateTime.Now - at;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes}m ago";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours}h ago";
+        return $"{(int)d.TotalDays}d ago";
+    }
+
+    private List<ResultItem> ClipboardRows(string q)
+    {
+        var rows = new List<ResultItem>
+        {
+            new() { Title = "CLIPBOARD HISTORY", Subtitle = "in memory only — cleared when Lumo exits", Kind = ResultKind.Header },
+        };
+
+        var items = _clips?.Snapshot() ?? new List<ClipboardHistory.Entry>();
+        int shown = 0;
+        foreach (var e in items)
+        {
+            string first = e.Text.Replace("\r", "").Split('\n', 2)[0];
+            if (first.Length > 96) first = first[..96] + "…";
+            if (q.Length > 0 && !first.Contains(q, StringComparison.OrdinalIgnoreCase) &&
+                !e.Text.Contains(q, StringComparison.OrdinalIgnoreCase)) continue;
+
+            int lines = e.Text.Count(c => c == '\n') + 1;
+            string sub = $"copied {Age(e.At)} · {e.Text.Length:N0} chars" + (lines > 1 ? $" · {lines} lines" : "") + " · Enter to copy again";
+            rows.Add(new ResultItem { Title = first, Subtitle = sub, Glyph = "⧉", Kind = ResultKind.Clipboard, RunArgument = e.Id });
+            if (++shown >= MaxResults) break;
+        }
+
+        if (shown == 0)
+            rows.Add(new ResultItem
+            {
+                Title = q.Length == 0 ? "Nothing copied yet" : $"No copies matching \"{q}\"",
+                Subtitle = "Lumo remembers your last 50 copies while it runs",
+                Glyph = "⧉", Kind = ResultKind.Hint,
+            });
+
+        rows.Add(new ResultItem { Title = "Clear clipboard history", Subtitle = "forget everything remembered so far", Glyph = "✕", Kind = ResultKind.Tool, RunArgument = "cmd:clear-clipboard" });
+        return rows;
+    }
+
+    private List<ResultItem> WindowRows(string q)
+    {
+        var rows = new List<ResultItem>
+        {
+            new() { Title = "WINDOW MANAGEMENT", Subtitle = "snaps the window you used right before opening Lumo", Kind = ResultKind.Header },
+            new() { Title = "Left half",  Subtitle = "snap to the left half of the screen",  Glyph = "▣", Kind = ResultKind.Tool, RunArgument = "cmd:win-left" },
+            new() { Title = "Right half", Subtitle = "snap to the right half of the screen", Glyph = "▣", Kind = ResultKind.Tool, RunArgument = "cmd:win-right" },
+            new() { Title = "Maximize",    Subtitle = "fill the whole screen",               Glyph = "▣", Kind = ResultKind.Tool, RunArgument = "cmd:win-max" },
+            new() { Title = "Center",      Subtitle = "center the window on its monitor",    Glyph = "▣", Kind = ResultKind.Tool, RunArgument = "cmd:win-center" },
+            new() { Title = "Restore down", Subtitle = "back to its normal size",            Glyph = "▣", Kind = ResultKind.Tool, RunArgument = "cmd:win-restore" },
+        };
+
+        if (q.Length == 0) return rows;
+        var filtered = rows
+            .Where(r => r.Kind != ResultKind.Header)
+            .Select(r => (R: r, S: Fuzzy.Score(q, r.Title)))
+            .Where(x => x.S > 0)
+            .OrderByDescending(x => x.S)
+            .Select(x => x.R)
+            .ToList();
+        return filtered.Count > 0 ? filtered : rows.Skip(1).ToList();
+    }
+
+    private List<ResultItem> SnippetRows(string q)
+    {
+        var rows = new List<ResultItem>
+        {
+            new() { Title = "SNIPPETS", Subtitle = "Enter copies the text — then Ctrl+V pastes it anywhere", Kind = ResultKind.Header },
+        };
+
+        var found = _shortcuts?.Match(q, MaxResults - 1).Where(x => x.Def.IsSnippet).ToList()
+                    ?? new List<(ShortcutDef, int)>();
+        foreach (var (def, _) in found)
+        {
+            string preview = def.Target.Replace("\r", "").Split('\n', 2)[0];
+            if (preview.Length > 90) preview = preview[..90] + "…";
+            rows.Add(new ResultItem { Title = def.Name, Subtitle = preview, Glyph = "S", Kind = ResultKind.Shortcut, RunArgument = def.Id });
+        }
+
+        if (found.Count == 0)
+            rows.Add(new ResultItem
+            {
+                Title = q.Length == 0 ? "No snippets yet" : $"No snippets matching \"{q}\"",
+                Subtitle = "Create one: /  → New shortcut → type “Snippet” — e.g. !email for your address",
+                Glyph = "S", Kind = ResultKind.Hint,
+            });
+        return rows;
+    }
+
     // ---------------------------------------------------------------- helpers
 
     public static bool IsExecutable(ResultItem item) =>
         item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web or ResultKind.Image
-            or ResultKind.Tool or ResultKind.Calculator or ResultKind.Shortcut;
+            or ResultKind.Tool or ResultKind.Calculator or ResultKind.Shortcut or ResultKind.Clipboard;
 
     /// <summary>
     /// Runs the item. Returns null on success, or a short human-readable
@@ -396,9 +523,12 @@ public sealed class SearchEngine
                     TrySetClipboard(item.RunArgument);
                     break;
 
-                case ResultKind.Tool:
-                    RunTool(item.RunArgument);
+                case ResultKind.Clipboard:   // v1.6 — copy the entry back to the clipboard
+                    if (_clips?.Find(item.RunArgument) is { } e) _clips.Restore(e);
                     break;
+
+                case ResultKind.Tool:
+                    return RunTool(item.RunArgument);
 
                 case ResultKind.Shortcut:
                     return RunShortcut(item.RunArgument) ?? null;
@@ -412,7 +542,7 @@ public sealed class SearchEngine
         }
     }
 
-    private void RunTool(string arg)
+    private string? RunTool(string arg)
     {
         switch (arg)
         {
@@ -423,7 +553,17 @@ public sealed class SearchEngine
             case "cmd:shutdown": OpenCommand("shutdown", "/s /t 0"); break;
             case "cmd:settings": OpenPath(AppPaths.SettingsDir); break;
             case "cmd:log": OpenPath(AppPaths.DataDir); break;
+            case "cmd:clear-clipboard": _clips?.Clear(); break;
+
+            // v1.6 — window management; Apply returns null on success (→ launcher hides,
+            // you see the snap happen) or an error (→ shown in the status bar)
+            case "cmd:win-left": return WindowManager.Apply(WindowMode.Left);
+            case "cmd:win-right": return WindowManager.Apply(WindowMode.Right);
+            case "cmd:win-max": return WindowManager.Apply(WindowMode.Maximize);
+            case "cmd:win-center": return WindowManager.Apply(WindowMode.Center);
+            case "cmd:win-restore": return WindowManager.Apply(WindowMode.Restore);
         }
+        return null;
     }
 
     /// <summary>v1.4 — runs a saved shortcut/macro by id. Null = success.</summary>
@@ -434,6 +574,13 @@ public sealed class SearchEngine
 
         try
         {
+            if (def.IsSnippet)
+            {
+                // v1.6 — snippets copy their text; Ctrl+V pastes it anywhere
+                TrySetClipboard(def.Target);
+                return null;
+            }
+
             if (def.IsMacro)
             {
                 var steps = MacroProgram.FromDef(def);

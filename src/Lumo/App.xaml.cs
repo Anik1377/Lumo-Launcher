@@ -16,6 +16,7 @@ public partial class App : Application
     private Settings _settings = new();
     private ShortcutStore? _shortcuts;
     private MacroRecorder? _recorder;
+    private ClipboardHistory? _clips;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -38,7 +39,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.5.1 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v1.6 starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -55,7 +56,8 @@ public partial class App : Application
             _settings = Settings.Load();
             _shortcuts = new ShortcutStore();
             _recorder = new MacroRecorder();
-            _window = new LauncherWindow(_settings, _shortcuts, _recorder);
+            _clips = new ClipboardHistory();          // v1.6 — clipboard history (UI-thread timer)
+            _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips);
             MainWindow = _window;
 
             _window.SettingsRequested += () =>
@@ -138,7 +140,7 @@ public partial class App : Application
                 applyHotkey: () =>
                 {
                     string active = _window?.ReapplyHotkey() ?? "(none)";
-                    try { _tray?.UpdateText($"Lumo v1.5.1 — press {active}"); } catch { }
+                    try { _tray?.UpdateText($"Lumo v1.6 — press {active}"); } catch { }
                     return active;
                 },
                 rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } },

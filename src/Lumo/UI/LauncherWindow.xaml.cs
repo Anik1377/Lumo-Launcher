@@ -34,8 +34,9 @@ public partial class LauncherWindow : Window
     private readonly AppIndex _apps = new();
     private readonly FileIndex _files = new();
     private readonly SearchEngine _engine;
-    private readonly ShortcutStore? _shortcuts;   // v1.4
-    private readonly MacroRecorder? _recorder;    // v1.5
+    private readonly ShortcutStore? _shortcuts;      // v1.4
+    private readonly MacroRecorder? _recorder;       // v1.5
+    private readonly ClipboardHistory? _clips;       // v1.6
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
     private HotkeyService? _hotkey;
@@ -69,15 +70,17 @@ public partial class LauncherWindow : Window
     /// <summary>v1.5 — recording finished; App opens the builder with the captured steps.</summary>
     public event Action<List<MacroStep>, string?>? RecordFinishRequested;
 
-    public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null)
+    public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null,
+                          ClipboardHistory? clips = null)
     {
         InitializeComponent();
         _settings = settings;
         _shortcuts = shortcuts;
         _recorder = recorder;
+        _clips = clips;
         _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
-        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder);
+        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips);
 
         _debounce = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -168,6 +171,10 @@ public partial class LauncherWindow : Window
     {
         try
         {
+            // v1.6 — remember which window the user was just in, so S/ window
+            // commands snap THAT window instead of Lumo itself
+            WindowManager.RememberForeground(_hwnd);
+
             _animGen++; // cancel any pending hide-completion
             Root.BeginAnimation(OpacityProperty, null);
 
@@ -293,9 +300,9 @@ public partial class LauncherWindow : Window
         try
         {
             var area = SystemParameters.WorkArea;
-            // Center on the primary work area (simple + reliable).
+            // v1.6 — Raycast-style placement: always top-center of the work area
             Left = area.Left + (area.Width - ActualWidth) / 2;
-            Top = area.Top + Math.Max(60, area.Height * 0.28);
+            Top = area.Top + Math.Max(48, area.Height * 0.12);
         }
         catch { }
     }

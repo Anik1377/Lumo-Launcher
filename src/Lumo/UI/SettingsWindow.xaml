@@ -623,7 +623,7 @@
                                         <StackPanel Grid.Column="0">
                                             <TextBlock Text="Your one-tap launches" Style="{StaticResource SettingName}"/>
                                             <TextBlock Style="{StaticResource SettingDesc}" TextWrapping="Wrap"
-                                                       Text="Save a URL, file, folder or a multi-step macro — then type  /sc name  in Lumo (or just  /  to browse)."/>
+                                                       Text="Save a URL, file, folder, a multi-step macro or a text snippet — then type  /sc name  (or  !name  for snippets) in Lumo (or just  /  to browse)."/>
                                         </StackPanel>
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                             <Button x:Name="RecordMacroButton" Content="⏺ Record macro" Style="{StaticResource GhostButton}"

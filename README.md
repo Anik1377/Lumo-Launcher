@@ -37,6 +37,27 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
+## 🆕 What's new in v1.6 — the Raycast update
+
+Built after studying [Raycast for Windows](https://www.raycast.com/windows) — same flagship features, same feel, still one ~260 KB portable exe.
+
+1. **⧉ Clipboard History** — type `H/` and see everything you've copied (last 50, with
+   "copied 3m ago" stamps). Pick one → it's on your clipboard again, ready to paste.
+   Search within history, or clear it in one row. **In memory only** — never written to
+   disk, gone when Lumo exits.
+2. **▣ Window Management** — type `S/` to snap the window you were just using:
+   **Left half / Right half / Maximize / Center / Restore down**. Multi-monitor aware
+   (snaps into the work area of the window's own monitor) and it never touches Lumo
+   itself — Lumo remembers which app had focus before it popped up.
+3. **S Snippets** — your paste-anywhere texts (email drafts, addresses, promo codes).
+   Create via `/` → New shortcut → type **Snippet**. Run with `/sc name` or type
+   `!name` — Enter copies the text, `Ctrl+V` pastes it anywhere. Multi-line supported.
+4. **Raycast-style UI** — the launcher now sits **top-center** like Raycast (no longer
+   follows the cursor), the results list has **section headers** (APPS / FILES /
+   CLIPBOARD HISTORY / WINDOW MANAGEMENT / SNIPPETS), the search box reads
+   *"Search apps and commands…"*, and the footer got a proper divider. Wider panel,
+   same Apple-clean aesthetic and glow border.
+
 ## 🆕 What's new in v1.5.1 — recorder usability fixes
 
 1. **Keyboard always works** — clicking *Record a macro* (or any row) used to leave

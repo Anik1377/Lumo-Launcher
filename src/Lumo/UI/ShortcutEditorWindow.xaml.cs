@@ -136,6 +136,7 @@ public partial class ShortcutEditorWindow : Window
                 case "file": TypeFile.IsChecked = true; break;
                 case "folder": TypeFolder.IsChecked = true; break;
                 case "macro": TypeMacro.IsChecked = true; break;
+                case "snippet": TypeSnippet.IsChecked = true; break;
                 default: TypeUrl.IsChecked = true; break;
             }
             TargetBox.Text = _def.Target;
@@ -154,30 +155,40 @@ public partial class ShortcutEditorWindow : Window
     private string SelectedType =>
         TypeFile.IsChecked == true ? "file" :
         TypeFolder.IsChecked == true ? "folder" :
-        TypeMacro.IsChecked == true ? "macro" : "url";
+        TypeMacro.IsChecked == true ? "macro" :
+        TypeSnippet.IsChecked == true ? "snippet" : "url";
 
     private void SyncTypePanels()
     {
         string t = SelectedType;
         bool macro = t == "macro";
+        bool snippet = t == "snippet";          // v1.6
         MacroPanel.Visibility = macro ? Visibility.Visible : Visibility.Collapsed;
         TargetPanel.Visibility = macro ? Visibility.Collapsed : Visibility.Visible;
         BrowseButton.Visibility = t is "file" or "folder" ? Visibility.Visible : Visibility.Collapsed;
 
-        SubtitleText.Text = macro
-            ? "Run it any time by typing  /sc name  in Lumo"
+        // v1.6 — snippets hold multi-line text
+        TargetBox.AcceptsReturn = snippet;
+        TargetBox.MinHeight = snippet ? 88 : 36;
+        TargetBox.VerticalScrollBarVisibility = snippet ? ScrollBarVisibility.Auto : ScrollBarVisibility.Hidden;
+        TargetBox.VerticalContentAlignment = snippet ? VerticalAlignment.Top : VerticalAlignment.Center;
+
+        SubtitleText.Text = snippet
+            ? "Run it with  /sc name  or  !name  — Enter copies the text, Ctrl+V pastes it"
             : "Run it any time by typing  /sc name  in Lumo";
 
         TargetLabel.Text = t switch
         {
             "file" => "FILE PATH",
             "folder" => "FOLDER PATH",
+            "snippet" => "SNIPPET TEXT",
             _ => "URL",
         };
         TargetHint.Text = t switch
         {
             "file" => "e.g.  C:\\Users\\me\\Documents\\report.docx  (%ENV% supported)",
             "folder" => "e.g.  D:\\Projects  (%USERPROFILE%\\Desktop works too)",
+            "snippet" => "Text that gets copied to the clipboard — e-mail drafts, addresses, replies. Multi-line allowed.",
             _ => "e.g.  github.com  or  https://mail.google.com",
         };
     }
@@ -481,6 +492,17 @@ public partial class ShortcutEditorWindow : Window
 
                 _def.Steps = steps.Select(s => s.Encode()).ToList();
                 _def.Target = steps[0].Arg;
+            }
+            else if (type == "snippet")   // v1.6 — multi-line text, copy on Enter
+            {
+                string text = TargetBox.Text.TrimEnd();
+                if (text.Trim().Length == 0)
+                {
+                    ShowError("Give the snippet some text to copy.");
+                    return;
+                }
+                _def.Target = text;
+                _def.Steps = new List<string>();
             }
             else
             {

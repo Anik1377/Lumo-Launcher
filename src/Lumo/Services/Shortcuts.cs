@@ -20,6 +20,9 @@ public sealed class ShortcutDef
 
     public bool IsMacro => Type.Equals("macro", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>v1.6 — a snippet holds text that Enter copies to the clipboard.</summary>
+    public bool IsSnippet => Type.Equals("snippet", StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Bindable wrapper for lists.</summary>
     public string DescribeText => Describe();
 
@@ -34,6 +37,7 @@ public sealed class ShortcutDef
                 "file" => "Opens file — " + Target,
                 "folder" => "Opens folder — " + Target,
                 "macro" => $"Macro · {Steps.Count} step{(Steps.Count == 1 ? "" : "s")}",
+                "snippet" => "Snippet — Enter copies the text",
                 _ => Target,
             };
         }
