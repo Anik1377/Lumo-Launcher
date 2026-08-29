@@ -86,15 +86,10 @@ dotnet publish src/Lumo/Lumo.csproj -c Release
 # → src/Lumo/bin/Release/net8.0-windows/win-x64/publish/Lumo.exe
 ```
 
-CI is ready to go: `.github/ci/build.yml.disabled` builds the portable zip on every push
-and auto-attaches it to GitHub Releases on `v*` tags. To activate it (requires signing in
-on github.com — the upload token used to seed this repo lacks the `workflow` scope):
-
-1. Copy the contents of `.github/ci/build.yml.disabled`
-2. On GitHub: **Add file → Create new file** → path `.github/workflows/build.yml` → paste → commit
-
-After that, every push builds `Lumo-windows-x64-portable`, and pushing a tag
-(`git tag v1.1.1 && git push --tags`) publishes a new Release with the zip attached automatically.
+CI is active (`.github/workflows/build.yml`): every push to `main` builds the portable zip
+and uploads it as a build artifact, and pushing a `v*` tag
+(e.g. `git tag v1.2.0 && git push --tags`) publishes a new GitHub Release
+with the zip attached automatically.
 
 ## 🗺️ Roadmap
 
