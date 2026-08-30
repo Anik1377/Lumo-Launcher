@@ -191,8 +191,18 @@
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
                     <Border x:Name="Bd" CornerRadius="4" Padding="11,6.5" Background="Transparent">
-                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
-                                          VerticalAlignment="Center"/>
+                        <!-- v2.2.0-alpha.2 — second column renders InputGestureText (e.g. "Enter") -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                              VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="1" Text="{TemplateBinding InputGestureText}"
+                                       FontSize="11" Margin="22,0,0,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource SubtitleBrush}"/>
+                        </Grid>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
@@ -501,21 +511,51 @@
                                                Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
 
-                                <!-- kind chip (App / File / Web / Tool …) -->
-                                <Border Grid.Column="2" CornerRadius="4" Padding="7,2.5" VerticalAlignment="Center"
-                                        Background="{DynamicResource ChipBrush}">
-                                    <Border.Style>
-                                        <Style TargetType="Border">
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding KindLabel}" Value="">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Border.Style>
-                                    <TextBlock Text="{Binding KindLabel}" FontSize="10" FontWeight="Medium"
-                                               Foreground="{DynamicResource ChipTextBrush}"/>
-                                </Border>
+                                <!-- v2.2.0-alpha.2 — pin star + kind chip share the trailing edge:
+                                     ★ filled accent when pinned (always visible so a pinned row
+                                     can be unpinned from any view), ☆ on hover for pinnable rows.
+                                     Click is handled by OnPinStarDown — no menu needed. -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock x:Name="PinStar" Text="☆" FontSize="13" Margin="0,1,7,0"
+                                               VerticalAlignment="Center" Cursor="Hand"
+                                               MouseLeftButtonDown="OnPinStarDown">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True"/>
+                                                            <Condition Binding="{Binding CanPin}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </MultiDataTrigger>
+                                                    <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                        <Setter Property="Text" Value="★"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <!-- kind chip (App / File / Web / Tool …) -->
+                                    <Border CornerRadius="4" Padding="7,2.5" VerticalAlignment="Center"
+                                            Background="{DynamicResource ChipBrush}">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding KindLabel}" Value="">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding KindLabel}" FontSize="10" FontWeight="Medium"
+                                                   Foreground="{DynamicResource ChipTextBrush}"/>
+                                    </Border>
+                                </StackPanel>
                             </Grid>
 
                             <DataTemplate.Triggers>

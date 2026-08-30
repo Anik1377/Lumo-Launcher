@@ -61,12 +61,19 @@ CI runs tests before publish.
   (github/youtube/ddg/maps/wiki/images/so/npm/nuget/news/amazon/scholar/…);
   Settings.CustomWebProviders (tolerant read + RestoreFrom) override built-ins.
 
-## Phase 2 — v2.2 "Actions" ✅ (shipped in v2.2.0-alpha.1)
+## Phase 2 — v2.2 "Actions" ✅ (shipped in v2.2.0-alpha.1; 2.1/2.2 reworked in v2.2.0-alpha.2)
 
 - **Task 2.1 — Quick actions on result rows:** right-click / Ctrl+→ context menu
   (OpenContainingFolder, CopyPath, CopyName, OpenTerminal, RunAsAdmin, Pin).
+  *Rework (alpha.2):* menu leads with **Open** (shared execute path with Enter),
+  separator + gesture hints, **Tool rows openable & pinnable** (record/shortcut-editor
+  commands excluded), elevation for elevatable **File** rows, `e.Handled` fix for the
+  empty-menu flash on non-actionable rows, Ctrl+→ toggles the menu.
 - **Task 2.2 — Pinned favourites + FAVOURITES header** on the empty view
   (Services/Favourites.cs, key = RunArgument).
+  *Rework (alpha.2):* newest-pin-first display (storage order unchanged), cap raised
+  6 → 12, hover **★** pin affordance stamped via `SearchEngine.Annotate`
+  (`ResultItem.CanPin/Pinned`), `Favourites.Toggle()` for both UI entry points.
 - **Task 2.3 — Tab-key preview pane** (text head/image thumbnail/clipboard text,
   async read with generation counter).
 - **Task 2.4 — More system utilities** (hibernate, night light, battery, mute,

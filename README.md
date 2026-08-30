@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.2.0--alpha.1-CA5010?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.2.0--alpha.2-CA5010?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -45,9 +45,39 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~350 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
-| ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`) any result: open containing folder, copy path/name, open a terminal there, run as administrator, pin to favourites |
-| ★ | **Pinned favourites** | A FAVOURITES section leads the empty view — pin anything and it's one keystroke away (`favourites.json`) |
+| ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`, again to close) any result: **Open** (the Enter path), containing folder, copy path/name, terminal there, run as administrator, pin — with a separator before the pin pair |
+| ★ | **Pinned favourites** | A FAVOURITES section leads the empty view, newest pin first (up to 12) — pin via the menu **or the hover ★ right on the row** (`favourites.json`) |
 | 👁️ | **Preview pane** | `Tab` previews the selection — text-file heads (binary-safe, 512 KB cap), image thumbnails, clipboard entries, URLs — read off-thread with stale-read protection |
+
+## 🆕 What's new in v2.2.0-alpha.2 — Quick actions & favourites rework
+
+A quality pass over Task 2.1/2.2 after real use: the menu gains its primary
+action, pinning becomes a one-click gesture, and two real bugs go away.
+
+1. **✂️ Open leads every menu.** The quick-action menu now starts with **Open** —
+   exactly what pressing Enter does (both funnel through one shared execute
+   path, so they can never drift). The pin/unpin pair sits visually apart
+   behind a separator, items show their keyboard gesture (`Open   Enter`), and
+   copying a web row now reports **Copied URL** instead of "path".
+2. **★ Pin on hover.** Every pinnable row shows a **☆ on hover** (filled accent
+   **★** while pinned, always visible so it can be unpinned from any view).
+   One click pins — no menu needed. Pin state is stamped on every row by the
+   search pipeline itself, so star and menu can never disagree.
+3. **🛠 Tools and files join the fun.** Utility rows (`cmd:mute`, night light,
+   Settings …) are now **openable and pinnable** — a utility you reach for
+   constantly is the best possible favourite (transient record/shortcut-editor
+   controls are excluded). Elevation works for **.bat/.cmd/.exe/.msc files**
+   found by the file index, not just Start-Menu apps.
+4. **🔍 Favourites, refined.** The section now shows **up to 12** pinned rows
+   (a silent cap of 6 used to hide the rest) ordered **newest pin first** — the
+   thing you just pinned lands at the top, where you just looked. Storage order
+   on disk is unchanged, so upgrading is lossless.
+5. **🐛 Fixes.** Right-clicking a header/hint row no longer flashes an empty
+   menu shell (WPF opens the menu captured at event-raise; the handler now
+   suppresses it with `e.Handled`). `Ctrl+→` **toggles** the menu closed
+   instead of piling opens. The row model (`ResultItem`) moved to a WPF-free
+   file so the whole pin/menu policy is unit-testable on any OS — **43 tests**
+   now cover scoring, stores, settings and the action policy.
 
 ## 🆕 What's new in v2.2.0-alpha.1 — Actions (DEV_PLAN Phase 2)
 

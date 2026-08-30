@@ -15,9 +15,10 @@ public sealed record FavEntry(string Key, string Title, string Subtitle, string 
 
 /// <summary>
 /// v2.2 (DEV_PLAN Task 2.2) — pinned favourites behind the FAVOURITES section on the
-/// empty view. Rows are pinned/unpinned from the v2.2 row context menu; the store is
-/// keyed by RunArgument (OrdinalIgnoreCase) and keeps insertion order, so the most
-/// recently pinned item is the last one shown.
+/// empty view. Rows are pinned/unpinned from the row context menu or the hover star
+/// (v2.2.0-alpha.2); the store is keyed by RunArgument (OrdinalIgnoreCase) and keeps
+/// insertion order — Snapshot() is oldest-first (storage order), DisplaySnapshot()
+/// flips to newest-first for display.
 ///
 /// Storage mirrors UsageStore: favourites.json in %APPDATA%\Lumo — tiny, tolerant of
 /// corruption, written on a background thread (never on the keystroke path) with a
@@ -43,10 +44,39 @@ public sealed class Favourites
     /// <summary>Number of pinned favourites (diagnostics/tests).</summary>
     public int Count { get { lock (_gate) { return _items.Count; } } }
 
-    /// <summary>Ordered copy of the pinned rows (oldest pin first). Never throws.</summary>
+    /// <summary>Ordered copy of the pinned rows (oldest pin first — storage order). Never throws.</summary>
     public List<FavEntry> Snapshot()
     {
         lock (_gate) { return new List<FavEntry>(_items); }
+    }
+
+    /// <summary>
+    /// v2.2.0-alpha.2 rework — the display order for the FAVOURITES section: newest
+    /// pin first. The row the user just pinned is the one they most likely want
+    /// next, so it leads the section (storage order is untouched — Snapshot() still
+    /// returns oldest-first, and the JSON file keeps its insertion order).
+    /// </summary>
+    public List<FavEntry> DisplaySnapshot()
+    {
+        lock (_gate)
+        {
+            var list = new List<FavEntry>(_items);
+            list.Reverse();
+            return list;
+        }
+    }
+
+    /// <summary>
+    /// v2.2.0-alpha.2 — one call for the hover star and the menu's pin/unpin pair:
+    /// adds when unpinned, removes when pinned. Returns the NEW pinned state
+    /// (true = now pinned) — NOT the operation's success, so callers can show
+    /// feedback directly. Callers are UI-thread-only, so the check-then-act is
+    /// safe; the store itself stays fully thread-safe.
+    /// </summary>
+    public bool Toggle(string? key, string title, string subtitle, string glyph, string kind)
+    {
+        if (IsPinned(key)) { Remove(key); return false; }
+        return Add(key, title, subtitle, glyph, kind);
     }
 
     /// <summary>

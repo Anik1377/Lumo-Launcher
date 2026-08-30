@@ -1,7 +1,31 @@
 ======================================================
-  LUMO v2.2.0-alpha.1  —  universal launcher for Windows
+  LUMO v2.2.0-alpha.2  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.2.0-alpha.2 (quick actions + favourites rework)
+---------------------------------------------------------------
+1. OPEN LEADS THE MENU - the quick-action menu now starts
+   with Open (exactly what Enter does), the pin/unpin pair
+   sits behind a separator, items show their gesture key
+   ("Open   Enter"), and copying a web row reports
+   "Copied URL" instead of "Copied path".
+2. PIN ON HOVER - pinnable rows show a star on hover:
+   outline ☆ to pin, filled accent ★ while pinned (always
+   visible, so you can unpin from any view). One click,
+   no menu needed.
+3. TOOLS + FILES JOIN - utility rows (U/ commands like
+   mute, night light, Settings) are now openable and
+   PINNABLE. Elevation now works for .bat/.cmd/.exe/.msc
+   files found by the file index, not just Start-Menu
+   apps.
+4. FAVOURITES, REFINED - the FAVOURITES section now shows
+   up to 12 pins (the old silent cap was 6) ordered
+   NEWEST PIN FIRST; storage on disk is unchanged, so
+   upgrading is lossless.
+5. FIXES - right-clicking a header no longer flashes an
+   empty menu; Ctrl+Right now TOGGLES the menu closed;
+   the pin/menu policy is covered by 43 unit tests.
 
 WHAT'S NEW IN v2.2.0-alpha.1 (DEV_PLAN Phase 2 — "Actions")
 -----------------------------------------------------------

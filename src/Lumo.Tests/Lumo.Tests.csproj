@@ -24,6 +24,10 @@
     <Compile Include="../Lumo/Core/WebProviders.cs" Link="Core/WebProviders.cs" />
     <Compile Include="../Lumo/Core/AppPaths.cs" Link="Core/AppPaths.cs" />
     <Compile Include="../Lumo/Core/SystemTheme.cs" Link="Core/SystemTheme.cs" />
+    <!-- v2.2.0-alpha.2 — ResultItem/ResultKind live in their own WPF-free file
+         (Icon is #if NETWINDOWS), so the pin/menu policy is testable anywhere -->
+    <Compile Include="../Lumo/Core/ResultItem.cs" Link="Core/ResultItem.cs" />
+    <Compile Include="../Lumo/Core/RowActions.cs" Link="Core/RowActions.cs" />
     <Compile Include="../Lumo/Services/UsageStore.cs" Link="Services/UsageStore.cs" />
     <Compile Include="../Lumo/Services/Favourites.cs" Link="Services/Favourites.cs" />
     <Compile Include="../Lumo/Services/DiagnosticLogger.cs" Link="Services/DiagnosticLogger.cs" />

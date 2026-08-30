@@ -3,49 +3,8 @@ using Lumo.Services;
 
 namespace Lumo.Core;
 
-/// <summary>A single row in the launcher result list.</summary>
-public sealed class ResultItem
-{
-    public string Title { get; init; } = "";
-    public string Subtitle { get; init; } = "";
-    public string Glyph { get; init; } = "·";
-    public string RunArgument { get; init; } = "";   // file path / url / shell command / expression result
-    public ResultKind Kind { get; init; }
-
-    /// <summary>v1.4.1 — real shell icon (app/logo/file type). Null → the row shows Glyph instead.</summary>
-    public System.Windows.Media.ImageSource? Icon { get; init; }
-
-    /// <summary>v1.3 — short label shown in the right-hand chip of a result row.</summary>
-    public string KindLabel => Kind switch
-    {
-        ResultKind.App => "App",
-        ResultKind.File => "File",
-        ResultKind.Calculator => "=",
-        ResultKind.Web => "Web",
-        ResultKind.Image => "Image",
-        ResultKind.Tool => "Tool",
-        ResultKind.Hint => "Tip",
-        ResultKind.Shortcut => "Shortcut",
-        ResultKind.Clipboard => "Copy",   // v1.6
-        ResultKind.Header => "",          // v1.6 — section title, no chip
-        _ => "",
-    };
-}
-
-public enum ResultKind
-{
-    App,
-    File,
-    Calculator,
-    Web,
-    Image,
-    Tool,
-    Hint,
-    Error,
-    Shortcut,   // v1.4 — user-defined /sc launch
-    Clipboard,  // v1.6 — one clipboard-history entry (Enter copies it back)
-    Header,     // v1.6 — section title row (Raycast "Favourites" style)
-}
+// v2.2.0-alpha.2 rework — ResultItem / ResultKind moved to Core/ResultItem.cs so
+// the pure test target can compile them (and RowActions) without WPF.
 
 /// <summary>
 /// Central search pipeline. Everything it does is synchronous, in-memory and bounded;
@@ -79,51 +38,7 @@ public sealed class SearchEngine
     {
         try
         {
-            var query = (rawQuery ?? string.Empty).Trim();
-            if (query.Length == 0) return DefaultRows();
-
-            if (query.StartsWith("A/", StringComparison.OrdinalIgnoreCase))
-                return AppRows(query[2..].Trim());
-
-            if (query.StartsWith("F/", StringComparison.OrdinalIgnoreCase))
-                return FileRows(query[2..].Trim());
-
-            if (query.StartsWith("C/", StringComparison.OrdinalIgnoreCase))
-                return CalcRows(query[2..].Trim());
-
-            if (query.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
-                return WebRows(query[2..].Trim());
-
-            if (query.StartsWith("I/", StringComparison.OrdinalIgnoreCase))
-                return ImageRows(query[2..].Trim());
-
-            if (query.StartsWith("U/", StringComparison.OrdinalIgnoreCase))
-                return ToolRows(query[2..].Trim());
-
-            // v1.6 — H/ : Raycast-style clipboard history
-            if (query.StartsWith("H/", StringComparison.OrdinalIgnoreCase))
-                return ClipboardRows(query[2..].Trim());
-
-            // v1.6 — S/ : Raycast-style window management (snap / maximize / center)
-            if (query.StartsWith("S/", StringComparison.OrdinalIgnoreCase))
-                return WindowRows(query[2..].Trim());
-
-            // v1.6 — !keyword : snippet search (type ! and part of a snippet name)
-            if (query.StartsWith("!"))
-                return SnippetRows(query[1..].Trim());
-
-            // v1.4 — /sc <name> : user shortcuts & macros. Any "/…" query enters
-            // shortcut mode; a leading "sc" token is optional and stripped.
-            if (query.StartsWith("/"))
-            {
-                string rest = query[1..].Trim();
-                if (rest.Equals("sc", StringComparison.OrdinalIgnoreCase)) rest = "";
-                else if (rest.StartsWith("sc ", StringComparison.OrdinalIgnoreCase)) rest = rest[3..].Trim();
-                return ShortcutRows(rest);
-            }
-
-            // Default view: apps + tools matching, plus top files.
-            return MixedRows(query);
+            return Annotate(SearchCore(rawQuery));
         }
         catch (Exception ex)
         {
@@ -135,20 +50,92 @@ public sealed class SearchEngine
         }
     }
 
+    /// <summary>
+    /// v2.2.0-alpha.2 rework — stamps every returned row with its pin state in ONE
+    /// place, so the hover star (CanPin/Pinned) and the right-click menu can never
+    /// disagree about what a row offers. Rows are re-annotated on every search, and
+    /// pin/unpin triggers a fresh search, so the state is always current.
+    /// </summary>
+    private List<ResultItem> Annotate(List<ResultItem> rows)
+    {
+        foreach (var r in rows)
+        {
+            bool pinnable = RowActions.Pinnable(r);
+            r.CanPin = pinnable;
+            r.Pinned = pinnable && _favs is { } f && f.IsPinned(r.RunArgument);
+        }
+        return rows;
+    }
+
+    private List<ResultItem> SearchCore(string rawQuery)
+    {
+        var query = (rawQuery ?? string.Empty).Trim();
+        if (query.Length == 0) return DefaultRows();
+
+        if (query.StartsWith("A/", StringComparison.OrdinalIgnoreCase))
+            return AppRows(query[2..].Trim());
+
+        if (query.StartsWith("F/", StringComparison.OrdinalIgnoreCase))
+            return FileRows(query[2..].Trim());
+
+        if (query.StartsWith("C/", StringComparison.OrdinalIgnoreCase))
+            return CalcRows(query[2..].Trim());
+
+        if (query.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
+            return WebRows(query[2..].Trim());
+
+        if (query.StartsWith("I/", StringComparison.OrdinalIgnoreCase))
+            return ImageRows(query[2..].Trim());
+
+        if (query.StartsWith("U/", StringComparison.OrdinalIgnoreCase))
+            return ToolRows(query[2..].Trim());
+
+        // v1.6 — H/ : Raycast-style clipboard history
+        if (query.StartsWith("H/", StringComparison.OrdinalIgnoreCase))
+            return ClipboardRows(query[2..].Trim());
+
+        // v1.6 — S/ : Raycast-style window management (snap / maximize / center)
+        if (query.StartsWith("S/", StringComparison.OrdinalIgnoreCase))
+            return WindowRows(query[2..].Trim());
+
+        // v1.6 — !keyword : snippet search (type ! and part of a snippet name)
+        if (query.StartsWith("!"))
+            return SnippetRows(query[1..].Trim());
+
+        // v1.4 — /sc <name> : user shortcuts & macros. Any "/…" query enters
+        // shortcut mode; a leading "sc" token is optional and stripped.
+        if (query.StartsWith("/"))
+        {
+            string rest = query[1..].Trim();
+            if (rest.Equals("sc", StringComparison.OrdinalIgnoreCase)) rest = "";
+            else if (rest.StartsWith("sc ", StringComparison.OrdinalIgnoreCase)) rest = rest[3..].Trim();
+            return ShortcutRows(rest);
+        }
+
+        // Default view: apps + tools matching, plus top files.
+        return MixedRows(query);
+    }
+
     // ---------------------------------------------------------------- rows
 
     private List<ResultItem> DefaultRows()
     {
         var rows = new List<ResultItem>();
 
-        // v2.2 (DEV_PLAN Task 2.2) — pinned favourites lead the empty view, Raycast-style.
-        // Row data comes from the store; the shell icon is refreshed live for app/file rows.
+        // v2.2.0-alpha.2 rework (DEV_PLAN Task 2.2) — pinned favourites lead the empty
+        // view, newest pin FIRST: the thing you just pinned is the thing you most
+        // likely want next, and a fresh pin visibly lands at the top of the section.
+        // Up to 12 rows are shown (was a silent 6 — pinning more made rows vanish).
+        // Row data comes from the store; the shell icon is refreshed live for app/file
+        // rows, and Annotate() stamps CanPin/Pinned so the hover star appears immediately.
         if (_favs is { Count: > 0 })
         {
-            rows.Add(new ResultItem { Title = "FAVOURITES", Subtitle = "pinned — right-click any result to pin or unpin", Kind = ResultKind.Header });
-            foreach (var f in _favs.Snapshot())
+            rows.Add(new ResultItem { Title = "FAVOURITES", Subtitle = "pinned — hover a row for its ★, right-click for quick actions", Kind = ResultKind.Header });
+            int shown = 0;
+            foreach (var f in _favs.DisplaySnapshot())
             {
-                if (rows.Count >= 7) break;   // header + up to 6 favourites
+                if (shown >= 12) break;   // header + up to 12 favourites
+                shown++;
                 var kind = Enum.TryParse<ResultKind>(f.Kind, out var k) ? k : ResultKind.Tool;
                 rows.Add(new ResultItem
                 {

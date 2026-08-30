@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>2.2.0-alpha.1</Version>
-    <InformationalVersion>Lumo 2.1.0-alpha.1 (ALPHA — unstable build)</InformationalVersion>
+    <Version>2.2.0-alpha.2</Version>
+    <InformationalVersion>Lumo 2.2.0-alpha.2 (ALPHA — unstable build)</InformationalVersion>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -20,6 +20,9 @@
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <!-- ResultItem.cs guards its one WPF-typed member (Icon) with LUMO_WPF so the
+         Phase 0 pure test target (net8.0, no WPF) can compile the row model too. -->
+    <DefineConstants Condition="'$(UseWPF)' == 'true'">$(DefineConstants);LUMO_WPF</DefineConstants>
   </PropertyGroup>
 
   <!-- UseWindowsForms injects global System.Drawing / System.Windows.Forms usings which

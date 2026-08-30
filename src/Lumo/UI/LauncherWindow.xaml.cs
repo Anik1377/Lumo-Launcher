@@ -637,10 +637,18 @@ public partial class LauncherWindow : Window
 
     private void ExecuteSelected()
     {
+        if (Results.SelectedItem is ResultItem item) ExecuteItem(item);
+    }
+
+    /// <summary>
+    /// v2.2.0-alpha.2 rework — the one true execute path. Enter, double-click and the
+    /// quick-action menu's "Open" all funnel through here, so the menu's primary
+    /// action can never drift from what pressing Enter does.
+    /// </summary>
+    private void ExecuteItem(ResultItem item)
+    {
         try
         {
-            if (Results.SelectedItem is not ResultItem item) return;
-
             // open the in-app settings window (not the settings folder)
             if (item.RunArgument == "cmd:app-settings")
             {
@@ -790,20 +798,34 @@ public partial class LauncherWindow : Window
         catch { }
     }
 
-    /// <summary>The menu is rebuilt for the selected row every time it opens.</summary>
+    /// <summary>
+    /// The menu is rebuilt for the selected row every time it opens. When the row
+    /// carries no actions we set e.Handled: merely nulling the ContextMenu inside
+    /// this handler does NOT stop WPF from opening the (empty) menu it already
+    /// captured at event-raise time — right-clicking a header used to flash an
+    /// empty menu shell.
+    /// </summary>
     private void OnResultsContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        try { BuildRowMenu(); }
+        try
+        {
+            if (!BuildRowMenu()) e.Handled = true;
+        }
         catch (Exception ex) { DiagnosticLogger.LogException("Window.RowMenuOpening", ex); }
     }
 
-    /// <summary>Ctrl+→ opens the same menu, anchored under the selected row.</summary>
+    /// <summary>Ctrl+→ toggles the quick-action menu under the selected row.</summary>
     private void OpenRowMenuKeyboard()
     {
         try
         {
-            BuildRowMenu();
-            if (Results.ContextMenu is not ContextMenu menu) return;
+            // v2.2.0-alpha.2 — the gesture is a toggle, not a spigot
+            if (Results.ContextMenu is ContextMenu { IsOpen: true })
+            {
+                Results.ContextMenu.IsOpen = false;
+                return;
+            }
+            if (!BuildRowMenu() || Results.ContextMenu is not ContextMenu menu) return;
             if (Results.ItemContainerGenerator.ContainerFromItem(Results.SelectedItem) is ListBoxItem lbi)
             {
                 menu.PlacementTarget = lbi;
@@ -814,25 +836,38 @@ public partial class LauncherWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("Window.RowMenuKeyboard", ex); }
     }
 
-    private void BuildRowMenu()
+    /// <summary>
+    /// Rebuilds the menu for the selected row. Returns false when there is nothing
+    /// to show — ContextMenu is left null so no stale menu can ever open.
+    /// </summary>
+    private bool BuildRowMenu()
     {
         if (Results.SelectedItem is not ResultItem item)
         {
             Results.ContextMenu = null;
-            return;
+            return false;
         }
 
         var actions = RowActions.For(item, _favs.IsPinned(item.RunArgument));
         if (actions.Count == 0)
         {
             Results.ContextMenu = null;
-            return;
+            return false;
         }
 
         var menu = new ContextMenu();
         foreach (var a in actions)
         {
+            // v2.2.0-alpha.2 — the pin/unpin pair sits apart from the work actions
+            if (a is RowAction.Pin or RowAction.Unpin && menu.Items.Count > 0)
+            {
+                var sep = new Border { Height = 1, Margin = new Thickness(7, 5, 7, 4), Opacity = 0.6 };
+                sep.SetResourceReference(Border.BackgroundProperty, "BorderLineBrush");
+                menu.Items.Add(sep);
+            }
+
             var mi = new MenuItem { Header = RowActions.Label(a) };
+            if (a == RowAction.Open) mi.InputGestureText = "Enter";
             var captured = a;
             mi.Click += (_, _) =>
             {
@@ -842,6 +877,7 @@ public partial class LauncherWindow : Window
             menu.Items.Add(mi);
         }
         Results.ContextMenu = menu;
+        return true;
     }
 
     /// <summary>Runs one quick action. The launcher stays open — these are helpers
@@ -850,13 +886,20 @@ public partial class LauncherWindow : Window
     {
         switch (action)
         {
+            // v2.2.0-alpha.2 — the menu's primary action is the exact Enter path
+            case RowAction.Open:
+                ExecuteItem(item);
+                break;
+
             case RowAction.OpenContainingFolder:
                 OpenContainingFolder(item.RunArgument);
                 break;
 
             case RowAction.CopyPath:
                 TryClipboardText(item.RunArgument);
-                StatusText.Text = "Copied path";
+                // web rows carry their URL as the "path" — say so
+                StatusText.Text = item.RunArgument.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? "Copied URL" : "Copied path";
                 break;
 
             case RowAction.CopyName:
@@ -872,18 +915,36 @@ public partial class LauncherWindow : Window
                 RunElevated(item.RunArgument);
                 break;
 
+            // v2.2.0-alpha.2 — one Toggle call covers both directions
             case RowAction.Pin:
-                _favs.Add(item.RunArgument, item.Title, item.Subtitle, item.Glyph, item.Kind.ToString());
-                StatusText.Text = "★ Pinned to favourites";
-                RunSearch();   // the FAVOURITES section appears immediately on the empty view
-                break;
-
             case RowAction.Unpin:
-                _favs.Remove(item.RunArgument);
-                StatusText.Text = "Unpinned";
-                RunSearch();
+                bool nowPinned = _favs.Toggle(item.RunArgument, item.Title, item.Subtitle, item.Glyph, item.Kind.ToString());
+                StatusText.Text = nowPinned ? "★ Pinned to favourites" : "Unpinned";
+                RunSearch();   // FAVOURITES section / star state refresh immediately
                 break;
         }
+    }
+
+    /// <summary>
+    /// v2.2.0-alpha.2 — the hover star: pin/unpin without opening any menu. The star
+    /// is only rendered on rows that CanPin (SearchEngine.Annotate stamps it); marking
+    /// the mouse-down handled keeps the ListBox from also treating the click as row
+    /// selection. Pin/unpin triggers a fresh search, which re-stamps every row — so
+    /// the star can never show stale state.
+    /// </summary>
+    private void OnPinStarDown(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            e.Handled = true;
+            if (sender is FrameworkElement { DataContext: ResultItem { CanPin: true } item })
+            {
+                bool nowPinned = _favs.Toggle(item.RunArgument, item.Title, item.Subtitle, item.Glyph, item.Kind.ToString());
+                StatusText.Text = nowPinned ? "★ Pinned to favourites" : "Unpinned";
+                RunSearch();
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Window.PinStar", ex); }
     }
 
     private static void TryClipboardText(string? s)

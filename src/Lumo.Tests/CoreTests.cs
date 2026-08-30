@@ -431,4 +431,113 @@ public class FavouritesTests
         }
         finally { try { System.IO.File.Delete(file); } catch { } }
     }
+
+    // v2.2.0-alpha.2 rework — Toggle + display order
+
+    [Fact]
+    public void Toggle_Flips_Pin_State()
+    {
+        var favs = new Favourites(TempFile());
+        Assert.True(favs.Toggle("k1", "Name", "Sub", "A", "App"));    // unpinned → pinned
+        Assert.True(favs.IsPinned("k1"));
+        Assert.False(favs.Toggle("K1", "Name", "Sub", "A", "App"));   // case-insensitive → unpinned
+        Assert.Equal(0, favs.Count);
+        Assert.False(favs.Toggle(null, "x", "", "", "App"));          // empty keys stay no-ops
+    }
+
+    [Fact]
+    public void DisplaySnapshot_Shows_Newest_Pin_First()
+    {
+        var favs = new Favourites(TempFile());
+        favs.Add("a", "First", "", "★", "App");
+        favs.Add("b", "Second", "", "★", "File");
+        favs.Add("c", "Third", "", "★", "Web");
+
+        // display: the pin you just made leads the section
+        Assert.Equal(new[] { "Third", "Second", "First" },
+                     favs.DisplaySnapshot().Select(f => f.Title).ToArray());
+
+        // storage order is untouched — the JSON file keeps insertion order
+        Assert.Equal(new[] { "First", "Second", "Third" },
+                     favs.Snapshot().Select(f => f.Title).ToArray());
+    }
+}
+
+// ---- v2.2.0-alpha.2 RowActions rework (DEV_PLAN Task 2.1) -----------------------
+
+public class RowActionsTests
+{
+    private static ResultItem Row(ResultKind kind, string arg, string title = "row") =>
+        new() { Kind = kind, RunArgument = arg, Title = title };
+
+    [Fact]
+    public void App_Menu_Leads_With_Open_And_Ends_With_Pin()
+    {
+        var list = RowActions.For(Row(ResultKind.App, @"C:\Apps\Chrome.lnk", "Chrome"), pinned: false);
+        Assert.Equal(RowAction.Open, list[0]);                 // primary action first
+        Assert.Equal(RowAction.Pin, list[^1]);                 // pin sits last, after a separator
+        Assert.Contains(RowAction.OpenContainingFolder, list);
+        Assert.Contains(RowAction.OpenTerminal, list);
+        Assert.Contains(RowAction.CopyPath, list);
+        Assert.Contains(RowAction.CopyName, list);
+        Assert.Contains(RowAction.RunAsAdmin, list);           // .lnk is elevatable
+    }
+
+    [Fact]
+    public void Pinned_Row_Offers_Unpin_And_Plain_Text_Files_Never_Elevate()
+    {
+        var list = RowActions.For(Row(ResultKind.File, @"C:\Docs\readme.txt"), pinned: true);
+        Assert.Equal(RowAction.Unpin, list[^1]);
+        Assert.DoesNotContain(RowAction.RunAsAdmin, list);     // .txt cannot elevate
+    }
+
+    [Fact]
+    public void Batch_File_Found_By_Index_Can_Be_Elevated()    // v2.2.0-alpha.2 — File-kind elevation
+    {
+        var list = RowActions.For(Row(ResultKind.File, @"C:\Scripts\build.bat"), pinned: false);
+        Assert.Contains(RowAction.RunAsAdmin, list);
+    }
+
+    [Fact]
+    public void Tool_Rows_Are_Openable_And_Pinnable_With_No_Path_Actions()
+    {
+        var list = RowActions.For(Row(ResultKind.Tool, "cmd:mute"), pinned: false);
+        Assert.Equal(new List<RowAction> { RowAction.Open, RowAction.Pin }, list);
+    }
+
+    [Fact]
+    public void Web_Rows_Open_Copy_Their_Url_And_Pin()
+    {
+        var list = RowActions.For(Row(ResultKind.Web, "https://github.com"), pinned: false);
+        Assert.Equal(RowAction.Open, list[0]);
+        Assert.Contains(RowAction.CopyPath, list);
+        Assert.Equal(RowAction.Pin, list[^1]);
+    }
+
+    [Fact]
+    public void Management_Commands_Are_Never_Pinnable()
+    {
+        Assert.False(RowActions.Pinnable(Row(ResultKind.Tool, "cmd:record-stop")));
+        Assert.False(RowActions.Pinnable(Row(ResultKind.Tool, "cmd:new-shortcut:work")));
+        Assert.False(RowActions.Pinnable(Row(ResultKind.Tool, "cmd:manage-shortcuts")));
+        Assert.True(RowActions.Pinnable(Row(ResultKind.Tool, "cmd:app-settings")));   // Settings is a legit favourite
+        Assert.True(RowActions.Pinnable(Row(ResultKind.Tool, "cmd:mute")));
+    }
+
+    [Fact]
+    public void Non_Actionable_Rows_Get_No_Menu_At_All()
+    {
+        Assert.Empty(RowActions.For(Row(ResultKind.Header, ""), false));
+        Assert.Empty(RowActions.For(Row(ResultKind.Hint, "A/"), false));
+        Assert.Empty(RowActions.For(Row(ResultKind.Error, ""), false));
+        Assert.Empty(RowActions.For(Row(ResultKind.Calculator, "42"), false));
+        Assert.Empty(RowActions.For(Row(ResultKind.Clipboard, "copied text"), false));
+    }
+
+    [Fact]
+    public void Pinnable_Guards_Null_And_Empty_Keys()
+    {
+        Assert.False(RowActions.Pinnable(null));
+        Assert.False(RowActions.Pinnable(new ResultItem { Kind = ResultKind.App, RunArgument = "" }));
+    }
 }
