@@ -20,7 +20,7 @@ public sealed class Settings
     public bool HideOnFocusLoss { get; set; } = false;
 
     // ---- v1.2 customization -------------------------------------------------
-    public string AccentColor { get; set; } = "#7C6CFF";   // hex, used by text/caret/highlights
+    public string AccentColor { get; set; } = "#FF6363";   // hex — v2.4 Raycast red (was violet)
     public bool BorderEffect { get; set; } = true;         // animated glow border around the launcher
     public string BorderStyle { get; set; } = "Aurora";    // Aurora | Sunset | Ocean | Ember | Mint | Solid
     public double BorderSpeedSec { get; set; } = 9.0;      // seconds per perimeter lap (6 = fast, 14 = slow)
@@ -34,7 +34,7 @@ public sealed class Settings
     // ---- v2.0.1 advanced customization --------------------------------------
     public double GlowOpacity { get; set; } = 0.9;         // rim comet brightness (0.40–1.00)
     public double RimThickness { get; set; } = 3.0;        // glowing rim band width in px (2–6)
-    public double WindowWidth { get; set; } = 720.0;       // launcher width in DIP (560–900)
+    public double WindowWidth { get; set; } = 744.0;       // launcher width in DIP (560–900) — Raycast proportion
     public string CornerStyle { get; set; } = "rounded";   // rounded (Win11 8 px) | square
     public string RowDensity { get; set; } = "comfortable"; // comfortable | compact
 
@@ -102,6 +102,14 @@ public sealed class Settings
         s.AiEndpoint        = GetStr(root, nameof(AiEndpoint), s.AiEndpoint);
         s.AiModel           = GetStr(root, nameof(AiModel), s.AiModel);
         s.AiApiKey          = GetStr(root, nameof(AiApiKey), s.AiApiKey);
+
+        // v2.4 design-system migration — pre-2.4 installs carry an accent that was only
+        // ever the old default (violet #7C6CFF or Win11 blue #0078D4). The Raycast-grade
+        // system ships a new signature accent, so silently carry those installs over;
+        // a colour the user actually picked (anything else) is respected untouched.
+        if (string.Equals(s.AccentColor, "#7C6CFF", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(s.AccentColor, "#0078D4", StringComparison.OrdinalIgnoreCase))
+            s.AccentColor = "#FF6363";
     }
 
     private static string GetStr(JsonElement root, string name, string fallback)

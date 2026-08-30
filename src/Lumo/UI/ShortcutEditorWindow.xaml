@@ -161,8 +161,8 @@
         </Border>
 
         <Border x:Name="Root" CornerRadius="14" BorderThickness="1"
-                BorderBrush="{DynamicResource BorderLineBrush}" Background="#FF1C1C1E"
-                TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Arial"
+                BorderBrush="{DynamicResource BorderLineBrush}" Background="#FF0E0F12"
+                TextElement.FontFamily="/Assets/Fonts/#Inter"
                 RenderTransformOrigin="0.5,0.5">
             <Border.RenderTransform>
                 <ScaleTransform x:Name="RootScale" ScaleX="1" ScaleY="1"/>

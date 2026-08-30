@@ -242,12 +242,14 @@ public partial class SettingsWindow : Window
 
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
 
-            // Windows 11 Fluent surface tokens — solid, no blur dependency.
-            Color field   = dark ? FromRgb(0x2D, 0x2D, 0x2D) : FromRgb(0xFB, 0xFB, 0xFB);
-            Color card    = dark ? FromRgb(0x2B, 0x2B, 0x2B) : Colors.White;
-            Color sidebar = dark ? FromRgb(0x1C, 0x1C, 0x1C) : FromRgb(0xEC, 0xEC, 0xEC);
-            Color segTrack = dark ? FromRgb(0x3B, 0x3B, 0x3B) : FromRgb(0xE6, 0xE6, 0xE6);
-            Color segSel  = dark ? FromRgb(0x4A, 0x4A, 0x4A) : Colors.White;
+            // v2.4 — Raycast surface ladder: elevated cards one step above the canvas,
+            // sidebar slightly BELOW the canvas (the Raycast settings split), hairline
+            // segmentation everywhere. No saturated fills — quiet, monochrome chrome.
+            Color field    = Appearance.ElevatedFor(dark);
+            Color card     = dark ? FromRgb(0x14, 0x15, 0x1A) : Colors.White;
+            Color sidebar  = dark ? FromRgb(0x0B, 0x0C, 0x0F) : FromRgb(0xF1, 0xF1, 0xF4);
+            Color segTrack = dark ? FromRgb(0x21, 0x23, 0x28) : FromRgb(0xE9, 0xEA, 0xEC);
+            Color segSel   = dark ? FromRgb(0x34, 0x36, 0x3C) : Colors.White;
 
             Resources["TitleBrush"] = new SolidColorBrush(p.Title);
             Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);

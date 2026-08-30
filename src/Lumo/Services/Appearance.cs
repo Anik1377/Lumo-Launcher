@@ -11,32 +11,37 @@ namespace Lumo.Services;
 /// <summary>
 /// Shared appearance helpers.
 ///
-/// • v2.0 — Windows 11 "Fluent 2" design tokens: solid surfaces (#202020 / #F3F3F3),
-///   4 px-class control geometry, neutral hover fills and accent-tinted selection —
-///   the glassmorphism era is over, this is a native-feeling Windows 11 app now.
-/// • Rim glow (v2.0.1, rewritten) — the z.ai chat-box comet: two soft radial light
-///   blobs (bright head + fainter tail) that orbit the TRUE window perimeter via a
-///   path animation, clipped to the window so the light only ever exists INSIDE the
-///   rim — nothing bleeds outside, no spinning diagonal gradient. A rotating brush
-///   on a rectangle never follows the border (the head slides across edges at uneven
-///   speed and stalls at corners); a blob that travels the outline does.
+/// • v2.4 — "Raycast-grade" design system. The Win11 gray ladder (#202020 → #2D2D2D)
+///   is gone; every surface now sits on a near-black, faintly blue-tinted ladder
+///   modelled on Raycast's product chrome: panel ≈ #0E0F12, elevated fields ≈
+///   #17181C, hairline #26282D, ink #F4F4F6, mute #9B9CA1. Selection is a QUIET
+///   neutral fill (Raycast's active row) — the accent appears only as punctuation:
+///   caret, selection pill, glyphs, primary buttons. Light mode mirrors the same
+///   structure with a #FAFAFB canvas and white fields. Typography is embedded Inter.
+/// • Rim glow (v2.0.1) — the z.ai chat-box comet: two soft radial light blobs that
+///   orbit the TRUE window perimeter via a path animation, clipped to the window so
+///   the light only ever exists INSIDE the rim.
 /// • v1.3 — "auto" theme reads the Windows personalization setting.
 /// </summary>
 public static class Appearance
 {
     public static readonly string[] BorderStyleNames = { "Aurora", "Sunset", "Ocean", "Ember", "Mint", "Solid" };
 
+    /// <summary>
+    /// v2.4 — Raycast red leads the palette (the brand accent of the design system
+    /// we now mirror); the older Fluent hues stay as secondary choices.
+    /// </summary>
     public static readonly string[] AccentPresets =
     {
-        "#0078D4", // Windows 11 system blue (default)
+        "#FF6363", // Raycast red (v2.4 default)
         "#7C6CFF", // violet (classic Lumo)
-        "#0099BC", // teal
-        "#107C10", // green
+        "#57C1FF", // sky (Raycast info blue)
+        "#59D499", // emerald (Raycast green)
+        "#FFC533", // amber (Raycast yellow)
         "#C239B3", // magenta
-        "#CA5010", // orange
-        "#DA3B01", // red
+        "#0099BC", // teal
+        "#CA5010", // burnt orange
         "#5C2E91", // purple
-        "#038387", // cyan-deep
     };
 
     // v2.0 "comet" rim presets — stops[0] is the bright core colour, stops[1] the
@@ -60,7 +65,7 @@ public static class Appearance
                 return (Color)ColorConverter.ConvertFromString(hex.Trim());
         }
         catch { /* fall through */ }
-        return Color.FromRgb(0x00, 0x78, 0xD4);   // Windows 11 system blue
+        return Color.FromRgb(0xFF, 0x63, 0x63);   // Raycast red — the v2.4 system accent
     }
 
     /// <summary>True when the style is an animated comet preset (everything but "Solid").</summary>
@@ -168,38 +173,58 @@ public static class Appearance
         Color Hover, Color Selected, Color GlyphBox, Color Accent, Color Separator);
 
     /// <summary>
-    /// v2.0 — Windows 11 Fluent 2 surface tokens. Solid, no blur dependency:
-    /// dark #202020 base (Mica-dark equivalent), light #F3F3F3 base; hairline strokes
-    /// (#383838 / #E5E5E5); neutral 5-6% hover fills and accent-tinted selection,
-    /// the way Win11 list items and nav pills behave.
+    /// v2.4 — Raycast-grade surface ladder.
+    ///
+    /// Dark: a near-black, faintly blue-tinted canvas (#0E0F12) with ONE elevation
+    /// step up (#17181C fields/tiles) and hairline strokes (#26282D) — the Raycast
+    /// "surface ladder" (#07080a → #0d0d0d → #101111 → #121212) adapted for a
+    /// launcher card that floats on the desktop. Text: ink #F4F4F6, mute #9B9CA1,
+    /// placeholder ash #63646B. Selection is deliberately QUIET — a neutral fill one
+    /// step above the panel (Raycast's active row); the accent stays punctuation.
+    ///
+    /// Light mirrors the structure: #FAFAFB canvas, #FFFFFF fields, #17181C ink,
+    /// #71727A mute, #E6E7EA hairlines, #ECEDEF active row.
     /// </summary>
     public static Palette PaletteFor(bool dark, string? accentHex)
     {
         var accent = ParseAccent(accentHex);
         return dark
             ? new Palette(
-                Panel:    FromRgb(0x20, 0x20, 0x20),   // Win11 SolidBackgroundFillColorBase dark
-                Field:    FromRgb(0x2D, 0x2D, 0x2D),   // ControlFillColorDefault dark
-                Border:   FromRgb(0x38, 0x38, 0x38),   // CardStrokeColorDefault dark
-                Title:    FromRgb(0xFF, 0xFF, 0xFF),   // TextFillColorPrimary dark
-                Subtitle: FromRgb(0xC8, 0xC8, 0xC8),   // TextFillColorSecondary dark
-                Hover:    Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF),   // SubtleFillColorSecondary-ish
-                Selected: Tint(accent, 0x2E),          // accent @ 18% — softer with the new selection pill
-                GlyphBox: FromRgb(0x2D, 0x2D, 0x2D),
+                Panel:    FromRgb(0x0E, 0x0F, 0x12),   // canvas — Raycast surface tier 1
+                Field:    FromRgb(0x17, 0x18, 0x1C),   // elevated fill — tier 3 (inputs, tiles)
+                Border:   FromRgb(0x26, 0x28, 0x2D),   // hairline (Raycast #242728, nudged)
+                Title:    FromRgb(0xF4, 0xF4, 0xF6),   // ink
+                Subtitle: FromRgb(0x9B, 0x9C, 0xA1),   // mute
+                Hover:    Color.FromArgb(0x0F, 0xFF, 0xFF, 0xFF),   // 6% white — quiet pointer wash
+                Selected: FromRgb(0x1F, 0x21, 0x27),   // active row — Raycast's neutral highlight
+                GlyphBox: FromRgb(0x1B, 0x1C, 0x22),   // icon tile fill — tier 2
                 Accent:   accent,
-                Separator: FromRgb(0x33, 0x33, 0x33))
+                Separator: FromRgb(0x1D, 0x1F, 0x24))
             : new Palette(
-                Panel:    FromRgb(0xF3, 0xF3, 0xF3),   // Win11 SolidBackgroundFillColorBase light
-                Field:    FromRgb(0xFB, 0xFB, 0xFB),
-                Border:   FromRgb(0xE5, 0xE5, 0xE5),   // CardStrokeColorDefault light
-                Title:    FromRgb(0x1B, 0x1B, 0x1B),   // TextFillColorPrimary light
-                Subtitle: FromRgb(0x5F, 0x5F, 0x5F),   // TextFillColorSecondary light
-                Hover:    Color.FromArgb(0x0D, 0x00, 0x00, 0x00),
-                Selected: Tint(accent, 0x26),
-                GlyphBox: FromRgb(0xFB, 0xFB, 0xFB),
+                Panel:    FromRgb(0xFA, 0xFA, 0xFB),   // canvas
+                Field:    Colors.White,                // elevated fill
+                Border:   FromRgb(0xE6, 0xE7, 0xEA),   // hairline
+                Title:    FromRgb(0x17, 0x18, 0x1C),   // ink
+                Subtitle: FromRgb(0x71, 0x72, 0x7A),   // mute
+                Hover:    Color.FromArgb(0x0A, 0x00, 0x00, 0x00),   // 4% black
+                Selected: FromRgb(0xEC, 0xED, 0xEF),   // active row
+                GlyphBox: FromRgb(0xF1, 0xF1, 0xF4),   // icon tile fill
                 Accent:   accent,
-                Separator: FromRgb(0xE0, 0xE0, 0xE0));
+                Separator: FromRgb(0xE8, 0xE9, 0xEB));
     }
+
+    /// <summary>The muted placeholder tone for the current mode (ash tier of the ladder).</summary>
+    public static Color PlaceholderFor(bool dark) => dark
+        ? FromRgb(0x63, 0x64, 0x6B)
+        : FromRgb(0xA2, 0xA3, 0xA8);
+
+    /// <summary>
+    /// The elevated card/surface colour used by settings cards, code blocks and
+    /// popovers — tier 2.5 of the ladder, between the icon tile and the field.
+    /// </summary>
+    public static Color ElevatedFor(bool dark) => dark
+        ? FromRgb(0x14, 0x15, 0x1A)
+        : Colors.White;
 
     /// <summary>accent with the given alpha — the base for tinted highlights.</summary>
     public static Color Tint(Color accent, byte alpha) => Color.FromArgb(alpha, accent.R, accent.G, accent.B);

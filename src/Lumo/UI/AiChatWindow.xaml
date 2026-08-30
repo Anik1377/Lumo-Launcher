@@ -330,6 +330,7 @@
          (CornerRadius is synced to the DWM value in code — Win11 8 px, Win10 0) -->
     <Border x:Name="RootCard" CornerRadius="8"
             Background="{DynamicResource PanelBrush}"
+            TextElement.FontFamily="/Assets/Fonts/#Inter"
             BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>

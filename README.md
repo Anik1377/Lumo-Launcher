@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.3.0--alpha.1-CA5010?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.4.0--alpha.1-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -32,24 +32,56 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | ⚡ | **Shortcuts & macros** | Save your own one-tap launches — a URL, a file, a folder, or a multi-step macro — and run them with `/sc name` |
 | 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
-| 🪟 | **Windows 11 design** | Solid Fluent surfaces following the Windows 11 design language: `#202020`/`#F3F3F3` panels, hairline strokes, 4 px control geometry, native DWM rounded corners, Segoe UI — a full-window Settings app in the same style |
+| 🪟 | **Raycast-grade design** | A complete visual overhaul modelled on Raycast's command palette: near-black surface ladder (`#0E0F12` canvas → elevated fields), hairline strokes, quiet neutral selection with an accent pill, embedded **Inter** typography (OFL), and a flush search header — one design system across the launcher, Settings and the AI chat |
 | 🖆️ | **Clean vector icons** | A coherent Fluent-style outline icon set (24×24 stroke paths) for every row, hint and button — razor sharp at any DPI, tinted by your accent |
 | 🌈 | **Rim glow effect** | A soft comet of light that orbits the **true window perimeter, inside the rim** — never outside — 5 presets, solid accent, 3 speeds, pauses when hidden |
 | 📋 | **Clipboard history** | `H/` — your last 50 copies with timestamps, searchable, in memory only |
 | ▣ | **Window management** | `S/` — snap the last window left/right, maximize, center or restore; multi-monitor aware |
 | 📝 | **Snippets** | Save paste-anywhere texts as shortcuts and trigger with `!name` — multi-line supported, with live variables: `{{date}}`, `{{time}}`, `{{clipboard}}`, `{{name:Jane}}` |
-| 🤖 | **AI answers** | `?` + a question — local Ollama (no key) or an Anthropic API key; the answer lands on the result row, Enter copies it all |
+| 🤖 | **AI answers & chat** | `?` + a question for a quick answer on the result row, or type `AI/` and press Enter for a dedicated chat tab — streaming replies, markdown, history, local Ollama (no key) or an Anthropic API key |
 | 🔖 | **Browser bookmarks** | `B/` searches your Chrome & Edge bookmarks (all profiles) — read-only, fuzzy, newest first on the empty query |
 | 🎬 | **Fluid motion** | Spring-in window, cascading result rows, smooth hover transitions — with a reduced-motion master switch |
-| 🎨 | **Accent theming** | 9 accent presets + custom hex, driving the whole highlight system (accent-tinted selection) |
+| 🎨 | **Accent theming** | 9 accent presets (Raycast red leads) + custom hex, driving the whole highlight system |
 | 🌗 | **Dark / light / auto theme** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
 | ⏰ | **Start with Windows** | One toggle in Settings (per-user Run key, no admin rights) |
-| 🧳 | **Truly portable** | One ~350 KB exe, no installer |
+| 🧳 | **Truly portable** | One ~2 MB exe (Inter embedded), no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 | ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`, again to close) any result: **Open** (the Enter path), containing folder, copy path/name, terminal there, run as administrator, pin — with a separator before the pin pair |
 | ★ | **Pinned favourites** | A FAVOURITES section leads the empty view, newest pin first (up to 12) — pin via the menu **or the hover ★ right on the row** (`favourites.json`) |
 | 👁️ | **Preview pane** | `Tab` previews the selection — text-file heads (binary-safe, 512 KB cap), image thumbnails, clipboard entries, URLs — read off-thread with stale-read protection |
+
+## 🆕 What's new in v2.4.0-alpha.1 — the Raycast-grade UI overhaul
+
+The whole app was re-skinned from the ground up. Every surface, stroke, glyph
+and animation now follows one design system inspired by **Raycast**'s command
+palette — researched from Raycast's published design tokens and rebuilt natively
+in WPF (no WebView, still one portable exe).
+
+1. **🌊 The Raycast surface ladder.** The flat Win11 grays (`#202020`) are gone.
+   Dark mode is now a near-black, faintly blue-tinted canvas (`#0E0F12`) with one
+   elevation step up for fields and tiles (`#17181C`), hairline strokes
+   (`#26282D`), ink `#F4F4F6` and mute `#9B9CA1` — the same tiering Raycast uses
+   (`canvas → surface → surface-elevated → card`). Light mode mirrors the
+   structure (`#FAFAFB` canvas, white fields, `#E6E7EA` hairlines).
+2. **🔤 Inter, embedded.** Lumo ships the Inter type family (Regular / Medium /
+   SemiBold / Bold, SIL OFL) inside the exe — the same type system Raycast builds
+   on. Name tables are flattened so `FontWeight` picks the exact face; every
+   window, list row, card and caption now renders in Inter.
+3. **⌨️ Command-palette search header.** The boxed Win11 text field is replaced by
+   a flush search row — the input IS the header, like Raycast/Spotlight — with a
+   full-bleed hairline beneath, a larger quiet magnifier, and no focus chrome
+   (the caret is the affordance). Rows are quieter too: medium-weight titles,
+   8 px-class icon tiles, Raycast-style section headers, and a **quiet neutral
+   selection** with the accent demoted to a 3 px pill.
+4. **🪟 Settings & AI chat, same system.** Settings gets 8 px cards, a deeper
+   sidebar tier, 6 px controls, a richer window shadow and Inter headings; the AI
+   chat inherits the ladder (elevated cards, deeper caption bar, darker code
+   blocks) so all three surfaces read as one product.
+5. **🔴 Raycast red is the new signature accent** (`#FF6363`, first in the preset
+   list) — installs whose accent was only ever an old default migrate silently;
+   a colour you actually picked is respected. The launcher also widens to a 744 px
+   Raycast proportion by default (still user-tunable 560–900).
 
 ## 🆕 What's new in v2.3.0-alpha.1 — Connected (DEV_PLAN Phase 3)
 

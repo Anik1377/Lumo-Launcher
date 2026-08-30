@@ -17,14 +17,19 @@
         PreviewKeyDown="OnPreviewKeyDown">
 
     <!--
-        v2.0 "Windows 11" — solid Fluent surfaces, no acrylic.
+        v2.4 "Raycast" — the command-palette structure, natively in WPF.
 
-        · The card paints opaque Win11 palette colours (Appearance.PaletteFor):
-          dark #202020 / light #F3F3F3, hairline strokes, 4 px-class control geometry.
+        · The card paints the Raycast surface ladder (Appearance.PaletteFor):
+          dark canvas #0E0F12 / light #FAFAFB, one elevation step up for fields
+          and tiles, hairline #26282D strokes, quiet neutral selection.
+        · Typography is embedded Inter (OFL) — Regular / Medium / SemiBold / Bold,
+          name tables flattened so FontWeight picks the exact face.
+        · The search row is flush with the card top (no boxed field — the input IS
+          the header, like Raycast/Spotlight), followed by a full-bleed hairline.
         · The window keeps WindowChrome GlassFrameThickness="-1" so DWM still composites
-          the drop shadow, and DWMWCP_ROUND supplies the native Win11 rounded corners
+          the drop shadow, and DWMWCP_ROUND supplies the native rounded corners
           (Windows 10 falls back to square corners set in code).
-        · The only glow is the v2.0.1 rim comet (z.ai-style): two soft light blobs orbit
+        · The only glow is the rim comet (z.ai-style): two soft light blobs orbit
           the TRUE window perimeter on a path animation, clipped to the window — the
           light only ever exists INSIDE the rim, never bleeding outside.
     -->
@@ -37,10 +42,10 @@
         <!-- glyph → vector icon (modern outline set, 24×24 stroke paths) -->
         <ui:GlyphIconConverter x:Key="GlyphToIcon"/>
 
-        <!-- kbd-style hint chip, Win11 flavour (v2.3.0-alpha.4: 5 px radius) -->
+        <!-- kbd-style hint chip — Raycast keycap: quiet raised fill, hairline, no glow -->
         <Style x:Key="KbdChipBorder" TargetType="Border">
             <Setter Property="CornerRadius" Value="5"/>
-            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Padding" Value="7,2.5"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource GlyphBoxBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
@@ -219,8 +224,8 @@
 
     <!-- main card (DWM draws the real drop shadow + rounded corners);
          the hairline ring lives on RimLine, Root itself has no border -->
-    <Border x:Name="Root" CornerRadius="8" BorderThickness="0" Background="#FF202020"
-            TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Arial"
+    <Border x:Name="Root" CornerRadius="8" BorderThickness="0" Background="#FF0E0F12"
+            TextElement.FontFamily="/Assets/Fonts/#Inter"
             RenderTransformOrigin="0.5,0.5">
         <Border.RenderTransform>
             <TransformGroup>
@@ -278,62 +283,58 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- ================= search field (Win11 text box: 6 px radius, hairline
-                     stroke, 2 px accent focus bar — v2.3.0-alpha.4 polish) ================= -->
-                <Border Grid.Row="0" x:Name="SearchField" Margin="14,12,14,10"
-                        CornerRadius="6" Background="{DynamicResource FieldBrush}"
-                        BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
-                        SnapsToDevicePixels="True">
-                    <Grid>
-                        <Grid Margin="12,7,8,7">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+                <!-- ================= search row (Raycast: the input IS the header —
+                     flush with the card top, no boxed field, generous 52 px band) ================= -->
+                <Grid Grid.Row="0" x:Name="SearchField" Background="Transparent" SnapsToDevicePixels="True">
+                    <Grid Margin="18,10,14,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
 
-                            <!-- magnifier icon: shown when no command prefix is active -->
-                            <Grid x:Name="MagnifierIcon" Width="17" Height="17" VerticalAlignment="Center"
-                                  Margin="0,2,11,0" IsHitTestVisible="False">
-                                <Ellipse Width="11.5" Height="11.5" StrokeThickness="1.6"
-                                         Stroke="{DynamicResource IconBrush}"
-                                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="1.4,1.4,0,0"/>
-                                <Line X1="11.5" Y1="11.5" X2="15.6" Y2="15.6"
-                                      Stroke="{DynamicResource IconBrush}" StrokeThickness="1.6" StrokeEndLineCap="Round"/>
-                            </Grid>
+                        <!-- magnifier icon: shown when no command prefix is active -->
+                        <Grid x:Name="MagnifierIcon" Width="18" Height="18" VerticalAlignment="Center"
+                              Margin="0,2,13,0" IsHitTestVisible="False">
+                            <Ellipse Width="12" Height="12" StrokeThickness="1.7"
+                                     Stroke="{DynamicResource IconBrush}"
+                                     HorizontalAlignment="Left" VerticalAlignment="Top" Margin="1.5,1.5,0,0"/>
+                            <Line X1="12" Y1="12" X2="16.4" Y2="16.4"
+                                  Stroke="{DynamicResource IconBrush}" StrokeThickness="1.7" StrokeEndLineCap="Round"/>
+                        </Grid>
 
-                            <!-- prefix badge: shown while a command prefix (A/, F/, C/…) is active -->
-                            <TextBlock x:Name="PrefixBadge" Grid.Column="0" Text="L" FontWeight="Bold" FontSize="16"
-                                       Foreground="{DynamicResource AccentBrush}" Margin="2,1,11,0"
-                                       VerticalAlignment="Center" Visibility="Collapsed"/>
+                        <!-- prefix badge: shown while a command prefix (A/, F/, C/…) is active -->
+                        <TextBlock x:Name="PrefixBadge" Grid.Column="0" Text="L" FontWeight="SemiBold" FontSize="16"
+                                   Foreground="{DynamicResource AccentBrush}" Margin="1,1,13,0"
+                                   VerticalAlignment="Center" Visibility="Collapsed"/>
 
-                            <Grid Grid.Column="1" VerticalAlignment="Center">
-                                <TextBox x:Name="Input" FontSize="17" FontWeight="Normal"
-                                         Background="Transparent" BorderThickness="0" Padding="0" MinHeight="28"
-                                         Foreground="{DynamicResource TitleBrush}"
-                                         CaretBrush="{DynamicResource AccentBrush}"
-                                         VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                         TextChanged="OnInputTextChanged" PreviewKeyDown="OnInputKeyDown"
-                                         GotKeyboardFocus="OnInputFocusChanged" LostKeyboardFocus="OnInputFocusChanged"/>
-                                <!-- placeholder (Win11 wording, v2.0) -->
-                                <TextBlock Text="Search apps, files and commands…" FontSize="17" Margin="1,0,0,0"
-                                           Foreground="{DynamicResource PlaceholderBrush}" IsHitTestVisible="False"
-                                           VerticalAlignment="Center">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Text, ElementName=Input}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
+                        <Grid Grid.Column="1" VerticalAlignment="Center">
+                            <TextBox x:Name="Input" FontSize="16.5" FontWeight="Normal"
+                                     Background="Transparent" BorderThickness="0" Padding="0" MinHeight="30"
+                                     Foreground="{DynamicResource TitleBrush}"
+                                     CaretBrush="{DynamicResource AccentBrush}"
+                                     VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                     TextChanged="OnInputTextChanged" PreviewKeyDown="OnInputKeyDown"
+                                     GotKeyboardFocus="OnInputFocusChanged" LostKeyboardFocus="OnInputFocusChanged"/>
+                            <!-- placeholder (Raycast tone-of-voice: lowercase, quiet) -->
+                            <TextBlock Text="Search apps, files and commands…" FontSize="16.5" Margin="1,0,0,0"
+                                       Foreground="{DynamicResource PlaceholderBrush}" IsHitTestVisible="False"
+                                       VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=Input}" Value="">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
 
                             <!-- clear button — v1.7 vector cross (also fixed: now actually appears when text is present) -->
-                            <ContentControl x:Name="ClearButton" Grid.Column="2" Width="26" Height="26" VerticalAlignment="Center"
+                        <ContentControl x:Name="ClearButton" Grid.Column="2" Width="26" Height="26" VerticalAlignment="Center"
                                             Focusable="False" Cursor="Hand" MouseLeftButtonUp="OnClearClick"
                                             ui:PressFeedback.IsEnabled="True"
                                             ToolTip="Clear (Ctrl+Backspace)">
@@ -364,20 +365,14 @@
                                     </ControlTemplate>
                                 </ContentControl.Template>
                             </ContentControl>
-                        </Grid>
-
-                        <!-- 2 px accent bar along the bottom edge while the field has focus
-                             (the Win11 TextBox focus treatment) -->
-                        <Border x:Name="FocusBar" Height="2" VerticalAlignment="Bottom" Margin="1,0,1,1"
-                                CornerRadius="1" Background="{DynamicResource AccentBrush}"
-                                Visibility="Collapsed" IsHitTestVisible="False"/>
                     </Grid>
-                </Border>
+                </Grid>
 
-                <Border Grid.Row="1" Height="1" x:Name="Separator" Margin="16,0,16,0" Opacity="0.9"/>
+                <!-- full-bleed hairline under the search row — Raycast's header rule -->
+                <Border Grid.Row="1" Height="1" x:Name="Separator" Margin="0" Opacity="1"/>
 
                 <!-- ================= results ================= -->
-                <ListBox x:Name="Results" Grid.Row="2" Margin="10,8,10,4" BorderThickness="0"
+                <ListBox x:Name="Results" Grid.Row="2" Margin="8,6,8,4" BorderThickness="0"
                          Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          MouseDoubleClick="OnResultDoubleClick"
                          SelectionChanged="OnResultsSelectionChanged"
@@ -394,17 +389,17 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
                                         <Border x:Name="Bd" Background="Transparent" CornerRadius="6"
-                                                Padding="2" Margin="6,1">
+                                                Padding="0" Margin="5,1">
                                             <Grid>
-                                                <!-- neutral hover / accent selection overlays (Win11 list item) -->
+                                                <!-- neutral hover / quiet selection overlays (Raycast active row) -->
                                                 <Border x:Name="HoverOverlay" CornerRadius="6"
                                                         Background="{DynamicResource HoverBrush}" Opacity="0"/>
                                                 <Border x:Name="SelectedOverlay" CornerRadius="6"
                                                         Background="{DynamicResource SelectedBrush}" Opacity="0"/>
-                                                <!-- v2.0.1 — Win11 selection pill: 3 px accent bar on the left edge -->
+                                                <!-- v2.0.1 — selection pill: 3 px accent punctuation on the left edge -->
                                                 <Border x:Name="SelPill" Width="3" CornerRadius="1.5"
                                                         Background="{DynamicResource AccentBrush}"
-                                                        HorizontalAlignment="Left" Margin="2,10,0,10" Opacity="0"/>
+                                                        HorizontalAlignment="Left" Margin="0,9,0,9" Opacity="0"/>
                                                 <ContentPresenter/>
                                             </Grid>
                                         </Border>
@@ -470,11 +465,11 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Border x:Name="GlyphBox" Grid.Column="0" Width="32" Height="32" CornerRadius="7"
+                                <Border x:Name="GlyphBox" Grid.Column="0" Width="30" Height="30" CornerRadius="8"
                                         Background="{DynamicResource GlyphBoxBrush}">
                                     <Grid>
                                         <!-- real shell icon (app logo / file type); v1.7 vector icon when none -->
-                                        <Image Source="{Binding Icon}" Width="27" Height="27" Stretch="Uniform"
+                                        <Image Source="{Binding Icon}" Width="25" Height="25" Stretch="Uniform"
                                                RenderOptions.BitmapScalingMode="HighQuality"
                                                HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Image.Style>
@@ -488,9 +483,9 @@
                                             </Image.Style>
                                         </Image>
                                         <Path x:Name="KindIcon" Data="{Binding Glyph, Converter={StaticResource GlyphToIcon}}"
-                                              Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.1"
+                                              Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.9"
                                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                              Width="19" Height="19" Stretch="Uniform"
+                                              Width="18" Height="18" Stretch="Uniform"
                                               HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Path.Style>
                                                 <Style TargetType="Path">
@@ -506,10 +501,10 @@
                                     </Grid>
                                 </Border>
 
-                                <StackPanel x:Name="RowText" Grid.Column="1" VerticalAlignment="Center" Margin="11,0,8,0">
-                                    <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold"
+                                <StackPanel x:Name="RowText" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,10,0">
+                                    <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="14" FontWeight="Medium"
                                                Foreground="{DynamicResource TitleBrush}" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock x:Name="SubtitleText" Text="{Binding Subtitle}" FontSize="11.5" Margin="0,1,0,0"
+                                    <TextBlock x:Name="SubtitleText" Text="{Binding Subtitle}" FontSize="11.5" Margin="0,1.5,0,0"
                                                Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
 
@@ -563,13 +558,14 @@
 
                             <DataTemplate.Triggers>
                                 <!-- v1.6 — Raycast-style section headers: no tile, no chip,
-                                     small caps look with extra breathing room above -->
+                                     small muted caption with extra breathing room above -->
                                 <DataTrigger Binding="{Binding Kind}" Value="Header">
                                     <Setter TargetName="GlyphBox" Property="Visibility" Value="Collapsed"/>
                                     <Setter TargetName="SubtitleText" Property="Visibility" Value="Collapsed"/>
                                     <Setter TargetName="TitleText" Property="FontSize" Value="11"/>
+                                    <Setter TargetName="TitleText" Property="FontWeight" Value="Medium"/>
                                     <Setter TargetName="TitleText" Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
-                                    <Setter TargetName="RowText" Property="Margin" Value="11,9,8,2"/>
+                                    <Setter TargetName="RowText" Property="Margin" Value="12,9,10,2"/>
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
@@ -577,8 +573,8 @@
                 </ListBox>
 
                 <!-- ================= preview pane (v2.2 — Tab toggles; Esc closes) ================= -->
-                <Border x:Name="PreviewPane" Grid.Row="3" Margin="14,2,14,2" CornerRadius="8"
-                        Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
+                <Border x:Name="PreviewPane" Grid.Row="3" Margin="10,2,10,2" CornerRadius="8"
+                        Background="{DynamicResource GlyphBoxBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
                         BorderThickness="1" Visibility="Collapsed" Focusable="False">
                     <Grid MaxHeight="200" Margin="12,8,12,10">
                         <Grid.RowDefinitions>
@@ -611,14 +607,14 @@
                 </Border>
 
                 <!-- ================= status bar (Raycast footer) ================= -->
-                <Border Grid.Row="4" Height="1" VerticalAlignment="Top" Margin="16,0,16,0"
+                <Border Grid.Row="4" Height="1" VerticalAlignment="Top" Margin="18,0,18,0"
                         x:Name="FooterRule" Opacity="0.55"/>
-                <Grid Grid.Row="4" Margin="20,10,14,11">
+                <Grid Grid.Row="4" Margin="18,9,14,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
-                    <TextBlock x:Name="StatusText" Grid.Column="0" FontSize="11"
+                    <TextBlock x:Name="StatusText" Grid.Column="0" FontSize="11.5"
                                Foreground="{DynamicResource SubtitleBrush}"
                                Text="Starting…" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
 

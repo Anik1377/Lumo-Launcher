@@ -12,13 +12,10 @@
         PreviewKeyDown="OnWindowPreviewKeyDown">
 
     <!--
-        v2.0 — full-window Windows 11 style settings app.
-
-        Solid Fluent surfaces (no acrylic): page background #202020/#F3F3F3, white/dark
-        cards with hairline strokes, 4 px control geometry, Segoe UI. The window opens
-        filling the work area like a real Windows 11 system app. The nav uses the Win11
-        selection pill (accent bar + tinted row). No outer glow anywhere — the only
-        animated accent is the launcher's rim comet.
+        v2.4 — Raycast-grade settings shell on the shared surface ladder:
+        canvas #0E0F12, elevated cards #14151A with hairline strokes, quiet
+        neutral nav pills, Inter typography throughout. Same tokens as the
+        launcher and the AI chat — one design system, three surfaces.
     -->
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="-1" CaptionHeight="0" CornerRadius="0"
@@ -74,16 +71,16 @@
             </Setter>
         </Style>
 
-        <!-- Windows 11 nav item: rounded row, accent bar + tinted fill when selected -->
+        <!-- Windows 11 nav item — v2.4: quiet Raycast pill (6 px radius), accent bar only when selected -->
         <Style x:Key="NavRadio" TargetType="RadioButton">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
-            <Setter Property="FontSize" Value="13.5"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="Margin" Value="10,2"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="12,8">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="12,8">
                             <Grid>
                                 <Rectangle x:Name="AccentBar" Width="3" HorizontalAlignment="Left"
                                            VerticalAlignment="Stretch" Margin="-7,2,0,2"
@@ -115,7 +112,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="14,5.5">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="5" Padding="14,5.5">
                             <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -142,7 +139,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="Bd" Background="{DynamicResource FieldBrush}" CornerRadius="4"
+                        <Border x:Name="Bd" Background="{DynamicResource FieldBrush}" CornerRadius="6"
                                 BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1" Padding="14,6.5">
                             <ContentPresenter VerticalAlignment="Center"/>
                         </Border>
@@ -170,7 +167,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{DynamicResource FieldBrush}" CornerRadius="4"
+                        <Border x:Name="Bd" Background="{DynamicResource FieldBrush}" CornerRadius="6"
                                 BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -193,7 +190,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{DynamicResource AccentBrush}" CornerRadius="4"
+                        <Border x:Name="Bd" Background="{DynamicResource AccentBrush}" CornerRadius="6"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -210,9 +207,9 @@
             </Setter>
         </Style>
 
-        <!-- v2.0 — Win11 page title (large, semibold, sentence case) -->
+        <!-- v2.4 — page title (Inter SemiBold, sentence case) -->
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontSize" Value="20"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
             <Setter Property="Margin" Value="2,0,0,14"/>
@@ -220,7 +217,7 @@
 
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Padding" Value="16"/>
@@ -239,11 +236,62 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Margin" Value="0,3,0,0"/>
         </Style>
+
+        <!-- v2.4 — WinUI caption buttons: full-bleed quiet hover, WinUI-red close.
+               The stock WPF button chrome (classic blue hover square) screamed "cheap". -->
+        <Style x:Key="CaptionButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bg" Property="Opacity" Value="0.7"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CloseCaptionButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="Transparent" CornerRadius="0,8,0,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#E81123"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bg" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <!-- v2.0 — full-bleed window: no outer glow frame, no margin -->
+    <!-- v2.4 — full-bleed window: no outer glow frame, no margin -->
     <Grid>
-        <Border x:Name="Root" CornerRadius="8" BorderThickness="1" Background="#FF202020"
+        <Border x:Name="Root" CornerRadius="8" BorderThickness="1" Background="#FF0E0F12"
+                TextElement.FontFamily="/Assets/Fonts/#Inter"
                 BorderBrush="{DynamicResource BorderLineBrush}"
                 RenderTransformOrigin="0.5,0.5">
             <Border.RenderTransform>
@@ -252,7 +300,7 @@
                 </TransformGroup>
             </Border.RenderTransform>
             <Border.Effect>
-                <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.30"/>
+                <DropShadowEffect BlurRadius="28" ShadowDepth="2" Opacity="0.45"/>
             </Border.Effect>
 
             <Grid>
@@ -273,38 +321,36 @@
                                    Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                         <TextBlock Text="Settings" FontSize="14"
                                    Foreground="{DynamicResource TitleBrush}" Margin="5,0,0,0" VerticalAlignment="Center"/>
-                        <Border Background="{DynamicResource ChipBrush}" CornerRadius="4" Margin="12,0,0,0" Padding="7,2.5"
+                        <Border Background="{DynamicResource ChipBrush}" CornerRadius="10" Margin="12,0,0,0" Padding="8,2.5"
                                 BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
                             <TextBlock Text="ALPHA · UNSTABLE" FontSize="10" FontWeight="SemiBold"
                                        Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
                         </Border>
-                        <Border Background="{DynamicResource FieldBrush}" CornerRadius="4" Margin="8,0,0,0" Padding="7,2.5">
+                        <Border Background="{DynamicResource FieldBrush}" CornerRadius="5" Margin="8,0,0,0" Padding="8,2.5">
                             <TextBlock x:Name="VersionText" Text="v2.0" FontSize="10.5"
                                        Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
                         </Border>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
                         <Button x:Name="MinButton" Width="46" Height="34" Click="OnMinimize"
-                                Cursor="Hand" Background="Transparent" BorderThickness="0"
-                                Content="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10"
-                                Foreground="{DynamicResource TitleBrush}"/>
+                                Style="{StaticResource CaptionButton}"
+                                Content="&#xE921;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                         <Button x:Name="CloseButton" Width="46" Height="34" Click="OnClose"
-                                Cursor="Hand" Background="Transparent" BorderThickness="0"
-                                Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="10"
-                                Foreground="{DynamicResource TitleBrush}"/>
+                                Style="{StaticResource CloseCaptionButton}"
+                                Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="10"/>
                     </StackPanel>
                 </Grid>
 
                 <!-- ============ body ============ -->
                 <Grid Grid.Row="1" Margin="24,8,24,12">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="264"/>
+                        <ColumnDefinition Width="232"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- sidebar (Win11 nav: monochrome glyphs on quiet rows) -->
-                    <Border Grid.Column="0" Background="{DynamicResource SidebarBrush}" CornerRadius="4"
-                            Padding="0,10" Margin="0,0,20,0">
+                    <!-- sidebar (quiet Raycast nav: monochrome glyphs on soft pills) -->
+                    <Border Grid.Column="0" Background="{DynamicResource SidebarBrush}" CornerRadius="8"
+                            Padding="0,10" Margin="0,0,18,0">
                         <StackPanel>
                             <RadioButton x:Name="NavGeneral" Tag="0" IsChecked="True" Checked="OnNavChanged"
                                          Style="{StaticResource NavRadio}">

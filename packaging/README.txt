@@ -1,7 +1,41 @@
 ======================================================
-  LUMO v2.3.0-alpha.4  —  universal launcher for Windows
+  LUMO v2.4.0-alpha.1  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.4.0-alpha.1 (the Raycast-grade UI overhaul)
+---------------------------------------------------------------
+1. A COMPLETE VISUAL OVERHAUL, INSPIRED BY RAYCAST. The
+   flat Windows 11 grays are gone. Every surface now sits
+   on a near-black, faintly blue-tinted ladder (canvas
+   #0E0F12, elevated fields #17181C, hairline strokes
+   #26282D) - the same tiering Raycast's command palette
+   uses. Light mode mirrors the structure on a #FAFAFB
+   canvas with white fields.
+2. INTER, EMBEDDED. Lumo now ships the Inter type family
+   (Regular / Medium / SemiBold / Bold, SIL OFL licence
+   included) inside the exe - the same type system Raycast
+   builds on. Headlines, rows, cards and captions all
+   render in Inter at every weight.
+3. THE SEARCH ROW IS THE HEADER. No more boxed field: the
+   input sits flush with the top of the card like
+   Raycast/Spotlight, with a full-bleed hairline beneath.
+   Result rows are quieter too - medium-weight titles,
+   8 px-class icon tiles, and a calm neutral selection
+   with the accent demoted to a 3 px pill on the edge.
+4. SETTINGS AND THE AI CHAT JOIN THE SAME SYSTEM. Cards
+   at 8 px with hairline strokes, a deeper sidebar tier,
+   6 px controls, WinUI-style caption buttons (the close
+   button glows red on hover), and a richer window shadow.
+5. RAYCAST RED IS THE NEW SIGNATURE ACCENT (#FF6363,
+   first in the preset list). If you only ever had the old
+   default colour, it migrates silently; a colour you
+   actually picked is respected. The launcher also widens
+   to a 744 px Raycast proportion by default (Settings >
+   Appearance can still set 560-900).
+6. Same single portable exe as before - no new
+   dependencies, no WebView2, now ~2 MB with Inter on
+   board.
 
 WHAT'S NEW IN v2.3.0-alpha.4 (the polish pass)
 ---------------------------------------------------------------

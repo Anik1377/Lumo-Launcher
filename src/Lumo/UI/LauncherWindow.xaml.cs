@@ -1458,7 +1458,7 @@ public partial class LauncherWindow : Window
             Resources["ChipBrush"] = new SolidColorBrush(dark
                 ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
             Resources["ChipTextBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["PlaceholderBrush"] = new SolidColorBrush(dark ? FromRgb(0x71, 0x71, 0x71) : FromRgb(0x9D, 0x9D, 0x9D));
+            Resources["PlaceholderBrush"] = new SolidColorBrush(Appearance.PlaceholderFor(dark));
             Resources["IconBrush"] = new SolidColorBrush(p.Subtitle);
             Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
             Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
@@ -1491,8 +1491,8 @@ public partial class LauncherWindow : Window
             GlowCover.Margin = new Thickness(t);
             GlowCover.Background = Root.Background;
             Resources["ResultRowPad"] = string.Equals(_settings.RowDensity, "compact", StringComparison.OrdinalIgnoreCase)
-                ? new Thickness(10, 3, 10, 3)
-                : new Thickness(10, 6, 10, 6);
+                ? new Thickness(14, 4, 14, 4)
+                : new Thickness(14, 7, 14, 7);
             if (ActualWidth >= 40 && ActualHeight >= 40)
                 UpdateGlowGeometry(new Size(ActualWidth, ActualHeight));
             Input.Foreground = new SolidColorBrush(p.Title);
@@ -1516,21 +1516,14 @@ public partial class LauncherWindow : Window
     }
 
     /// <summary>
-    /// v2.0 — Win11 text-field focus treatment: show the 2 px accent bar along the
-    /// bottom edge of the search field while it holds keyboard focus.
+    /// v2.4 — Raycast search row: the input is flush with the card header, so there is
+    /// no focus chrome to toggle any more (the Win11 accent focus bar is gone). The
+    /// handler stays wired because the focus notifications are still useful state,
+    /// but it no longer paints anything.
     /// </summary>
     private void OnInputFocusChanged(object sender, KeyboardFocusChangedEventArgs e)
     {
-        try
-        {
-            bool focused = Input.IsKeyboardFocusWithin;
-            FocusBar.Visibility = focused ? Visibility.Visible : Visibility.Collapsed;
-            // v2.0.1 FIX — the Win11 text-field treatment keeps the hairline stroke in
-            // BOTH states: the accent lives ONLY in the 2 px bottom bar. (Painting the
-            // whole border accent + the bar overlapped two accent layers on one box.)
-            SearchField.BorderBrush = (Brush)FindResource("BorderLineBrush");
-        }
-        catch { }
+        // Intentionally empty — the Raycast header has no focus ring to draw.
     }
 
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);

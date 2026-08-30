@@ -167,14 +167,16 @@ public partial class AiChatWindow : Window
             Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
             Resources["PanelBrush"] = new SolidColorBrush(p.Panel);
             Resources["FieldBrush"] = new SolidColorBrush(p.Field);
-            Resources["CardBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x2B, 0x2B, 0x2B) : Colors.White);
-            Resources["SidebarBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x1C, 0x1C, 0x1C) : Color.FromRgb(0xEC, 0xEC, 0xEC));
+            // v2.4 — Raycast ladder surfaces (were Win11 grays): elevated cards, deeper
+            // sidebar, and a code-block tier that sits between the two.
+            Resources["CardBrush"] = new SolidColorBrush(Appearance.ElevatedFor(dark));
+            Resources["SidebarBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x0B, 0x0C, 0x0F) : Color.FromRgb(0xF1, 0xF1, 0xF4));
             Resources["ChipBrush"] = new SolidColorBrush(dark
                 ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
             Resources["UserBubbleBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2E));   // accent @ 18%
             Resources["UserBubbleBorderBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x38));
             Resources["AvatarBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2A));
-            Resources["CodeBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x1B, 0x1B, 0x1B) : Color.FromRgb(0xF9, 0xF9, 0xF9));
+            Resources["CodeBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x12, 0x13, 0x17) : Color.FromRgb(0xF6, 0xF6, 0xF8));
             Resources["WarnBrush"] = new SolidColorBrush(Color.FromArgb(0x2A, 0xCA, 0x50, 0x10));
 
             // v2.3.0-alpha.4 polish — gradient tokens (send cap, logo orb, orb halo).
