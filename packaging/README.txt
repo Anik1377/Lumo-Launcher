@@ -1,7 +1,34 @@
 ======================================================
-  LUMO v2.3.0-alpha.1  —  universal launcher for Windows
+  LUMO v2.3.0-alpha.2  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.3.0-alpha.2 (one-click local AI setup)
+---------------------------------------------------------------
+1. INSTALL OLLAMA FROM THE APP - Settings > AI now has a
+   "Local models (Ollama)" card. If Ollama is missing, one
+   button downloads the official installer from ollama.com
+   and runs it silently (Windows may show a UAC prompt).
+   If it is installed but not responding, a Start button
+   brings the local server up.
+2. ONE-CLICK LIGHTWEIGHT MODELS - the same card lists a
+   curated catalog with live progress:
+     qwen2.5:0.5b  ~0.4 GB     deepseek-r1:1.5b ~1.1 GB
+     qwen2.5:1.5b  ~1.0 GB     gemma2:2b        ~1.6 GB
+     llama3.2:1b   ~1.3 GB     llama3.2:3b      ~2.0 GB
+     phi3.5        ~2.2 GB     llama3.1:8b      ~4.9 GB
+   Pulls stream with a global percent across layers; a
+   finished model is set active automatically if the
+   current one isn't on disk. Installed models can be
+   switched (Use) or removed (Delete) to free space.
+3. SMARTER ? ROWS - with AI enabled and no local runtime,
+   the ? view offers "Get local AI free — install Ollama
+   in one click" (Enter opens Settings > AI) instead of a
+   dead-end asking row. Remote Ollama gateways are never
+   offered a local installer.
+4. MORE TESTS - the suite grew from 68 to 92, covering
+   the pull-line/tags parsers, the local-endpoint guard
+   and the model catalog invariants.
 
 WHAT'S NEW IN v2.3.0-alpha.1 (DEV_PLAN Phase 3 — "Connected")
 ---------------------------------------------------------------

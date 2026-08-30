@@ -82,6 +82,13 @@ public partial class LauncherWindow : Window
     /// <summary>v1.4 — user asked to manage shortcuts (opens settings → Shortcuts).</summary>
     public event Action? ManageShortcutsRequested;
 
+    /// <summary>
+    /// v2.3.0-alpha.2 — open settings on a specific page (0 = default).
+    /// Raised by the AI setup row ("cmd:ai-setup") so a dead-end ? query can land
+    /// straight on Settings → AI with the one-click Ollama installer.
+    /// </summary>
+    public event Action<int>? SettingsPageRequested;
+
     /// <summary>v1.5 — recording finished; App opens the builder with the captured steps.</summary>
     public event Action<List<MacroStep>, string?>? RecordFinishRequested;
 
@@ -606,6 +613,30 @@ public partial class LauncherWindow : Window
             if (!t.StartsWith("?") || t.Length < 4) return;   // "?" + at least 2 chars
             if (!_settings.AiEnabled) return;
 
+            // v2.3.0-alpha.2 — keep the Ollama probe fresh (background, never the
+            // search thread): the AI rows consult OllamaManager.Current to decide
+            // between "asking…" and the one-click setup row. Re-render once the
+            // probe lands so the right row appears without further typing.
+            if (!AiProviders.IsAnthropic(_settings.AiStyle, _settings.AiEndpoint) &&
+                OllamaManager.IsLocalEndpoint(_settings.AiEndpoint) &&
+                (OllamaManager.Current.Stale || !OllamaManager.Current.Probed))
+            {
+                string endpoint = _settings.AiEndpoint;
+                int genAtStart = _aiGen;
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await OllamaManager.RefreshStatusAsync(endpoint).ConfigureAwait(true);
+                        await Dispatcher.InvokeAsync(() =>
+                        {
+                            try { if (genAtStart == _aiGen) RunSearch(); } catch { }
+                        });
+                    }
+                    catch (Exception ex) { DiagnosticLogger.LogException("Launcher.OllamaProbe", ex); }
+                });
+            }
+
             string prompt = t[1..].Trim();
             if (prompt.Length == 0) return;
             if (!force && _ai.HasCached(prompt)) return;      // cached → the row already shows the answer
@@ -775,6 +806,16 @@ public partial class LauncherWindow : Window
             if (item.RunArgument == "cmd:ai-ask")
             {
                 MaybeAskAi(force: true);
+                return;
+            }
+
+            // v2.3.0-alpha.2 — the setup row: Ollama is missing or not serving.
+            // Land the user on Settings → AI where install / start / pull-model
+            // actions live. The launcher hides; the settings window takes over.
+            if (item.RunArgument == "cmd:ai-setup")
+            {
+                HideAnimated();
+                SettingsPageRequested?.Invoke(6);
                 return;
             }
 

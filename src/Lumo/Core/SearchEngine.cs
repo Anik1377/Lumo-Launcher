@@ -606,6 +606,27 @@ public sealed class SearchEngine
             return rows;
         }
 
+        // v2.3.0-alpha.2 — one-click local AI setup. When the background probe says
+        // the local runtime is missing or not serving, the dead-end "asking…" row
+        // becomes a direct shortcut to Settings → AI (install Ollama / pull a model
+        // / start the server). Only for LOCAL endpoints — a remote Ollama gateway
+        // must not be offered a local installer. The probe never runs on the search
+        // thread; rows only read the immutable OllamaManager.Current snapshot.
+        bool ollamaLocal = !AiProviders.IsAnthropic(_settings.AiStyle, _settings.AiEndpoint) &&
+                           OllamaManager.IsLocalEndpoint(_settings.AiEndpoint);
+        var probe = OllamaManager.Current;
+        if (ollamaLocal && probe.Probed && !probe.ServerUp)
+        {
+            rows.Add(new ResultItem
+            {
+                Title = probe.Installed ? "Ollama is not responding — set it up in one click"
+                                        : "Get local AI free — install Ollama in one click",
+                Subtitle = "Enter opens Settings → AI · download + lightweight models (Llama 3.2, Qwen, Gemma…)",
+                Glyph = "?", Kind = ResultKind.Tool, RunArgument = "cmd:ai-setup",
+            });
+            return rows;
+        }
+
         // No answer yet: the ask row doubles as instant feedback while the request
         // the window fired (MaybeAskAi) is in flight.
         rows.Add(new ResultItem

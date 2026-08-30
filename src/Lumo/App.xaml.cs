@@ -81,6 +81,12 @@ public partial class App : Application
                 try { OpenSettings(initialPage: 4); } catch (Exception ex) { DiagnosticLogger.LogException("App.ManageShortcuts", ex); }
             };
 
+            // v2.3.0-alpha.2 — deep-link to a settings page (AI setup row → page 6)
+            _window.SettingsPageRequested += page =>
+            {
+                try { OpenSettings(initialPage: page); } catch (Exception ex) { DiagnosticLogger.LogException("App.SettingsPage", ex); }
+            };
+
             // v1.5 — a finished recording opens the visual builder with the captured steps
             _window.RecordFinishRequested += (steps, name) =>
             {

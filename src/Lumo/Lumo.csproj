@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>2.3.0-alpha.1</Version>
-    <InformationalVersion>Lumo 2.3.0-alpha.1 (ALPHA — unstable build)</InformationalVersion>
+    <Version>2.3.0-alpha.2</Version>
+    <InformationalVersion>Lumo 2.3.0-alpha.2 (ALPHA — unstable build)</InformationalVersion>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

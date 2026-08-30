@@ -45,6 +45,9 @@ public partial class SettingsWindow : Window
     // (_previewRotation removed in v2.0.1 — the rim comet lives on the launcher only;
     //  the settings preview card shows a static gradient of the style's palette)
     private bool _sourceReady;                // v1.8 — glass needs the HWND; set in OnSourceInitialized
+    private CancellationTokenSource? _ollamaCts;   // v2.3.0-alpha.2 — cancels in-flight download/pull
+    private bool _ollamaBusy;                 // v2.3.0-alpha.2 — one download/pull at a time (bounded)
+    private readonly List<Button> _pullButtons = new();   // catalog Install buttons (rebuilt on each render)
 
     public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex,
                           ShortcutStore? shortcuts = null, Action? recordMacro = null,
@@ -352,6 +355,11 @@ public partial class SettingsWindow : Window
             AiEndpointBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiEndpoint = AiEndpointBox.Text.Trim(); };
             AiModelBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiModel = AiModelBox.Text.Trim(); };
             AiKeyBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiApiKey = AiKeyBox.Text.Trim(); };
+
+            // v2.3.0-alpha.2 — Local models (Ollama): probe in the background, render
+            // when it lands. Closed cancels any in-flight download/pull.
+            Closed += (_, _) => { try { _ollamaCts?.Cancel(); } catch { } };
+            _ = ProbeAndRenderOllamaAsync();
 
             // event wiring for the pills (Checked handlers)
             StartWithWindowsToggle.Click += (_, _) =>
@@ -842,5 +850,395 @@ public partial class SettingsWindow : Window
             OnCancel(this, e);
         }
         catch { }
+    }
+
+    // ================================================================= v2.3.0-alpha.2 — Local models (Ollama)
+    //
+    // The one-click local AI setup: probe → install Ollama → start it → pull a
+    // lightweight model with live progress. Every network/process operation runs
+    // on a worker (Task.Run); only rendering touches the UI thread. One download
+    // or pull at a time (_ollamaBusy) so nothing can stack; the window Closed
+    // event cancels whatever is in flight via _ollamaCts.
+
+    /// <summary>Background probe → dispatcher render. Fire-and-forget safe; never throws.</summary>
+    private async Task ProbeAndRenderOllamaAsync()
+    {
+        try
+        {
+            string endpoint = _settings.AiEndpoint;
+            await Task.Run(() => OllamaManager.RefreshStatusAsync(endpoint)).ConfigureAwait(true);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                try { RenderOllamaPanel(); }
+                catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaRender", ex); }
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaProbe", ex); }
+    }
+
+    private void OnOllamaRefresh(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_ollamaBusy) return;
+            OllamaManager.Invalidate();
+            _ = ProbeAndRenderOllamaAsync();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaRefresh", ex); }
+    }
+
+    /// <summary>Repaints the whole card from the immutable OllamaManager.Current snapshot. UI thread only.</summary>
+    private void RenderOllamaPanel()
+    {
+        var st = OllamaManager.Current;
+        bool busy = _ollamaBusy;
+
+        if (!st.Probed)
+            OllamaStatusText.Text = "Checking…";
+        else if (!st.Installed)
+            OllamaStatusText.Text = "Ollama is not installed — one click below installs it (free, private, offline)";
+        else if (!st.ServerUp)
+            OllamaStatusText.Text = $"Ollama is installed but not answering on {st.Endpoint}";
+        else
+            OllamaStatusText.Text = $"Ollama is running · {st.Models.Count} model{(st.Models.Count == 1 ? "" : "s")} · {st.Endpoint}";
+
+        OllamaInstallBlock.Visibility = st.Probed && !st.Installed ? Visibility.Visible : Visibility.Collapsed;
+        OllamaInstallButton.IsEnabled = !busy;
+        OllamaStartBlock.Visibility = st.Probed && st.Installed && !st.ServerUp ? Visibility.Visible : Visibility.Collapsed;
+        OllamaStartButton.IsEnabled = !busy;
+        OllamaRefreshButton.IsEnabled = !busy;
+
+        // installed models (server up only — the list comes from /api/tags)
+        OllamaInstalledList.Items.Clear();
+        bool showInstalled = st.ServerUp && st.Models.Count > 0;
+        OllamaInstalledTitle.Visibility = showInstalled ? Visibility.Visible : Visibility.Collapsed;
+        OllamaInstalledList.Visibility = showInstalled ? Visibility.Visible : Visibility.Collapsed;
+        if (showInstalled)
+            foreach (var m in st.Models)
+                OllamaInstalledList.Items.Add(BuildInstalledRow(m));
+
+        // curated lightweight catalog (install needs a live server)
+        _pullButtons.Clear();
+        OllamaCatalogList.Items.Clear();
+        var installedNames = st.Models.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var m in OllamaManager.Catalog)
+            OllamaCatalogList.Items.Add(BuildCatalogRow(m, installedNames.Contains(m.Id)));
+        foreach (var b in _pullButtons)
+            b.IsEnabled = !busy && st.ServerUp;
+    }
+
+    private FrameworkElement BuildInstalledRow(OllamaManager.ModelInfo m)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        bool active = m.Name.Equals(_settings.AiModel, StringComparison.OrdinalIgnoreCase);
+
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var name = new TextBlock
+        {
+            Text = m.Name + (m.Bytes > 0 ? "   ·   " + FmtBytes(m.Bytes) : ""),
+            FontSize = 12.5,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "TitleBrush");
+        text.Children.Add(name);
+        if (active)
+        {
+            var act = new TextBlock { Text = "active model", FontSize = 11 };
+            act.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+            text.Children.Add(act);
+        }
+        Grid.SetColumn(text, 0);
+        grid.Children.Add(text);
+
+        if (!active)
+        {
+            var use = new Button { Content = "Use", Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(0, 0, 8, 0), Tag = m.Name };
+            if (TryFindResource("GhostButton") is Style useStyle) use.Style = useStyle;
+            use.Click += OnOllamaUse;
+            Grid.SetColumn(use, 1);
+            grid.Children.Add(use);
+        }
+
+        var del = new Button { Content = "Delete", Padding = new Thickness(12, 4, 12, 4) };
+        if (TryFindResource("GhostButton") is Style delStyle) del.Style = delStyle;
+        del.Tag = m.Name;
+        del.Click += OnOllamaDelete;
+        Grid.SetColumn(del, 2);
+        grid.Children.Add(del);
+        return grid;
+    }
+
+    private FrameworkElement BuildCatalogRow(OllamaManager.OllamaModel m, bool installed)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var name = new TextBlock { Text = $"{m.Id}   ·   ~{m.SizeGb:0.0} GB", FontSize = 12.5, TextTrimming = TextTrimming.CharacterEllipsis };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "TitleBrush");
+        var blurb = new TextBlock { Text = m.Blurb, FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis };
+        blurb.SetResourceReference(TextBlock.ForegroundProperty, "SubtitleBrush");
+        text.Children.Add(name);
+        text.Children.Add(blurb);
+        Grid.SetColumn(text, 0);
+        grid.Children.Add(text);
+
+        if (installed)
+        {
+            var done = new TextBlock
+            {
+                Text = "installed",
+                FontSize = 11.5,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 2, 0),
+            };
+            done.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+            Grid.SetColumn(done, 1);
+            grid.Children.Add(done);
+        }
+        else
+        {
+            var pull = new Button { Content = "Install", Padding = new Thickness(14, 4, 14, 4), Tag = m.Id };
+            if (TryFindResource("AccentButton") is Style pullStyle) pull.Style = pullStyle;
+            pull.Click += OnOllamaPull;
+            _pullButtons.Add(pull);
+            Grid.SetColumn(pull, 1);
+            grid.Children.Add(pull);
+        }
+        return grid;
+    }
+
+    private void SetOllamaBusy(bool busy, string? message)
+    {
+        try
+        {
+            OllamaInstallButton.IsEnabled = !busy;
+            OllamaStartButton.IsEnabled = !busy;
+            OllamaRefreshButton.IsEnabled = !busy;
+            foreach (var b in _pullButtons)
+                b.IsEnabled = !busy;
+            OllamaProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+            OllamaProgressText.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+            if (message is not null) OllamaProgressText.Text = message;
+            if (!busy)
+            {
+                OllamaProgress.Value = 0;
+                OllamaProgress.IsIndeterminate = false;
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaBusy", ex); }
+    }
+
+    private async void OnOllamaInstall(object sender, RoutedEventArgs e)
+    {
+        if (_ollamaBusy) return;
+        _ollamaBusy = true;
+        try
+        {
+            _ollamaCts?.Cancel();
+            _ollamaCts?.Dispose();
+            _ollamaCts = new CancellationTokenSource();
+            var ct = _ollamaCts.Token;
+
+            SetOllamaBusy(true, "Downloading Ollama from ollama.com…");
+            string? path = await Task.Run(() => OllamaManager.DownloadInstallerAsync((done, total) =>
+                Dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        if (total > 0)
+                        {
+                            OllamaProgress.IsIndeterminate = false;
+                            OllamaProgress.Value = 100.0 * done / total;
+                        }
+                        OllamaProgressText.Text = "Downloading Ollama — " + FmtBytes(done) + (total > 0 ? " / " + FmtBytes(total) : "");
+                    }
+                    catch { }
+                }), ct)).ConfigureAwait(true);
+
+            if (path is null)
+            {
+                _ollamaBusy = false;
+                SetOllamaBusy(false, null);
+                RenderOllamaPanel();
+                OllamaStatusText.Text = "Download failed — check the log, or install manually from ollama.com";
+                return;
+            }
+
+            OllamaProgress.IsIndeterminate = true;
+            OllamaProgressText.Text = "Running the installer — this can take a minute or two…";
+            bool ok = await Task.Run(() => OllamaManager.RunInstallerAsync(path, ct)).ConfigureAwait(true);
+
+            OllamaProgressText.Text = "Installed — waiting for the local server…";
+            await Task.Delay(2500).ConfigureAwait(true);   // give the service a beat to bind the port
+            await Task.Run(() => OllamaManager.RefreshStatusAsync(_settings.AiEndpoint)).ConfigureAwait(true);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+            RenderOllamaPanel();
+            if (OllamaManager.Current.ServerUp)
+                OllamaStatusText.Text = "Ollama installed and running — pick a lightweight model below";
+            else if (ok)
+                OllamaStatusText.Text = "Ollama installed — if the server isn't up yet, press Start Ollama or Refresh";
+            else
+                OllamaStatusText.Text = "The installer exited unexpectedly — press Refresh, or install manually from ollama.com";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.OllamaInstall", ex);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+        }
+        finally { _ollamaBusy = false; }
+    }
+
+    private async void OnOllamaStart(object sender, RoutedEventArgs e)
+    {
+        if (_ollamaBusy) return;
+        _ollamaBusy = true;
+        try
+        {
+            SetOllamaBusy(true, "Starting Ollama…");
+            await Task.Run(() => OllamaManager.StartServer()).ConfigureAwait(true);
+            await Task.Delay(2500).ConfigureAwait(true);   // the server needs a moment to bind the port
+            await Task.Run(() => OllamaManager.RefreshStatusAsync(_settings.AiEndpoint)).ConfigureAwait(true);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+            RenderOllamaPanel();
+            if (!OllamaManager.Current.ServerUp)
+                OllamaStatusText.Text = "Ollama didn't respond yet — if it just started, press Refresh in a few seconds";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.OllamaStart", ex);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+        }
+        finally { _ollamaBusy = false; }
+    }
+
+    private async void OnOllamaPull(object sender, RoutedEventArgs e)
+    {
+        if (_ollamaBusy) return;
+        if (sender is not Button { Tag: string model }) return;
+        _ollamaBusy = true;
+        try
+        {
+            _ollamaCts?.Cancel();
+            _ollamaCts?.Dispose();
+            _ollamaCts = new CancellationTokenSource();
+            var ct = _ollamaCts.Token;
+
+            SetOllamaBusy(true, $"Pulling {model} — starting…");
+            var final = await Task.Run(() => OllamaManager.PullAsync(_settings.AiEndpoint, model, p =>
+                Dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        if (p.TotalBytes > 0)
+                        {
+                            OllamaProgress.IsIndeterminate = false;
+                            OllamaProgress.Value = p.Fraction * 100;
+                            OllamaProgressText.Text = $"Pulling {model} — {p.Fraction * 100:F0}% · {FmtBytes(p.DoneBytes)} / {FmtBytes(p.TotalBytes)}";
+                        }
+                        else if (!string.IsNullOrEmpty(p.Status))
+                        {
+                            OllamaProgressText.Text = $"Pulling {model} — {p.Status}…";
+                        }
+                    }
+                    catch { }
+                }), ct)).ConfigureAwait(true);
+
+            if (final.Ok)
+            {
+                await Task.Run(() => OllamaManager.RefreshStatusAsync(_settings.AiEndpoint)).ConfigureAwait(true);
+                _ollamaBusy = false;
+                SetOllamaBusy(false, null);
+                RenderOllamaPanel();
+
+                // adopt the fresh model when the current setting isn't on disk
+                var installedNames = OllamaManager.Current.Models.Select(x => x.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                if (!installedNames.Contains(_settings.AiModel))
+                {
+                    _settings.AiModel = model;
+                    AiModelBox.Text = model;
+                }
+                OllamaStatusText.Text = $"{model} ready — type ? in the launcher to ask. Active model: {_settings.AiModel}";
+            }
+            else
+            {
+                _ollamaBusy = false;
+                SetOllamaBusy(false, null);
+                RenderOllamaPanel();
+                OllamaStatusText.Text = final.Error == "cancelled"
+                    ? "Pull cancelled"
+                    : $"Pull failed — {final.Error}";
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.OllamaPull", ex);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+        }
+        finally { _ollamaBusy = false; }
+    }
+
+    private void OnOllamaUse(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not Button { Tag: string model }) return;
+            _settings.AiModel = model;
+            AiModelBox.Text = model;
+            RenderOllamaPanel();
+            OllamaStatusText.Text = $"{model} is now the active model — ? in the launcher uses it";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaUse", ex); }
+    }
+
+    private async void OnOllamaDelete(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not Button { Tag: string model }) return;
+            if (_ollamaBusy) return;
+            var confirm = MessageBox.Show(this,
+                $"Delete {model} from disk to free its space?", "Lumo",
+                MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            _ollamaBusy = true;
+            SetOllamaBusy(true, $"Deleting {model}…");
+            var (ok, err) = await Task.Run(() => OllamaManager.DeleteModelAsync(_settings.AiEndpoint, model)).ConfigureAwait(true);
+            await Task.Run(() => OllamaManager.RefreshStatusAsync(_settings.AiEndpoint)).ConfigureAwait(true);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+            RenderOllamaPanel();
+            OllamaStatusText.Text = ok ? $"{model} deleted" : $"Delete failed — {err}";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.OllamaDelete", ex);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+        }
+        finally { _ollamaBusy = false; }
+    }
+
+    private static string FmtBytes(long b)
+    {
+        try
+        {
+            if (b >= 1_000_000_000) return $"{b / 1_000_000_000.0:0.0} GB";
+            if (b >= 1_000_000) return $"{b / 1_000_000.0:0} MB";
+            if (b >= 1_000) return $"{b / 1_000.0:0} KB";
+            return $"{b} B";
+        }
+        catch { return "?"; }
     }
 }

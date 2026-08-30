@@ -809,6 +809,63 @@
                                                    Text="The key is stored only in settings.json on this PC and is never written to the log. Ollama needs no key — just have Ollama running locally."/>
                                     </StackPanel>
                                 </Border>
+
+                                <!-- ============ Local models (Ollama) — v2.3.0-alpha.2 ============ -->
+                                <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Local models (Ollama)" Style="{StaticResource SettingName}"/>
+                                                <TextBlock x:Name="OllamaStatusText" Style="{StaticResource SettingDesc}" Margin="0,2,0,0"
+                                                           Text="Checking…" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                            <Button x:Name="OllamaRefreshButton" Grid.Column="1" Content="Refresh"
+                                                    Style="{StaticResource GhostButton}" Padding="12,6" VerticalAlignment="Top"
+                                                    Click="OnOllamaRefresh"/>
+                                        </Grid>
+
+                                        <!-- Ollama missing → the one-click installer -->
+                                        <StackPanel x:Name="OllamaInstallBlock" Margin="0,12,0,0">
+                                            <Button x:Name="OllamaInstallButton" Content="Download &amp; install Ollama"
+                                                    Style="{StaticResource AccentButton}" HorizontalAlignment="Left"
+                                                    Click="OnOllamaInstall"/>
+                                            <TextBlock Style="{StaticResource SettingDesc}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                       Text="Downloads the official installer from ollama.com and runs it silently — free, private, no API key, nothing leaves your PC. Windows may show a permission prompt (UAC)."/>
+                                        </StackPanel>
+
+                                        <!-- installed but not serving -->
+                                        <StackPanel x:Name="OllamaStartBlock" Margin="0,12,0,0" Visibility="Collapsed">
+                                            <Button x:Name="OllamaStartButton" Content="Start Ollama"
+                                                    Style="{StaticResource AccentButton}" HorizontalAlignment="Left"
+                                                    Click="OnOllamaStart"/>
+                                            <TextBlock Style="{StaticResource SettingDesc}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                       Text="Ollama is installed but not answering on its local port — start it, then pull a model below."/>
+                                        </StackPanel>
+
+                                        <!-- shared progress line (download bytes or pull percent) -->
+                                        <ProgressBar x:Name="OllamaProgress" Height="5" Minimum="0" Maximum="100"
+                                                     Visibility="Collapsed" Margin="0,12,0,4"
+                                                     Background="{DynamicResource FieldBrush}" Foreground="{DynamicResource AccentBrush}"
+                                                     BorderThickness="0"/>
+                                        <TextBlock x:Name="OllamaProgressText" FontSize="11.5" Visibility="Collapsed"
+                                                   Foreground="{DynamicResource SubtitleBrush}" TextWrapping="Wrap"/>
+
+                                        <!-- installed models -->
+                                        <TextBlock x:Name="OllamaInstalledTitle" Text="Installed models"
+                                                   Style="{StaticResource SettingDesc}" Margin="0,12,0,4" Visibility="Collapsed"/>
+                                        <ItemsControl x:Name="OllamaInstalledList" Visibility="Collapsed"/>
+
+                                        <!-- curated lightweight catalog -->
+                                        <TextBlock Text="Recommended lightweight models" Style="{StaticResource SettingDesc}" Margin="0,14,0,4"/>
+                                        <ItemsControl x:Name="OllamaCatalogList"/>
+                                        <TextBlock Style="{StaticResource SettingDesc}" Margin="0,10,0,0" TextWrapping="Wrap"
+                                                   Text="A model downloads once (about the size shown) and then ? answers run fully offline. After a pull Lumo sets it as the active model if the current one isn't installed."/>
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </ScrollViewer>
 
