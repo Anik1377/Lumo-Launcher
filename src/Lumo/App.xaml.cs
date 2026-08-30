@@ -216,6 +216,11 @@ public partial class App : Application
             }
 
             _aiChatWindow = new AiChatWindow(_settings, _window.Ai);
+            // v2.3.0-alpha.4 — the chat's AI-off banner links straight to Settings → AI
+            _aiChatWindow.SettingsRequested += () =>
+            {
+                try { OpenSettings(initialPage: 6); } catch (Exception ex) { DiagnosticLogger.LogException("App.AiChatSettings", ex); }
+            };
             _aiChatWindow.Closed += (_, _) => _aiChatWindow = null;
             _aiChatWindow.Show();
             _aiChatWindow.Activate();

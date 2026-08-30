@@ -1,7 +1,37 @@
 ======================================================
-  LUMO v2.3.0-alpha.3  —  universal launcher for Windows
+  LUMO v2.3.0-alpha.4  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.3.0-alpha.4 (the polish pass)
+---------------------------------------------------------------
+1. THE AI CHAT GOT THE PROMPT-KIT MAKEOVER - the welcome
+   screen now opens on a glowing gradient logo orb that
+   gently breathes, the assistant avatar is a gradient
+   disc with a sparkle mark, typing dots pulse on a
+   smooth wave, and every message enters with a short
+   fade-and-rise. The window edge, shadow and card now
+   line up perfectly (no more floating shadow), and the
+   scrollbar is the slim overlay style instead of the
+   chunky stock one.
+2. THE PROMPT INPUT FEELS ALIVE - an accent ring lights
+   up around the input while it holds focus, the send
+   button is a gradient cap with a soft shadow that
+   lifts on hover and dips on press, and the hint row
+   uses the same key chips as the launcher.
+3. CLEARER MODEL + ERROR SIGNALS - the model chip in
+   the caption now carries a status dot (green for
+   private local models, accent for the Anthropic API),
+   errors render as a compact warning card, and the
+   "AI is off" banner gained an Open AI settings link
+   that jumps straight to Settings > AI.
+4. THE LAUNCHER GOT A GEOMETRY PASS - softer radii on
+   the search field, result rows, preview pane and the
+   right-click menu; bigger icon tiles; and the kind
+   badges are pill-shaped now. Everything still follows
+   your theme and accent colour.
+5. Same single portable exe as before - no new
+   dependencies, no WebView2, still ~500 KB.
 
 WHAT'S NEW IN v2.3.0-alpha.3 (the AI chat tab)
 ---------------------------------------------------------------

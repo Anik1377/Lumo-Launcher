@@ -42,11 +42,13 @@ public partial class AiChatWindow : Window
     private bool _sourceReady;
     private bool _atBottom = true;
 
+    /// <summary>v2.3.0-alpha.4 — the banner's "Open AI settings" link asks App to open Settings → AI (page 6).</summary>
+    public event Action? SettingsRequested;
+
     // ---- streaming plumbing -------------------------------------------------
     private readonly StringBuilder _streamBuf = new();
     private volatile bool _streamDirty;
     private DispatcherTimer? _flushTimer;
-    private DispatcherTimer? _dotsTimer;
     private int _shownLen;                       // typewriter reveal cursor
     private bool _firstDeltaArrived;
     private TextBlock? _liveText;                // plain-text view while streaming
@@ -74,7 +76,68 @@ public partial class AiChatWindow : Window
         BuildChips();
 
         Closed += (_, _) => { try { _genCts?.Cancel(); } catch { } };
-        Loaded += (_, _) => PromptBox.Focus();
+        Loaded += (_, _) =>
+        {
+            PromptBox.Focus();
+            StartOrbBreathing();
+        };
+    }
+
+    // ---------------------------------------------------------------- polish motion
+
+    /// <summary>
+    /// v2.3.0-alpha.4 — the empty-state halo breathes: a slow sine opacity wave that
+    /// gives the welcome screen life without demanding attention. Runs only when the
+    /// user has not disabled animations; the orb is collapsed once chatting starts,
+    /// so the cost disappears with it.
+    /// </summary>
+    private void StartOrbBreathing()
+    {
+        try
+        {
+            if (!_settings.AnimationsEnabled) return;
+            var wave = new System.Windows.Media.Animation.DoubleAnimation(0.55, 0.95, TimeSpan.FromMilliseconds(2200))
+            {
+                AutoReverse = true,
+                RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
+                EasingFunction = new System.Windows.Media.Animation.SineEase
+                {
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut,
+                },
+            };
+            OrbGlow.BeginAnimation(OpacityProperty, wave);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.OrbBreath", ex); }
+    }
+
+    /// <summary>
+    /// v2.3.0-alpha.4 — message entrance: a short fade + 7 px rise, the fluid-response
+    /// micro-motion that keeps the transcript from popping in dead still. One animation
+    /// per message; skipped entirely when animations are disabled.
+    /// </summary>
+    private void AnimateIn(FrameworkElement fe, double rise = 7)
+    {
+        try
+        {
+            if (!_settings.AnimationsEnabled) return;
+            var tt = new System.Windows.Media.TranslateTransform(0, rise);
+            fe.RenderTransform = tt;
+            var ease = new System.Windows.Media.Animation.CubicEase
+            {
+                EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut,
+            };
+            var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(190))
+            {
+                EasingFunction = ease,
+            };
+            var lift = new System.Windows.Media.Animation.DoubleAnimation(rise, 0, TimeSpan.FromMilliseconds(230))
+            {
+                EasingFunction = ease,
+            };
+            fe.BeginAnimation(OpacityProperty, fade);
+            tt.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, lift);
+        }
+        catch { /* motion is cosmetic */ }
     }
 
     // ---------------------------------------------------------------- theme
@@ -109,12 +172,60 @@ public partial class AiChatWindow : Window
             Resources["ChipBrush"] = new SolidColorBrush(dark
                 ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
             Resources["UserBubbleBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2E));   // accent @ 18%
+            Resources["UserBubbleBorderBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x38));
             Resources["AvatarBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2A));
             Resources["CodeBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x1B, 0x1B, 0x1B) : Color.FromRgb(0xF9, 0xF9, 0xF9));
             Resources["WarnBrush"] = new SolidColorBrush(Color.FromArgb(0x2A, 0xCA, 0x50, 0x10));
+
+            // v2.3.0-alpha.4 polish — gradient tokens (send cap, logo orb, orb halo).
+            // Built from the accent so every accent choice keeps a coherent system.
+            var accent = p.Accent;
+            var sendGrad = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(0.2, 1),
+            };
+            sendGrad.GradientStops.Add(new GradientStop(Light(accent, 0.22), 0.0));
+            sendGrad.GradientStops.Add(new GradientStop(accent, 1.0));
+            sendGrad.Freeze();
+            Resources["SendBrush"] = sendGrad;
+
+            var orbGrad = new LinearGradientBrush
+            {
+                StartPoint = new System.Windows.Point(0, 0),
+                EndPoint = new System.Windows.Point(0.3, 1),
+            };
+            orbGrad.GradientStops.Add(new GradientStop(Light(accent, 0.35), 0.0));
+            orbGrad.GradientStops.Add(new GradientStop(accent, 1.0));
+            orbGrad.Freeze();
+            Resources["OrbBrush"] = orbGrad;
+
+            var halo = new RadialGradientBrush();
+            halo.GradientStops.Add(new GradientStop(Appearance.Tint(accent, 0x42), 0.0));
+            halo.GradientStops.Add(new GradientStop(Appearance.Tint(accent, 0x14), 0.62));
+            halo.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.Transparent, 1.0));
+            halo.Freeze();
+            Resources["GlowBrush"] = halo;
+
+            _focusRingBrush = new SolidColorBrush(Appearance.Tint(accent, 0x66));
+
+            // the card edge IS the window edge now — sync the corner radius to what DWM
+            // actually rounds (Win11 8 px, Win10 square), so the shadow hugs the card.
+            bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
+            float r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
+            RootCard.CornerRadius = new CornerRadius(r);
+            CaptionBar.CornerRadius = new CornerRadius(r, r, 0, 0);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ApplyTheme", ex); }
     }
+
+    private SolidColorBrush? _focusRingBrush;
+
+    /// <summary>accent lifted toward white — gradient light ends for caps/orbs.</summary>
+    private static Color Light(Color c, double f) => System.Windows.Media.Color.FromRgb(
+        (byte)(c.R + (255 - c.R) * f),
+        (byte)(c.G + (255 - c.G) * f),
+        (byte)(c.B + (255 - c.B) * f));
 
     // ---------------------------------------------------------------- chrome
 
@@ -133,6 +244,12 @@ public partial class AiChatWindow : Window
     private void OnClose(object sender, RoutedEventArgs e)
     {
         try { Close(); } catch { }
+    }
+
+    private void OnOpenAiSettings(object sender, RoutedEventArgs e)
+    {
+        try { SettingsRequested?.Invoke(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.OpenSettings", ex); }
     }
 
     // ---------------------------------------------------------------- empty state / chips
@@ -180,6 +297,10 @@ public partial class AiChatWindow : Window
         {
             bool anthropic = AiProviders.IsAnthropic(_settings.AiStyle, _settings.AiEndpoint);
             ModelChipText.Text = $"{_settings.AiModel} · {(anthropic ? "Anthropic" : "local")}";
+            // live status dot: emerald for private local models, accent for the API
+            ModelDot.Fill = anthropic
+                ? (System.Windows.Media.Brush)Resources["AccentBrush"]
+                : new SolidColorBrush(System.Windows.Media.Color.FromRgb(0x10, 0xB9, 0x81));
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Chip", ex); }
     }
@@ -206,9 +327,40 @@ public partial class AiChatWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PromptKey", ex); }
     }
 
+    /// <summary>v2.3.0-alpha.4 — Esc closes the chat from anywhere in the window
+    /// (the hint chips promise it, so it must be true — the old build only claimed it).</summary>
+    private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        try
+        {
+            if (e.Key == Key.Escape)
+            {
+                e.Handled = true;
+                Close();
+            }
+        }
+        catch { }
+    }
+
     private void OnPromptTextChanged(object sender, TextChangedEventArgs e)
     {
         try { SendButton.IsEnabled = !string.IsNullOrWhiteSpace(PromptBox.Text); }
+        catch { }
+    }
+
+    /// <summary>
+    /// v2.3.0-alpha.4 — prompt-kit focus treatment: the input's hairline stroke lifts
+    /// to an accent ring while the prompt holds focus, then settles back. The one
+    /// place the chrome actively answers the user's pointer.
+    /// </summary>
+    private void OnPromptFocusChanged(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        try
+        {
+            PromptShell.BorderBrush = PromptBox.IsKeyboardFocusWithin
+                ? _focusRingBrush ?? (Brush)FindResource("AccentBrush")
+                : (Brush)FindResource("BorderLineBrush");
+        }
         catch { }
     }
 
@@ -432,9 +584,11 @@ public partial class AiChatWindow : Window
             var bubble = new Border
             {
                 Background = (Brush)Resources["UserBubbleBrush"],
+                BorderBrush = (Brush)Resources["UserBubbleBorderBrush"],   // v2.3.0-alpha.4 — hairline accent rim lifts the fill off the panel
+                BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(16, 16, 4, 16),   // prompt-kit: sharp tail corner toward the sender
                 Padding = new Thickness(13, 9, 13, 9),
-                MaxWidth = 540,
+                MaxWidth = 560,
                 HorizontalAlignment = HorizontalAlignment.Right,
             };
             var tb = new TextBlock
@@ -449,36 +603,45 @@ public partial class AiChatWindow : Window
             Grid.SetColumn(bubble, 1);
             grid.Children.Add(bubble);
             MessagesHost.Children.Add(grid);
+            AnimateIn(grid);
             ScrollIfAtBottom();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.UserBubble", ex); }
     }
 
-    /// <summary>Assistant placeholder: avatar dot + plain live text + (caller adds) typing dots.</summary>
+    /// <summary>Assistant placeholder: gradient sparkle avatar + plain live text + (caller adds) typing dots.</summary>
     private (StackPanel Host, TextBlock Live) AppendAssistantBubble()
     {
         var grid = new Grid { Margin = new Thickness(0, 4, 0, 14) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-        var avatar = new Border
+        // v2.3.0-alpha.4 — prompt-kit avatar: a gradient disc with a white sparkle
+        // mark (replaces the literal "?" glyph — the single cheapest look in the old build).
+        var avatar = new Grid
         {
-            Width = 26,
-            Height = 26,
-            CornerRadius = new CornerRadius(13),
-            Background = (Brush)Resources["AvatarBrush"],
+            Width = 28,
+            Height = 28,
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(0, 1, 10, 0),
         };
-        avatar.Child = new TextBlock
+        var disc = new System.Windows.Shapes.Ellipse
         {
-            Text = "?",
-            FontSize = 13,
-            FontWeight = FontWeights.Bold,
-            Foreground = (Brush)Resources["AccentBrush"],
+            Fill = (Brush)Resources["OrbBrush"],
+        };
+        var spark = new System.Windows.Shapes.Path
+        {
+            Data = System.Windows.Media.Geometry.Parse(
+                "M12,2 C12.7,7.3 16.7,11.3 22,12 C16.7,12.7 12.7,16.7 12,22 C11.3,16.7 7.3,12.7 2,12 C7.3,11.3 11.3,7.3 12,2 Z"),
+            Fill = System.Windows.Media.Brushes.White,
+            Stretch = Stretch.Uniform,
+            Width = 13,
+            Height = 13,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
         };
+        avatar.Children.Add(disc);
+        avatar.Children.Add(spark);
         Grid.SetColumn(avatar, 0);
 
         var host = new StackPanel();
@@ -495,6 +658,7 @@ public partial class AiChatWindow : Window
         grid.Children.Add(avatar);
         grid.Children.Add(host);
         MessagesHost.Children.Add(grid);
+        AnimateIn(grid);
         ScrollIfAtBottom();
         return (host, live);
     }
@@ -515,42 +679,47 @@ public partial class AiChatWindow : Window
     {
         try
         {
-            var grid = new Grid { Margin = new Thickness(0, 2, 0, 12) };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var avatar = new Border
-            {
-                Width = 26, Height = 26, CornerRadius = new CornerRadius(13),
-                Background = (Brush)Resources["WarnBrush"],
-                VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 10, 0),
-            };
-            avatar.Child = new TextBlock
-            {
-                Text = "!", FontSize = 13, FontWeight = FontWeights.Bold,
-                Foreground = (Brush)Resources["TitleBrush"],
-                HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center,
-            };
-            Grid.SetColumn(avatar, 0);
+            // v2.3.0-alpha.4 — errors are an inline warning card with a small badge,
+            // not a full avatar row: they read as a note about the answer, not a speaker.
+            var grid = new Grid { Margin = new Thickness(38, 2, 0, 12) };   // clears the 28 px avatar column
 
             var card = new Border
             {
                 Background = (Brush)Resources["WarnBrush"],
+                BorderBrush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0x40, 0xCA, 0x50, 0x10)),
+                BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(12, 8, 12, 8),
                 MaxWidth = 560,
                 HorizontalAlignment = HorizontalAlignment.Left,
             };
-            card.Child = new TextBlock
+            var row = new StackPanel { Orientation = Orientation.Horizontal };
+            var badge = new Border
+            {
+                Width = 16, Height = 16,
+                CornerRadius = new CornerRadius(8),   // circle
+                Background = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xCA, 0x50, 0x10)),
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 2, 9, 0),
+            };
+            badge.Child = new TextBlock
+            {
+                Text = "!", FontSize = 10.5, FontWeight = FontWeights.Bold,
+                Foreground = System.Windows.Media.Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            row.Children.Add(badge);
+            row.Children.Add(new TextBlock
             {
                 Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 12.5,
                 Foreground = (Brush)Resources["TitleBrush"],
-            };
-            Grid.SetColumn(card, 1);
-
-            grid.Children.Add(avatar);
+                VerticalAlignment = VerticalAlignment.Center,
+            });
+            card.Child = row;
             grid.Children.Add(card);
             MessagesHost.Children.Add(grid);
+            AnimateIn(grid);
             ScrollIfAtBottom();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ErrorBubble", ex); }
@@ -562,54 +731,50 @@ public partial class AiChatWindow : Window
     {
         try
         {
-            var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 4, 0, 2) };
-            var dots = new List<System.Windows.Shapes.Ellipse>();
+            var panel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 5, 0, 2) };
             for (int i = 0; i < 3; i++)
             {
                 var d = new System.Windows.Shapes.Ellipse
                 {
-                    Width = 7, Height = 7, Margin = new Thickness(0, 0, 5, 0),
+                    Width = 6.5, Height = 6.5, Margin = new Thickness(0, 0, 5.5, 0),
                     Fill = (Brush)Resources["SubtitleBrush"],
                     Opacity = 0.35,
                 };
-                dots.Add(d);
+                // v2.3.0-alpha.4 — a smooth staggered sine pulse (was: timer-stepped
+                // opacity flips, which read as three LEDs blinking, not "thinking").
+                if (_settings.AnimationsEnabled)
+                {
+                    var pulse = new System.Windows.Media.Animation.DoubleAnimation(0.3, 1.0, TimeSpan.FromMilliseconds(560))
+                    {
+                        AutoReverse = true,
+                        RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
+                        BeginTime = TimeSpan.FromMilliseconds(i * 170),
+                        EasingFunction = new System.Windows.Media.Animation.SineEase
+                        {
+                            EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut,
+                        },
+                    };
+                    d.BeginAnimation(OpacityProperty, pulse);
+                }
                 panel.Children.Add(d);
             }
             host.Children.Add(panel);
             _dotsPanel = panel;
-
-            if (_dotsTimer is not { }) _dotsTimer = MakeDotsTimer();
-            _dotsTimer.Tag = dots;
-            if (_settings.AnimationsEnabled) _dotsTimer.Start();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.DotsStart", ex); }
-    }
-
-    private DispatcherTimer MakeDotsTimer()
-    {
-        var t = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(300) };
-        int phase = 0;
-        t.Tick += (_, _) =>
-        {
-            try
-            {
-                if (t.Tag is not List<System.Windows.Shapes.Ellipse> dots) return;
-                phase = (phase + 1) % 3;
-                for (int i = 0; i < dots.Count; i++)
-                    dots[i].Opacity = i == phase ? 1.0 : 0.35;
-            }
-            catch { /* dots are cosmetic */ }
-        };
-        return t;
     }
 
     private void StopTypingDots()
     {
         try
         {
-            _dotsTimer?.Stop();
-            if (_dotsPanel is { } p && p.Parent is StackPanel host)
-                host.Children.Remove(p);
+            if (_dotsPanel is { } p)
+            {
+                foreach (var child in p.Children.OfType<System.Windows.Shapes.Ellipse>())
+                    child.BeginAnimation(OpacityProperty, null);   // kill the pulse before teardown
+                if (p.Parent is Panel host)
+                    host.Children.Remove(p);
+            }
             _dotsPanel = null;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.DotsStop", ex); }

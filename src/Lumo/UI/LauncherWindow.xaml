@@ -37,9 +37,9 @@
         <!-- glyph → vector icon (modern outline set, 24×24 stroke paths) -->
         <ui:GlyphIconConverter x:Key="GlyphToIcon"/>
 
-        <!-- kbd-style hint chip, Win11 flavour -->
+        <!-- kbd-style hint chip, Win11 flavour (v2.3.0-alpha.4: 5 px radius) -->
         <Style x:Key="KbdChipBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="CornerRadius" Value="5"/>
             <Setter Property="Padding" Value="6,2"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource GlyphBoxBrush}"/>
@@ -175,7 +175,7 @@
                 <ControlTemplate TargetType="ContextMenu">
                     <Border Margin="10" Background="{DynamicResource FieldBrush}"
                             BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
-                            CornerRadius="8" Padding="5">
+                            CornerRadius="10" Padding="5">
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.35"/>
                         </Border.Effect>
@@ -192,7 +192,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Bd" CornerRadius="4" Padding="11,6.5" Background="Transparent">
+                    <Border x:Name="Bd" CornerRadius="5" Padding="11,6.5" Background="Transparent">
                         <!-- v2.2.0-alpha.2 — second column renders InputGestureText (e.g. "Enter") -->
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -278,10 +278,10 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- ================= search field (Win11 text box: 4 px radius, hairline
-                     stroke, 2 px accent focus bar — v2.0) ================= -->
+                <!-- ================= search field (Win11 text box: 6 px radius, hairline
+                     stroke, 2 px accent focus bar — v2.3.0-alpha.4 polish) ================= -->
                 <Border Grid.Row="0" x:Name="SearchField" Margin="14,12,14,10"
-                        CornerRadius="4" Background="{DynamicResource FieldBrush}"
+                        CornerRadius="6" Background="{DynamicResource FieldBrush}"
                         BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
                         SnapsToDevicePixels="True">
                     <Grid>
@@ -393,18 +393,18 @@
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4"
+                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6"
                                                 Padding="2" Margin="6,1">
                                             <Grid>
                                                 <!-- neutral hover / accent selection overlays (Win11 list item) -->
-                                                <Border x:Name="HoverOverlay" CornerRadius="4"
+                                                <Border x:Name="HoverOverlay" CornerRadius="6"
                                                         Background="{DynamicResource HoverBrush}" Opacity="0"/>
-                                                <Border x:Name="SelectedOverlay" CornerRadius="4"
+                                                <Border x:Name="SelectedOverlay" CornerRadius="6"
                                                         Background="{DynamicResource SelectedBrush}" Opacity="0"/>
                                                 <!-- v2.0.1 — Win11 selection pill: 3 px accent bar on the left edge -->
                                                 <Border x:Name="SelPill" Width="3" CornerRadius="1.5"
                                                         Background="{DynamicResource AccentBrush}"
-                                                        HorizontalAlignment="Left" Margin="2,9,0,9" Opacity="0"/>
+                                                        HorizontalAlignment="Left" Margin="2,10,0,10" Opacity="0"/>
                                                 <ContentPresenter/>
                                             </Grid>
                                         </Border>
@@ -470,11 +470,11 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Border x:Name="GlyphBox" Grid.Column="0" Width="30" Height="30" CornerRadius="4"
+                                <Border x:Name="GlyphBox" Grid.Column="0" Width="32" Height="32" CornerRadius="7"
                                         Background="{DynamicResource GlyphBoxBrush}">
                                     <Grid>
                                         <!-- real shell icon (app logo / file type); v1.7 vector icon when none -->
-                                        <Image Source="{Binding Icon}" Width="26" Height="26" Stretch="Uniform"
+                                        <Image Source="{Binding Icon}" Width="27" Height="27" Stretch="Uniform"
                                                RenderOptions.BitmapScalingMode="HighQuality"
                                                HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Image.Style>
@@ -490,7 +490,7 @@
                                         <Path x:Name="KindIcon" Data="{Binding Glyph, Converter={StaticResource GlyphToIcon}}"
                                               Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.1"
                                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                              Width="18" Height="18" Stretch="Uniform"
+                                              Width="19" Height="19" Stretch="Uniform"
                                               HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Path.Style>
                                                 <Style TargetType="Path">
@@ -542,8 +542,9 @@
                                             </Style>
                                         </TextBlock.Style>
                                     </TextBlock>
-                                    <!-- kind chip (App / File / Web / Tool …) -->
-                                    <Border CornerRadius="4" Padding="7,2.5" VerticalAlignment="Center"
+                                    <!-- kind chip (App / File / Web / Tool …) — pill radius reads
+                                         softer than the old 4 px box (v2.3.0-alpha.4) -->
+                                    <Border CornerRadius="10" Padding="8,3" VerticalAlignment="Center"
                                             Background="{DynamicResource ChipBrush}">
                                         <Border.Style>
                                             <Style TargetType="Border">
@@ -576,7 +577,7 @@
                 </ListBox>
 
                 <!-- ================= preview pane (v2.2 — Tab toggles; Esc closes) ================= -->
-                <Border x:Name="PreviewPane" Grid.Row="3" Margin="14,2,14,2" CornerRadius="6"
+                <Border x:Name="PreviewPane" Grid.Row="3" Margin="14,2,14,2" CornerRadius="8"
                         Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
                         BorderThickness="1" Visibility="Collapsed" Focusable="False">
                     <Grid MaxHeight="200" Margin="12,8,12,10">
