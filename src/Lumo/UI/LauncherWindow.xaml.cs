@@ -75,7 +75,7 @@ public partial class LauncherWindow : Window
     public event Action<List<MacroStep>, string?>? RecordFinishRequested;
 
     public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null,
-                          ClipboardHistory? clips = null)
+                          ClipboardHistory? clips = null, UsageStore? usage = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -84,7 +84,7 @@ public partial class LauncherWindow : Window
         _clips = clips;
         _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
-        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips);
+        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips, usage);
 
         _debounce = new DispatcherTimer(DispatcherPriority.Background)
         {

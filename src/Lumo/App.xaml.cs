@@ -17,6 +17,7 @@ public partial class App : Application
     private ShortcutStore? _shortcuts;
     private MacroRecorder? _recorder;
     private ClipboardHistory? _clips;
+    private UsageStore? _usage;                      // v2.1 — MRU ranking
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -39,7 +40,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v1.8.0 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v2.1.0 starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -57,7 +58,9 @@ public partial class App : Application
             _shortcuts = new ShortcutStore();
             _recorder = new MacroRecorder();
             _clips = new ClipboardHistory();          // v1.6 — clipboard history (UI-thread timer)
-            _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips);
+            _usage = new UsageStore();                // v2.1 — launch frequency for MRU ranking
+            _usage.Load();
+            _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips, _usage);
             MainWindow = _window;
 
             _window.SettingsRequested += () =>
@@ -140,7 +143,7 @@ public partial class App : Application
                 applyHotkey: () =>
                 {
                     string active = _window?.ReapplyHotkey() ?? "(none)";
-                    try { _tray?.UpdateText($"Lumo v1.8.0 — press {active}"); } catch { }
+                    try { _tray?.UpdateText($"Lumo v2.1.0 — press {active}"); } catch { }
                     return active;
                 },
                 rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } },

@@ -154,6 +154,19 @@ public static class Calculator
             if (_pos > start)
             {
                 var name = _s[start.._pos].ToLowerInvariant();
+
+                // v2.1 FIX (caught by the Phase 0 test harness) — bare constants:
+                // "pi" and "e" were swallowed by the letter scan above and thrown
+                // at as unknown functions before the MatchWord constant path could
+                // ever run, so "pi", "pi*2" and "2*e" all failed. They are constants
+                // whenever no '(' follows.
+                if ((name == "pi" || name == "e"))
+                {
+                    SkipWhite();
+                    if (_pos >= _s.Length || _s[_pos] != '(')
+                        return name == "pi" ? Math.PI : Math.E;
+                }
+
                 double arg;
                 if (Eat('('))
                 {

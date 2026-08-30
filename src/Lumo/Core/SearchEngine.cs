@@ -62,11 +62,13 @@ public sealed class SearchEngine
     private readonly ShortcutStore? _shortcuts;      // v1.4
     private readonly MacroRecorder? _recorder;       // v1.5
     private readonly ClipboardHistory? _clips;       // v1.6
+    private readonly UsageStore? _usage;             // v2.1 — MRU ranking
 
     public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null,
-                        MacroRecorder? recorder = null, ClipboardHistory? clips = null)
+                        MacroRecorder? recorder = null, ClipboardHistory? clips = null, UsageStore? usage = null)
     {
         _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts; _recorder = recorder; _clips = clips;
+        _usage = usage;
     }
 
     public List<ResultItem> Search(string rawQuery)
@@ -138,7 +140,7 @@ public sealed class SearchEngine
             new() { Title = "A/  Applications", Subtitle = "Type A/ then a name — e.g.  A/chrome", Glyph = "A", Kind = ResultKind.Hint, RunArgument = "A/" },
             new() { Title = "F/  Files", Subtitle = "Type F/ then part of a file name", Glyph = "F", Kind = ResultKind.Hint, RunArgument = "F/" },
             new() { Title = "C/  Calculator", Subtitle = "e.g.  C/(1920*1080)/3", Glyph = "C", Kind = ResultKind.Hint, RunArgument = "C/" },
-            new() { Title = "W/  Web search", Subtitle = "e.g.  W/weather tomorrow", Glyph = "W", Kind = ResultKind.Hint, RunArgument = "W/" },
+            new() { Title = "W/  Web search", Subtitle = "e.g.  W/weather tomorrow — or switch per query: W/github · W/youtube · W/ddg · W/wiki", Glyph = "W", Kind = ResultKind.Hint, RunArgument = "W/" },
             new() { Title = "I/  Image search", Subtitle = "e.g.  I/mountain sunrise", Glyph = "I", Kind = ResultKind.Hint, RunArgument = "I/" },
             new() { Title = "U/  Utilities", Subtitle = "lock · sleep · restart · shutdown · empty bin", Glyph = "U", Kind = ResultKind.Hint, RunArgument = "U/" },
             new() { Title = "H/  Clipboard history", Subtitle = "everything you copied — pick one to copy again (Raycast style)", Glyph = "⧉", Kind = ResultKind.Hint, RunArgument = "H/" },
@@ -249,12 +251,12 @@ public sealed class SearchEngine
         var rows = new List<ResultItem>();
         if (q.Length == 0)
         {
-            foreach (var app in _apps.Query("", MaxResults))
+            foreach (var app in _apps.Query("", MaxResults, _usage))
                 rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application", Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
             return rows;
         }
 
-        foreach (var app in _apps.Query(q, MaxResults))
+        foreach (var app in _apps.Query(q, MaxResults, _usage))
             rows.Add(new ResultItem { Title = app.Name, Subtitle = "Application — " + app.Path, Glyph = "A", Kind = ResultKind.App, RunArgument = app.Path, Icon = Services.AppIcons.ForPath(app.Path) });
 
         if (rows.Count == 0)
@@ -272,7 +274,7 @@ public sealed class SearchEngine
         }
 
         IReadOnlyList<FileEntry> matches = _files.Ready
-            ? _files.Query(q, MaxResults)
+            ? _files.Query(q, MaxResults, _usage)
             : _files.QuickScan(q, MaxResults);
 
         if (!_files.Ready)
@@ -292,14 +294,22 @@ public sealed class SearchEngine
         var rows = new List<ResultItem>();
         if (q.Length == 0)
         {
-            rows.Add(new ResultItem { Title = "Type an expression", Subtitle = "Supported: + - * / % ^ ( ) sqrt sin cos tan log ln pi e", Glyph = "C", Kind = ResultKind.Hint });
+            rows.Add(new ResultItem { Title = "Type an expression", Subtitle = "Supported: + - * / % ^ ( ) sqrt sin cos tan log ln pi e — and units: 10 ft in cm, 50 usd to eur", Glyph = "C", Kind = ResultKind.Hint });
+            return rows;
+        }
+
+        // v2.1 (DEV_PLAN Task 1.2) — inline unit + currency conversion first:
+        // "10 ft in cm", "5kg in lbs", "50 usd to eur" — pure, synchronous, no I/O.
+        if (UnitConverter.TryConvert(q, out var converted))
+        {
+            rows.Add(new ResultItem { Title = converted, Subtitle = $"{q}  —  press Enter to copy", Glyph = "=", Kind = ResultKind.Calculator, RunArgument = converted });
             return rows;
         }
 
         if (Calculator.TryEvaluate(q, out var value))
             rows.Add(new ResultItem { Title = value, Subtitle = $"{q}  —  press Enter to copy", Glyph = "=", Kind = ResultKind.Calculator, RunArgument = value });
         else
-            rows.Add(new ResultItem { Title = "Not a valid expression", Subtitle = "e.g.  (1920*1080)/3   sqrt(2)^10   log(1000)", Glyph = "?", Kind = ResultKind.Hint });
+            rows.Add(new ResultItem { Title = "Not a valid expression or unit conversion", Subtitle = "e.g.  (1920*1080)/3   sqrt(2)^10   10 ft in cm   50 usd to eur", Glyph = "?", Kind = ResultKind.Hint });
 
         return rows;
     }
@@ -307,13 +317,25 @@ public sealed class SearchEngine
     private List<ResultItem> WebRows(string q)
     {
         if (q.Length == 0)
-            return new() { new ResultItem { Title = "Type what to search on the web", Subtitle = "e.g.  W/dotnet 8 release notes   or a URL like W/example.com", Glyph = "W", Kind = ResultKind.Hint } };
+            return new() { new ResultItem { Title = "Type what to search on the web", Subtitle = "e.g.  W/dotnet 8 release notes · W/github lumo · W/youtube cats · or a URL like W/example.com", Glyph = "W", Kind = ResultKind.Hint } };
+
+        // v2.1 (DEV_PLAN Task 1.3) — per-query provider quick-switch: "W/github dotnet"
+        // searches GitHub, "W/youtube cats" searches YouTube; the default engine wins
+        // for everything else (raw URLs keep the open-directly behaviour).
+        if (WebProviders.TryResolve(q, _settings.CustomWebProviders, out var purl, out var pkey, out var prest))
+        {
+            string label = char.ToUpperInvariant(pkey[0]) + pkey[1..] + " — press Enter";
+            return new()
+            {
+                new ResultItem { Title = prest, Subtitle = label, Glyph = "W", Kind = ResultKind.Web, RunArgument = purl }
+            };
+        }
 
         string arg = LooksLikeUrl(q) ? EnsureUrl(q) : SearchUrl(q);
-        var label = LooksLikeUrl(q) ? "Open URL — press Enter" : "Search the web — press Enter";
+        var defaultLabel = LooksLikeUrl(q) ? "Open URL — press Enter" : "Search the web — press Enter";
         return new()
         {
-            new ResultItem { Title = q, Subtitle = label, Glyph = "W", Kind = ResultKind.Web, RunArgument = arg }
+            new ResultItem { Title = q, Subtitle = defaultLabel, Glyph = "W", Kind = ResultKind.Web, RunArgument = arg }
         };
     }
 
@@ -358,7 +380,7 @@ public sealed class SearchEngine
         var rows = new List<ResultItem>();
 
         // v1.6 — Raycast-style section headers
-        var apps = _apps.Query(q, 8).ToList();
+        var apps = _apps.Query(q, 8, _usage).ToList();
         if (apps.Count > 0)
         {
             rows.Add(new ResultItem { Title = "APPS", Kind = ResultKind.Header });
@@ -378,7 +400,7 @@ public sealed class SearchEngine
 
         if (_files.Ready)
         {
-            var files = _files.Query(q, 6).ToList();
+            var files = _files.Query(q, 6, _usage).ToList();
             if (files.Count > 0)
             {
                 rows.Add(new ResultItem { Title = "FILES", Kind = ResultKind.Header });
@@ -512,11 +534,13 @@ public sealed class SearchEngine
                 case ResultKind.App or ResultKind.File:
                     OpenPath(item.RunArgument);
                     _recorder?.Capture(item);           // v1.5 — feed the macro recorder
+                    RecordUsage(item.RunArgument);      // v2.1 — feed the MRU store
                     break;
 
                 case ResultKind.Web or ResultKind.Image:
                     OpenUrl(item.RunArgument);
                     if (item.Kind == ResultKind.Web) _recorder?.Capture(item);   // v1.5
+                    RecordUsage(item.RunArgument);      // v2.1 — the resolved URL is the key
                     break;
 
                 case ResultKind.Calculator:
@@ -531,7 +555,10 @@ public sealed class SearchEngine
                     return RunTool(item.RunArgument);
 
                 case ResultKind.Shortcut:
-                    return RunShortcut(item.RunArgument) ?? null;
+                    string? shortcutError = RunShortcut(item.RunArgument);
+                    if (shortcutError is null && _shortcuts?.Find(item.RunArgument) is { } ran && !ran.IsSnippet)
+                        RecordUsage(ran.Target);        // v2.1 — shortcut launches count towards their target
+                    return shortcutError;
             }
             return null;
         }
@@ -541,6 +568,11 @@ public sealed class SearchEngine
             return $"Couldn't open “{item.Title}” — {ex.InnerException?.Message ?? ex.Message}";
         }
     }
+
+    /// <summary>v2.1 (DEV_PLAN Task 1.1) — usage recording is fire-and-forget: the
+    /// store bumps its counter and persists on a background thread, so the launch
+    /// path never touches the disk.</summary>
+    private void RecordUsage(string? key) => _usage?.Record(key);
 
     private string? RunTool(string arg)
     {

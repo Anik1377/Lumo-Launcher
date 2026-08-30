@@ -107,15 +107,18 @@ public sealed class FileIndex
         });
     }
 
-    /// <summary>In-memory filter over the published list — fast (bounded 150k) and synchronous.</summary>
-    public List<FileEntry> Query(string query, int max)
+    /// <summary>In-memory filter over the published list — fast (bounded 150k) and synchronous.
+    /// v2.1 — optional usage store blends launch frequency into the ranking.</summary>
+    public List<FileEntry> Query(string query, int max, Services.UsageStore? usage = null)
     {
         var entries = _entries;
         var scored = new List<(FileEntry File, int Score)>(64);
         foreach (var e in entries)
         {
             int s = Fuzzy.Score(query, e.Name);
-            if (s > 0) scored.Add((e, s));
+            if (s <= 0) continue;
+            if (usage is not null) s = Fuzzy.ScoreWithUsage(s, usage.Get(e.FullPath));
+            scored.Add((e, s));
             if (scored.Count > max * 8) break; // keep responsiveness on huge matches
         }
         scored.Sort((a, b) => b.Score.CompareTo(a.Score));

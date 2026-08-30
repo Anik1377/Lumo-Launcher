@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Phase 0 (DEV_PLAN) — regression harness for the pure core.
+
+       Two targets:
+       · net8.0           — compile-includes Lumo's PURE source files (Fuzzy, Calculator,
+                            UnitConverter, WebProviders, UsageStore, Settings, …) so the
+                            suite runs on ANY OS (Linux dev boxes included).
+       · net8.0-windows   — ProjectReference to the real Lumo assembly (WPF types resolve);
+                            this is the target CI (windows-latest) runs. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net8.0-windows</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <UseWPF Condition="'$(TargetFramework)' == 'net8.0-windows'">true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">
+    <Compile Include="../Lumo/Core/Fuzzy.cs" Link="Core/Fuzzy.cs" />
+    <Compile Include="../Lumo/Core/Calculator.cs" Link="Core/Calculator.cs" />
+    <Compile Include="../Lumo/Core/UnitConverter.cs" Link="Core/UnitConverter.cs" />
+    <Compile Include="../Lumo/Core/WebProviders.cs" Link="Core/WebProviders.cs" />
+    <Compile Include="../Lumo/Core/AppPaths.cs" Link="Core/AppPaths.cs" />
+    <Compile Include="../Lumo/Core/SystemTheme.cs" Link="Core/SystemTheme.cs" />
+    <Compile Include="../Lumo/Services/UsageStore.cs" Link="Services/UsageStore.cs" />
+    <Compile Include="../Lumo/Services/DiagnosticLogger.cs" Link="Services/DiagnosticLogger.cs" />
+    <Compile Include="../Lumo/Services/Settings.cs" Link="Services/Settings.cs" />
+    <Compile Include="../Lumo/Services/ExchangeRateService.cs" Link="Services/ExchangeRateService.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">
+    <ProjectReference Include="..\Lumo\Lumo.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="xunit" Version="2.7.0" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7" />
+  </ItemGroup>
+
+</Project>

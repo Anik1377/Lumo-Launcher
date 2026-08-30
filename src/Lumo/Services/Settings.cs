@@ -38,6 +38,9 @@ public sealed class Settings
     public string CornerStyle { get; set; } = "rounded";   // rounded (Win11 8 px) | square
     public string RowDensity { get; set; } = "comfortable"; // comfortable | compact
 
+    // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
+    public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
     public static Settings Load()
@@ -51,31 +54,40 @@ public sealed class Settings
                 // "Hotkey": { … } object) falls back to its default instead of
                 // throwing away every saved preference.
                 using var doc = JsonDocument.Parse(File.ReadAllText(AppPaths.SettingsFile));
-                var root = doc.RootElement;
-                if (root.ValueKind == JsonValueKind.Object)
-                {
-                    s.Hotkey            = GetStr(root, nameof(Hotkey), s.Hotkey);
-                    s.Theme             = GetStr(root, nameof(Theme), s.Theme);
-                    s.WebEngine         = GetStr(root, nameof(WebEngine), s.WebEngine);
-                    s.HideOnFocusLoss   = GetBool(root, nameof(HideOnFocusLoss), s.HideOnFocusLoss);
-                    s.AccentColor       = GetStr(root, nameof(AccentColor), s.AccentColor);
-                    s.BorderEffect      = GetBool(root, nameof(BorderEffect), s.BorderEffect);
-                    s.BorderStyle       = GetStr(root, nameof(BorderStyle), s.BorderStyle);
-                    s.BorderSpeedSec    = GetNum(root, nameof(BorderSpeedSec), s.BorderSpeedSec);
-                    s.StartWithWindows  = GetBool(root, nameof(StartWithWindows), s.StartWithWindows);
-                    s.MaxIndexedFiles   = (int)Math.Clamp(GetNum(root, nameof(MaxIndexedFiles), s.MaxIndexedFiles), 10_000, 500_000);
-                    s.AnimationsEnabled = GetBool(root, nameof(AnimationsEnabled), s.AnimationsEnabled);
-                    s.GlassEffect       = GetBool(root, nameof(GlassEffect), s.GlassEffect);
-                    s.GlowOpacity       = GetNum(root, nameof(GlowOpacity), s.GlowOpacity);
-                    s.RimThickness      = GetNum(root, nameof(RimThickness), s.RimThickness);
-                    s.WindowWidth       = GetNum(root, nameof(WindowWidth), s.WindowWidth);
-                    s.CornerStyle       = GetStr(root, nameof(CornerStyle), s.CornerStyle);
-                    s.RowDensity        = GetStr(root, nameof(RowDensity), s.RowDensity);
-                }
+                if (doc.RootElement.ValueKind == JsonValueKind.Object)
+                    ApplyJson(s, doc.RootElement);
             }
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.Load", ex); }
         return s;
+    }
+
+    /// <summary>
+    /// Phase 0 (DEV_PLAN) — the tolerant per-property reader, extracted so the test
+    /// harness can exercise it without touching the real settings.json on disk.
+    /// One bad value falls back to that property's default; nothing throws.
+    /// </summary>
+    internal static void ApplyJson(Settings s, JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object) return;
+        s.Hotkey            = GetStr(root, nameof(Hotkey), s.Hotkey);
+        s.Theme             = GetStr(root, nameof(Theme), s.Theme);
+        s.WebEngine         = GetStr(root, nameof(WebEngine), s.WebEngine);
+        s.HideOnFocusLoss   = GetBool(root, nameof(HideOnFocusLoss), s.HideOnFocusLoss);
+        s.AccentColor       = GetStr(root, nameof(AccentColor), s.AccentColor);
+        s.BorderEffect      = GetBool(root, nameof(BorderEffect), s.BorderEffect);
+        s.BorderStyle       = GetStr(root, nameof(BorderStyle), s.BorderStyle);
+        s.BorderSpeedSec    = GetNum(root, nameof(BorderSpeedSec), s.BorderSpeedSec);
+        s.StartWithWindows  = GetBool(root, nameof(StartWithWindows), s.StartWithWindows);
+        s.MaxIndexedFiles   = (int)Math.Clamp(GetNum(root, nameof(MaxIndexedFiles), s.MaxIndexedFiles), 10_000, 500_000);
+        s.AnimationsEnabled = GetBool(root, nameof(AnimationsEnabled), s.AnimationsEnabled);
+        s.GlassEffect       = GetBool(root, nameof(GlassEffect), s.GlassEffect);
+        s.GlowOpacity       = GetNum(root, nameof(GlowOpacity), s.GlowOpacity);
+        s.RimThickness      = GetNum(root, nameof(RimThickness), s.RimThickness);
+        s.WindowWidth       = GetNum(root, nameof(WindowWidth), s.WindowWidth);
+        s.CornerStyle       = GetStr(root, nameof(CornerStyle), s.CornerStyle);
+        s.RowDensity        = GetStr(root, nameof(RowDensity), s.RowDensity);
+        s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
     }
 
     private static string GetStr(JsonElement root, string name, string fallback)
@@ -121,6 +133,24 @@ public sealed class Settings
         return fallback;
     }
 
+    /// <summary>Tolerant string→string map read (v2.1 custom web providers).</summary>
+    private static Dictionary<string, string> GetStrMap(JsonElement root, string name, Dictionary<string, string> fallback)
+    {
+        try
+        {
+            if (root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Object)
+            {
+                var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var p in v.EnumerateObject())
+                    if (p.Value.ValueKind == JsonValueKind.String && p.Value.GetString() is { } url)
+                        map[p.Name] = url;
+                return map;
+            }
+        }
+        catch { /* defensive */ }
+        return fallback;
+    }
+
     public void Save()
     {
         try
@@ -157,6 +187,7 @@ public sealed class Settings
         WindowWidth = o.WindowWidth;
         CornerStyle = o.CornerStyle;
         RowDensity = o.RowDensity;
+        CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -166,7 +197,7 @@ public sealed class Settings
     public bool EffectiveDark() =>
         Theme?.Equals("light", StringComparison.OrdinalIgnoreCase) == false
             ? Theme?.Equals("auto", StringComparison.OrdinalIgnoreCase) == true
-                ? Appearance.IsSystemDark()
+                ? SystemTheme.IsDark()
                 : true
             : false;
 }

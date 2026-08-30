@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0--alpha.5-CA5010?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.1.0--alpha.1-CA5010?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -45,6 +45,32 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~350 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v2.1.0-alpha.1 — Smarter (DEV_PLAN Phases 0 + 1)
+
+The first slice of the [development plan](DEV_PLAN.md): a regression-safe test
+harness, then three "make every search feel better" features.
+
+1. **🧪 Test harness (Phase 0).** New `src/Lumo.Tests` (xUnit) covers the pure
+   core — fuzzy scoring, the safe calculator, settings JSON round-trips, tolerant
+   hand-edited settings, the usage store — and CI now runs `dotnet test` **before**
+   every publish, so a red test blocks a release. The harness immediately caught
+   and fixed a real bug: bare `pi` / `e` (and `pi*2`, `2*e`) never evaluated — the
+   parser consumed them as unknown functions.
+2. **🔥 MRU ranking (Task 1.1).** Every launch is counted in
+   `%APPDATA%\Lumo\usage.json` (written off-thread). Equal-match results are
+   boosted up to ×2 + a small recency nudge for the last 7 days, so the apps and
+   files you actually open float to the top of A/, F/ and mixed results.
+3. **💱 Inline unit + currency conversion (Task 1.2).** `C/10 ft in cm`,
+   `C/5kg in lbs`, `C/100f to c`, `C/50 usd to eur` now answer directly in the
+   list. Length/mass/volume/data/temperature are offline; FX rates ship with a
+   static fallback and quietly refresh from open.er-api.com every 12 h — the
+   keystroke path never touches the network.
+4. **🌐 Per-query web quick-switch (Task 1.3).** `W/github lumo`, `W/youtube
+   cats`, `W/ddg …`, `W/wiki …`, `W/maps …`, `W/so …` route that query to the
+   named provider without touching your default engine. Add your own via
+   `CustomWebProviders` in settings.json (`"keyword": "https://site.com/?q={0}"`)
+   — custom entries win over built-ins.
 
 ## 🆕 What's new in v2.0.0-alpha.5 — the Apple-craft pass
 

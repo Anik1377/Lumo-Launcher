@@ -1,3 +1,4 @@
+using Lumo.Core;
 using System.Windows;
 using System.Windows.Media;
 using Brush = System.Windows.Media.Brush;
@@ -210,17 +211,9 @@ public static class Appearance
     /// <summary>
     /// Reads the Windows personalization setting (Settings → Personalization → Colors →
     /// "Choose your mode"). Returns true when Windows apps are set to dark.
+    /// v2.1 — the probe itself now lives in the pure Core/SystemTheme.cs so the
+    /// test harness can compile Settings without WPF types; this shim stays for
+    /// every existing caller.
     /// </summary>
-    public static bool IsSystemDark()
-    {
-        try
-        {
-            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
-                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            if (key?.GetValue("AppsUseLightTheme") is int v)
-                return v == 0;
-        }
-        catch { }
-        return true; // default to dark — Lumo's signature look
-    }
+    public static bool IsSystemDark() => SystemTheme.IsDark();
 }

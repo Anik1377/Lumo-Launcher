@@ -75,14 +75,17 @@ public sealed class AppIndex
         });
     }
 
-    public List<AppEntry> Query(string query, int max)
+    public List<AppEntry> Query(string query, int max, Services.UsageStore? usage = null)
     {
         var entries = _entries; // atomic reference read
         var scored = new List<(AppEntry App, int Score)>(entries.Count);
         foreach (var e in entries)
         {
             int s = Fuzzy.Score(query, e.Name);
-            if (s > 0) scored.Add((e, s));
+            if (s <= 0) continue;
+            // v2.1 — MRU blend: frequently-launched apps outrank never-launched equals.
+            if (usage is not null) s = Fuzzy.ScoreWithUsage(s, usage.Get(e.Path));
+            scored.Add((e, s));
         }
         scored.Sort((a, b) => b.Score.CompareTo(a.Score));
         return scored.Take(max).Select(x => x.App).ToList();

@@ -23,6 +23,9 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
+      - name: Run unit tests (Phase 0 harness)
+        run: dotnet test src/Lumo.Tests/Lumo.Tests.csproj -c Release
+
       - name: Publish (single-file, win-x64)
         run: dotnet publish src/Lumo/Lumo.csproj -c Release
 

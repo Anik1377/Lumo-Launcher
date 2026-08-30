@@ -14,6 +14,8 @@ public static class AppPaths
     public static readonly string LogFile = Path.Combine(DataDir, "log.txt");
     public static readonly string SettingsFile = Path.Combine(SettingsDir, "settings.json");
     public static readonly string ShortcutsFile = Path.Combine(SettingsDir, "shortcuts.json");
+    public static string UsageFile => Path.Combine(SettingsDir, "usage.json");          // v2.1 MRU
+    public static string FavouritesFile => Path.Combine(SettingsDir, "favourites.json"); // v2.2 (Phase 2)
 
     static AppPaths()
     {
