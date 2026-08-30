@@ -1331,6 +1331,13 @@ public partial class LauncherWindow : Window
             Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
             Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
 
+            // v2.2.0-alpha.3 FIX — FieldBrush was never defined in this window, so every
+            // DynamicResource referencing it resolved to NULL. The quick-action menu card
+            // (a WPF popup has no backdrop of its own) rendered completely see-through,
+            // and the search field fill silently fell back to the panel colour. Wire the
+            // palette's OPAQUE Field token — same solid value SettingsWindow already uses.
+            Resources["FieldBrush"] = new SolidColorBrush(p.Field);
+
             // Win11 rounded corners come from DWM on Windows 11; Windows 10 keeps square
             // corners (an unpainted radius would otherwise expose raw window corners).
             // v2.0.1 — the user can also force square corners from Settings → Appearance.

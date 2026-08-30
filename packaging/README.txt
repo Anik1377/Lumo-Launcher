@@ -1,7 +1,20 @@
 ======================================================
-  LUMO v2.2.0-alpha.2  —  universal launcher for Windows
+  LUMO v2.2.0-alpha.3  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.2.0-alpha.3 (bugfix — solid quick-action menu)
+---------------------------------------------------------------
+1. FIX: THE RIGHT-CLICK MENU WAS SEE-THROUGH - the menu card
+   referenced a colour token (FieldBrush) that was never
+   defined in the launcher window, so the card rendered with
+   NO fill at all and whatever was on screen showed through
+   the menu. The card now uses the palette's opaque field
+   colour: solid dark #2D2D2D in dark mode, solid #FBFBFB in
+   light mode, matching the Settings window.
+2. SAME FIX FOR THE SEARCH BOX - the search field used the
+   same missing token and had been silently rendering as
+   plain background; it now gets its proper inset field fill.
 
 WHAT'S NEW IN v2.2.0-alpha.2 (quick actions + favourites rework)
 ---------------------------------------------------------------

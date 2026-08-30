@@ -163,7 +163,9 @@
         </Style>
         <!-- v2.2 — row context menu (Win11 flyout look: rounded card, hairline stroke,
          soft shadow, hover row). Only plain click items are used, so a simple
-         template pair is enough — no submenus / checkables needed. -->
+         template pair is enough — no submenus / checkables needed.
+         v2.2.0-alpha.3 — the card fill MUST be an OPAQUE brush (FieldBrush): the
+         menu is a chromeless popup, an unpainted card shows the screen through it. -->
     <Style TargetType="ContextMenu">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
