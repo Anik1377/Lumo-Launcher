@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0--alpha.1-CA5010?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.0.0--alpha.5-CA5010?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -45,6 +45,32 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~350 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v2.0.0-alpha.5 — the Apple-craft pass
+
+A full UI refinement pass guided by Apple's *Designing Fluid Interfaces* (WWDC 2018)
+principles, applied to a Windows launcher:
+
+1. **⚡ Respond on pointer-down, not on release.** Every result row, the clear button
+   and the gear now dip to 98.5 % the instant you press them (60 ms ease-out, always
+   starting from the current value) and spring back on release — the feedback you
+   feel before the click even commits.
+2. **↕️ The exit mirrors the entrance.** Hiding used to be a plain fade; now the
+   launcher scales back down and settles 10 px while fading, along the same path it
+   arrived, with the mirrored easing curve. Spatial consistency, the Apple way.
+3. **🌀 Slim overlay scrollbar.** The stock chunky WPF scrollbar is replaced by an
+   8 px invisible lane with a small rounded thumb that deepens on hover —
+   Spotlight/Raycast style.
+4. **🌫️ Edge-fade dividers.** The hairlines under the search field and above the
+   status bar now dissolve at both ends instead of hard-cutting the surface
+   ("scroll edge effects, not hard dividers").
+5. **✨ The light-catch.** A 1 px bright edge along the top of the card in dark
+   mode — the way light grazes the top of a material. Clipped to the rounded window
+   mask so it can never paint the corner cutouts.
+6. **🐢 Respects Windows "show animations".** All motion (entrance, exit, stagger)
+   gracefully degrades when the OS-level animation setting is off, in addition to
+   Lumo's own animation toggle. The stagger was also tightened (22 → 20 ms, 8 → 6 px)
+   for a calmer cascade.
 
 ## 🆕 What's new in v2.0.0-alpha.4 — the comet never stops again
 

@@ -52,6 +52,115 @@
             <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+
+        <!-- Apple craft — slim overlay scrollbar (Spotlight/Raycast): an 8 px invisible
+             lane with a small rounded thumb that quietly deepens on hover. The stock
+             WPF scrollbar (chunky square arrows) breaks the material illusion. -->
+        <Style TargetType="{x:Type ScrollBar}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="MinWidth" Value="8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ScrollBar}">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Rectangle Fill="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Rectangle Fill="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb>
+                                        <Thumb.Template>
+                                            <ControlTemplate TargetType="Thumb">
+                                                <Border x:Name="ThumbBd" Margin="2" CornerRadius="2"
+                                                        Background="{DynamicResource SubtitleBrush}" Opacity="0.32"/>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="ThumbBd" Property="Opacity" Value="0.55"/>
+                                                    </Trigger>
+                                                    <Trigger Property="IsDragging" Value="True">
+                                                        <Setter TargetName="ThumbBd" Property="Opacity" Value="0.72"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Thumb.Template>
+                                    </Thumb>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto"/>
+                    <Setter Property="MinWidth" Value="0"/>
+                    <Setter Property="Height" Value="8"/>
+                    <Setter Property="MinHeight" Value="8"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="{x:Type ScrollBar}">
+                                <Grid Background="Transparent">
+                                    <Track x:Name="PART_Track">
+                                        <Track.DecreaseRepeatButton>
+                                            <RepeatButton Command="ScrollBar.PageLeftCommand" Focusable="False">
+                                                <RepeatButton.Template>
+                                                    <ControlTemplate TargetType="RepeatButton">
+                                                        <Rectangle Fill="Transparent"/>
+                                                    </ControlTemplate>
+                                                </RepeatButton.Template>
+                                            </RepeatButton>
+                                        </Track.DecreaseRepeatButton>
+                                        <Track.IncreaseRepeatButton>
+                                            <RepeatButton Command="ScrollBar.PageRightCommand" Focusable="False">
+                                                <RepeatButton.Template>
+                                                    <ControlTemplate TargetType="RepeatButton">
+                                                        <Rectangle Fill="Transparent"/>
+                                                    </ControlTemplate>
+                                                </RepeatButton.Template>
+                                            </RepeatButton>
+                                        </Track.IncreaseRepeatButton>
+                                        <Track.Thumb>
+                                            <Thumb>
+                                                <Thumb.Template>
+                                                    <ControlTemplate TargetType="Thumb">
+                                                        <Border x:Name="ThumbBd" Margin="2" CornerRadius="2"
+                                                                Background="{DynamicResource SubtitleBrush}" Opacity="0.32"/>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="ThumbBd" Property="Opacity" Value="0.55"/>
+                                                            </Trigger>
+                                                            <Trigger Property="IsDragging" Value="True">
+                                                                <Setter TargetName="ThumbBd" Property="Opacity" Value="0.72"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Thumb.Template>
+                                            </Thumb>
+                                        </Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <!-- main card (DWM draws the real drop shadow + rounded corners);
@@ -98,6 +207,13 @@
                 </Grid>
             </Border>
             <Border x:Name="GlowCover" CornerRadius="5" Margin="3" IsHitTestVisible="False"/>
+
+            <!-- Apple craft — the light-catch: a 1 px bright edge along the top of the
+                 card, like light grazing the top of a material surface. Clipped to the
+                 window's rounded rect in code so it can never paint the corner cutouts. -->
+            <Grid x:Name="TopLightHost" IsHitTestVisible="False">
+                <Border x:Name="TopLight" Height="1" VerticalAlignment="Top" Opacity="0.85"/>
+            </Grid>
 
             <Grid>
                 <Grid.RowDefinitions>
@@ -164,6 +280,7 @@
                             <!-- clear button — v1.7 vector cross (also fixed: now actually appears when text is present) -->
                             <ContentControl x:Name="ClearButton" Grid.Column="2" Width="26" Height="26" VerticalAlignment="Center"
                                             Focusable="False" Cursor="Hand" MouseLeftButtonUp="OnClearClick"
+                                            ui:PressFeedback.IsEnabled="True"
                                             ToolTip="Clear (Ctrl+Backspace)">
                                 <ContentControl.Style>
                                     <Style TargetType="ContentControl">
@@ -213,6 +330,8 @@
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <!-- Apple §1 — respond on pointer-DOWN: instant 98.5 % dip -->
+                            <Setter Property="ui:PressFeedback.IsEnabled" Value="True"/>
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
@@ -370,7 +489,7 @@
 
                 <!-- ================= status bar (Raycast footer) ================= -->
                 <Border Grid.Row="3" Height="1" VerticalAlignment="Top" Margin="16,0,16,0"
-                        Background="{DynamicResource BorderLineBrush}" Opacity="0.55"/>
+                        x:Name="FooterRule" Opacity="0.55"/>
                 <Grid Grid.Row="3" Margin="20,10,14,11">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -393,6 +512,7 @@
                         <!-- v1.7 — vector gear (was a Segoe MDL2 glyph) -->
                         <ContentControl x:Name="SettingsGear" Width="26" Height="24" Focusable="False" Cursor="Hand"
                                         VerticalAlignment="Center" Margin="4,0,0,0" ToolTip="Settings"
+                                        ui:PressFeedback.IsEnabled="True"
                                         MouseLeftButtonUp="OnGearClick">
                             <ContentControl.Template>
                                 <ControlTemplate TargetType="ContentControl">

@@ -111,6 +111,13 @@ public partial class LauncherWindow : Window
         catch { }
     }
 
+    /// <summary>
+    /// Apple “Designing Fluid Interfaces” §14 — reduced motion. Motion plays only when
+    /// the user allowed it in Lumo AND Windows itself has “show animations” enabled;
+    /// otherwise the UI cross-fades / snaps instead of sliding and scaling.
+    /// </summary>
+    private bool MotionOk() => _settings.AnimationsEnabled && SystemParameters.ClientAreaAnimation;
+
     // ---------------------------------------------------------------- lifecycle
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -201,7 +208,7 @@ public partial class LauncherWindow : Window
             Root.BeginAnimation(OpacityProperty, null);
 
             if (!IsVisible) { CenterNearCursor(); AnimateShow(); }
-            else if (_settings.AnimationsEnabled) { RestoreVisualState(); }
+            else if (MotionOk()) { RestoreVisualState(); }
 
             if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 
@@ -215,14 +222,15 @@ public partial class LauncherWindow : Window
         }
     }
 
-    /// <summary>Fade + slide + gentle scale-in — the launcher springs open, Spotlight-style.</summary>
+    /// <summary>Fade + slide + gentle scale-in — the launcher springs open, Spotlight-style.
+    /// Critically damped (ease-out, no overshoot): motion that informs, never distracts.</summary>
     private void AnimateShow()
     {
         try
         {
             Show();
 
-            if (!_settings.AnimationsEnabled)
+            if (!MotionOk())
             {
                 RestoreVisualState();
                 ResumeGlow();
@@ -264,25 +272,49 @@ public partial class LauncherWindow : Window
         GlowClip.Opacity = CurrentGlowOpacity();
     }
 
-    /// <summary>Quick fade-out, then really hide. Safe against rapid toggle races.</summary>
+    /// <summary>
+    /// Quick fade-out, then really hide. Safe against rapid toggle races.
+    /// Apple §7 Spatial consistency — “if something disappears one way, we expect it
+    /// to emerge from where it came”: the exit mirrors the entrance path (scale down
+    /// + settle back down 10 px), with the mirrored EaseIn curve.
+    /// </summary>
     private void HideAnimated()
     {
         try
         {
             PauseGlow();
-            if (!_settings.AnimationsEnabled || !IsVisible) { Hide(); return; }
+            if (!MotionOk() || !IsVisible) { Hide(); return; }
 
             int gen = ++_animGen;
-            var fade = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(90))
-            {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn },
-            };
+            var dur = TimeSpan.FromMilliseconds(130);
+            var ease = new CubicEase { EasingMode = EasingMode.EaseIn };
+
+            var fade = new DoubleAnimation(1, 0, dur) { EasingFunction = ease };
+            var scale = new DoubleAnimation(1, 0.965, dur) { EasingFunction = ease };
+            var slide = new DoubleAnimation(0, 10, dur) { EasingFunction = ease };
+            var glow = new DoubleAnimation(CurrentGlowOpacity(), 0, dur) { EasingFunction = ease };
+
             fade.Completed += (_, _) =>
             {
                 if (gen != _animGen) return; // user re-summoned mid-fade
-                try { Hide(); } catch { }
+                try
+                {
+                    // Drop every hold-end animation so the next show starts clean.
+                    Root.BeginAnimation(UIElement.OpacityProperty, null);
+                    RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
+                    RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
+                    RootShift.BeginAnimation(TranslateTransform.YProperty, null);
+                    GlowClip.BeginAnimation(UIElement.OpacityProperty, null);
+                    RestoreVisualState();
+                    Hide();
+                }
+                catch { }
             };
             Root.BeginAnimation(UIElement.OpacityProperty, fade);
+            RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
+            RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
+            RootShift.BeginAnimation(TranslateTransform.YProperty, slide);
+            GlowClip.BeginAnimation(UIElement.OpacityProperty, glow);
         }
         catch
         {
@@ -509,12 +541,12 @@ public partial class LauncherWindow : Window
     }
 
     /// <summary>
-    /// v1.3 — results cascade in: each row fades + slides up with a 22 ms stagger,
-    /// the Raycast/Spotlight feel. Runs on the dispatcher after containers exist.
+    /// v1.3 — results cascade in: each row fades + slides up 6 px on a 20 ms stagger
+    /// (tightened in alpha.5), the Raycast/Spotlight feel. Runs after containers exist.
     /// </summary>
     private void PlayStaggeredEntrance()
     {
-        if (!_settings.AnimationsEnabled) return;
+        if (!MotionOk()) return;
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
             try
@@ -526,11 +558,11 @@ public partial class LauncherWindow : Window
                 {
                     if (Results.ItemContainerGenerator.ContainerFromIndex(i) is not FrameworkElement fe) continue;
 
-                    var tt = new TranslateTransform(0, 8);
+                    var tt = new TranslateTransform(0, 6);
                     fe.RenderTransform = tt;
-                    var delay = TimeSpan.FromMilliseconds(i * 22);
+                    var delay = TimeSpan.FromMilliseconds(i * 20);
                     tt.BeginAnimation(TranslateTransform.YProperty,
-                        new DoubleAnimation(8, 0, dur) { EasingFunction = ease, BeginTime = delay });
+                        new DoubleAnimation(6, 0, dur) { EasingFunction = ease, BeginTime = delay });
                     fe.BeginAnimation(UIElement.OpacityProperty,
                         new DoubleAnimation(0, 1, dur) { EasingFunction = ease, BeginTime = delay });
                 }
@@ -781,6 +813,13 @@ public partial class LauncherWindow : Window
             Input.SelectionBrush = new SolidColorBrush(Appearance.Tint(p.Accent, 0x55));
             Input.SelectionTextBrush = new SolidColorBrush(p.Title);
             Separator.Background = new SolidColorBrush(p.Separator);
+            FooterRule.Background = EdgeFadeBrush(p.Separator);
+
+            // Apple craft — the light-catch: a 1 px bright top edge, the way light grazes
+            // the top of a material. Dark mode gets a faint sheen; light mode stays clean.
+            TopLight.Background = dark
+                ? new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF))
+                : Brushes.Transparent;
             PrefixBadge.Foreground = new SolidColorBrush(p.Accent);
         }
         catch (Exception ex)
@@ -808,6 +847,25 @@ public partial class LauncherWindow : Window
     }
 
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
+
+    /// <summary>
+    /// Apple §12 — scroll edge effects, not hard dividers: a hairline that fades out at
+    /// both ends, so rules dissolve into the surface instead of cutting it.
+    /// </summary>
+    private static Brush EdgeFadeBrush(Color c)
+    {
+        var b = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0.5),
+            EndPoint = new Point(1, 0.5),
+        };
+        b.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 0.0));
+        b.GradientStops.Add(new GradientStop(c, 0.18));
+        b.GradientStops.Add(new GradientStop(c, 0.82));
+        b.GradientStops.Add(new GradientStop(Color.FromArgb(0, c.R, c.G, c.B), 1.0));
+        b.Freeze();
+        return b;
+    }
 
     private double CurrentGlowOpacity()
     {
@@ -955,6 +1013,9 @@ public partial class LauncherWindow : Window
         bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
         double r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
         GlowClip.Clip = new RectangleGeometry(new Rect(0, 0, size.Width, size.Height), r, r);
+        // The top light-catch must obey the same rounded mask — otherwise the straight
+        // line paints across the corner cutouts of the window.
+        TopLightHost.Clip = new RectangleGeometry(new Rect(0, 0, size.Width, size.Height), r, r);
         EnsureGlowSamples(size);
     }
 
