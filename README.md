@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.2.0--alpha.2-CA5010?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.3.0--alpha.1-CA5010?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -28,7 +28,7 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | | Feature | Detail |
 |---|---------|--------|
 | ⌨️ | **Keyboard-first** | Global hotkey (default `Alt+Space`) summons a centered search window anywhere in Windows |
-| 🚀 | **Command prefixes** | `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `U/` utilities · `/sc` your shortcuts |
+| 🚀 | **Command prefixes** | `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `B/` bookmarks · `U/` utilities · `/sc` your shortcuts · `?` ask AI |
 | ⚡ | **Shortcuts & macros** | Save your own one-tap launches — a URL, a file, a folder, or a multi-step macro — and run them with `/sc name` |
 | 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
@@ -37,7 +37,9 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🌈 | **Rim glow effect** | A soft comet of light that orbits the **true window perimeter, inside the rim** — never outside — 5 presets, solid accent, 3 speeds, pauses when hidden |
 | 📋 | **Clipboard history** | `H/` — your last 50 copies with timestamps, searchable, in memory only |
 | ▣ | **Window management** | `S/` — snap the last window left/right, maximize, center or restore; multi-monitor aware |
-| 📝 | **Snippets** | Save paste-anywhere texts as shortcuts and trigger with `!name` — multi-line supported |
+| 📝 | **Snippets** | Save paste-anywhere texts as shortcuts and trigger with `!name` — multi-line supported, with live variables: `{{date}}`, `{{time}}`, `{{clipboard}}`, `{{name:Jane}}` |
+| 🤖 | **AI answers** | `?` + a question — local Ollama (no key) or an Anthropic API key; the answer lands on the result row, Enter copies it all |
+| 🔖 | **Browser bookmarks** | `B/` searches your Chrome & Edge bookmarks (all profiles) — read-only, fuzzy, newest first on the empty query |
 | 🎬 | **Fluid motion** | Spring-in window, cascading result rows, smooth hover transitions — with a reduced-motion master switch |
 | 🎨 | **Accent theming** | 9 accent presets + custom hex, driving the whole highlight system (accent-tinted selection) |
 | 🌗 | **Dark / light / auto theme** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
@@ -48,6 +50,40 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`, again to close) any result: **Open** (the Enter path), containing folder, copy path/name, terminal there, run as administrator, pin — with a separator before the pin pair |
 | ★ | **Pinned favourites** | A FAVOURITES section leads the empty view, newest pin first (up to 12) — pin via the menu **or the hover ★ right on the row** (`favourites.json`) |
 | 👁️ | **Preview pane** | `Tab` previews the selection — text-file heads (binary-safe, 512 KB cap), image thumbnails, clipboard entries, URLs — read off-thread with stale-read protection |
+
+## 🆕 What's new in v2.3.0-alpha.1 — Connected (DEV_PLAN Phase 3)
+
+The launcher reaches out: answers from an AI model, your browser's bookmarks,
+and snippets that know what day it is.
+
+1. **🤖 AI answers — `?` prefix (Task 3.1, the flagship).** Type `?` and a
+   question: the request fires **off the UI thread the moment you settle on a
+   prompt** (in-flight deduped, stale replies discarded), and the answer appears
+   right on the result row — Enter copies the full multi-line text. Works with
+   **local Ollama** (default `http://localhost:11434`, no key, nothing leaves
+   your machine) and the **Anthropic Messages API** (key in Settings; it is
+   stored only in `settings.json` on this PC and is **never written to the
+   log** — every log line passes a redaction helper). Configure it all in the
+   new **Settings → AI** page: enable, provider, endpoint, model, key. Answers
+   are cached (8-entry scratchpad) so re-typing a prompt re-shows the answer
+   instantly.
+2. **🔖 Browser bookmarks — `B/` prefix (Task 3.2).** Lumo reads Chrome and
+   Edge `Bookmarks` files (Default, Profile 1, Profile 2 … capped at 8 profiles)
+   **in the background** and serves them from memory: fuzzy over name, folder
+   path and URL. The empty query shows your **newest bookmarks first**; rows are
+   ordinary Web rows — Enter opens, quick actions copy the URL, the hover ★
+   pins. Read-only: Lumo never edits browser data, and a cheap mtime probe
+   picks up new bookmarks without touching the search pipeline.
+3. **📝 Snippet variables — Task 3.3.** Snippets (and macro step targets!) now
+   expand `{{date}}` (ISO), `{{time}}`, `{{datetime}}`, `{{clipboard}}` (current
+   clipboard text), and any `{{key:default}}` pair — `Dear {{name:Jane}}` —
+   plus a `{{cursor}}` marker for future caret-positioning. Unknown tokens stay
+   **verbatim** (a visible typo beats silent loss) and expansion is never
+   recursive, so a clipboard containing `{{date}}` stays literal.
+4. **🧪 Harness grown to 68 tests.** The AI request/response layer, the
+   bookmark parser (garbage-in → zero-out, hard 3000-entry cap) and the
+   expander are pure code with 25 new tests — including an assertion that the
+   API key can never appear in a body or a log line.
 
 ## 🆕 What's new in v2.2.0-alpha.2 — Quick actions & favourites rework
 

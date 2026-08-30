@@ -336,6 +336,23 @@ public partial class SettingsWindow : Window
             _pendingHotkey = string.IsNullOrWhiteSpace(_settings.Hotkey) ? "Alt+Space" : _settings.Hotkey;
             HotkeyDisplay.Text = _pendingHotkey;
 
+            // v2.3 (DEV_PLAN Task 3.1) — AI answers: load + live-wire (Cancel restores
+            // via RestoreFrom(_snapshot), same as every other live-edited setting).
+            AiEnabledToggle.IsChecked = _settings.AiEnabled;
+            if (AiProviders.IsAnthropic(_settings.AiStyle, _settings.AiEndpoint))
+                AiAnthropic.IsChecked = true;
+            else
+                AiOllama.IsChecked = true;
+            AiEndpointBox.Text = _settings.AiEndpoint;
+            AiModelBox.Text = _settings.AiModel;
+            AiKeyBox.Text = _settings.AiApiKey;
+            AiEnabledToggle.Click += (_, _) => { if (!_suppress) _settings.AiEnabled = AiEnabledToggle.IsChecked == true; };
+            AiOllama.Checked += (_, _) => { if (!_suppress) _settings.AiStyle = AiProviders.OllamaStyle; };
+            AiAnthropic.Checked += (_, _) => { if (!_suppress) _settings.AiStyle = AiProviders.AnthropicStyle; };
+            AiEndpointBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiEndpoint = AiEndpointBox.Text.Trim(); };
+            AiModelBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiModel = AiModelBox.Text.Trim(); };
+            AiKeyBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiApiKey = AiKeyBox.Text.Trim(); };
+
             // event wiring for the pills (Checked handlers)
             StartWithWindowsToggle.Click += (_, _) =>
             {
@@ -739,6 +756,7 @@ public partial class SettingsWindow : Window
         PanelHotkey.Visibility = idx == 2 ? Visibility.Visible : Visibility.Collapsed;
         PanelSearch.Visibility = idx == 3 ? Visibility.Visible : Visibility.Collapsed;
         PanelShortcuts.Visibility = idx == 4 ? Visibility.Visible : Visibility.Collapsed;
+        PanelAI.Visibility = idx == 6 ? Visibility.Visible : Visibility.Collapsed;   // v2.3 — AI page
         PanelAbout.Visibility = idx == 5 ? Visibility.Visible : Visibility.Collapsed;
 
         // v1.3 — gentle page transition: the incoming panel fades + slides up a touch
@@ -752,6 +770,7 @@ public partial class SettingsWindow : Window
                 2 => PanelHotkey,
                 3 => PanelSearch,
                 4 => PanelShortcuts,
+                6 => PanelAI,
                 _ => (ScrollViewer?)PanelAbout,
             } is not { } panel) return;
 

@@ -28,6 +28,10 @@
          (Icon is #if NETWINDOWS), so the pin/menu policy is testable anywhere -->
     <Compile Include="../Lumo/Core/ResultItem.cs" Link="Core/ResultItem.cs" />
     <Compile Include="../Lumo/Core/RowActions.cs" Link="Core/RowActions.cs" />
+    <!-- v2.3 (Phase 3) — AI provider layer, bookmark parser, snippet expander -->
+    <Compile Include="../Lumo/Core/AiProviders.cs" Link="Core/AiProviders.cs" />
+    <Compile Include="../Lumo/Core/Bookmarks.cs" Link="Core/Bookmarks.cs" />
+    <Compile Include="../Lumo/Core/SnippetExpander.cs" Link="Core/SnippetExpander.cs" />
     <Compile Include="../Lumo/Services/UsageStore.cs" Link="Services/UsageStore.cs" />
     <Compile Include="../Lumo/Services/Favourites.cs" Link="Services/Favourites.cs" />
     <Compile Include="../Lumo/Services/DiagnosticLogger.cs" Link="Services/DiagnosticLogger.cs" />

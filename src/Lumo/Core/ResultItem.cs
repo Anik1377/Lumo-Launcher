@@ -31,6 +31,7 @@ public sealed class ResultItem
         ResultKind.Hint => "Tip",
         ResultKind.Shortcut => "Shortcut",
         ResultKind.Clipboard => "Copy",   // v1.6
+        ResultKind.Answer => "AI",        // v2.3 — ? answer row
         ResultKind.Header => "",          // v1.6 — section title, no chip
         _ => "",
     };
@@ -62,5 +63,6 @@ public enum ResultKind
     Error,
     Shortcut,   // v1.4 — user-defined /sc launch
     Clipboard,  // v1.6 — one clipboard-history entry (Enter copies it back)
+    Answer,     // v2.3 — an AI answer for a ? query (Enter copies it)
     Header,     // v1.6 — section title row (Raycast "Favourites" style)
 }

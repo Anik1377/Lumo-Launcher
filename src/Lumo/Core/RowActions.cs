@@ -54,6 +54,7 @@ public static class RowActions
         if (arg.StartsWith("cmd:record", StringComparison.OrdinalIgnoreCase)) return false;
         if (arg.StartsWith("cmd:new-shortcut", StringComparison.OrdinalIgnoreCase)) return false;
         if (arg.StartsWith("cmd:manage-shortcuts", StringComparison.OrdinalIgnoreCase)) return false;
+        if (arg.StartsWith("cmd:ai", StringComparison.OrdinalIgnoreCase)) return false;   // v2.3 — the "Ask …" row is transient UI state
         return item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web
                         or ResultKind.Image or ResultKind.Tool or ResultKind.Shortcut;
     }

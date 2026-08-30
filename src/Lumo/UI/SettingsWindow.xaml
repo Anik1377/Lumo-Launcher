@@ -347,6 +347,14 @@
                                     <TextBlock Text="Shortcuts" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
+                            <RadioButton Tag="6" Checked="OnNavChanged" Style="{StaticResource NavRadio}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8BD;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                               Foreground="{DynamicResource TitleBrush}" Margin="0,0,12,0"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="AI" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
                             <RadioButton Tag="5" Checked="OnNavChanged" Style="{StaticResource NavRadio}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE946;" FontFamily="Segoe MDL2 Assets" FontSize="16"
@@ -754,6 +762,51 @@
                                         <TextBlock x:Name="ShortcutsEmpty" Text="No shortcuts yet — create your first one above. A good start: a URL you open every day."
                                                    FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}" Margin="0,6,0,0"
                                                    TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- ================= AI (v2.3, DEV_PLAN Task 3.1) ================= -->
+                        <ScrollViewer x:Name="PanelAI" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="AI" Style="{StaticResource SectionTitle}"/>
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Enable AI answers (? prefix)" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}" Text="Type ? then a question — the answer appears in the result list; Enter copies it."/>
+                                            </StackPanel>
+                                            <ToggleButton x:Name="AiEnabledToggle" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Separator Background="{DynamicResource BorderLineBrush}" Margin="0,14"/>
+                                        <TextBlock Text="Provider" Style="{StaticResource SettingName}"/>
+                                        <Border Background="{DynamicResource SegTrackBrush}" CornerRadius="9" Padding="3"
+                                                HorizontalAlignment="Left" Margin="0,8">
+                                            <StackPanel Orientation="Horizontal">
+                                                <RadioButton x:Name="AiOllama" Content="Ollama (local)" Style="{StaticResource SegRadio}" GroupName="AiProvider"/>
+                                                <RadioButton x:Name="AiAnthropic" Content="Anthropic API" Style="{StaticResource SegRadio}" GroupName="AiProvider"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Text="Endpoint" Style="{StaticResource SettingDesc}" Margin="0,6,0,2"/>
+                                        <TextBox x:Name="AiEndpointBox" FontSize="12.5" Padding="8,6"
+                                                 Background="{DynamicResource FieldBrush}" Foreground="{DynamicResource TitleBrush}"
+                                                 BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"/>
+                                        <TextBlock Text="Model" Style="{StaticResource SettingDesc}" Margin="0,10,0,2"/>
+                                        <TextBox x:Name="AiModelBox" FontSize="12.5" Padding="8,6"
+                                                 Background="{DynamicResource FieldBrush}" Foreground="{DynamicResource TitleBrush}"
+                                                 BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"/>
+                                        <TextBlock Text="API key (Anthropic only)" Style="{StaticResource SettingDesc}" Margin="0,10,0,2"/>
+                                        <TextBox x:Name="AiKeyBox" FontSize="12.5" Padding="8,6"
+                                                 Background="{DynamicResource FieldBrush}" Foreground="{DynamicResource TitleBrush}"
+                                                 BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"/>
+                                        <TextBlock Style="{StaticResource SettingDesc}" Margin="0,8,0,0" TextWrapping="Wrap"
+                                                   Text="The key is stored only in settings.json on this PC and is never written to the log. Ollama needs no key — just have Ollama running locally."/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

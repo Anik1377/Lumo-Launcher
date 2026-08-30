@@ -23,15 +23,19 @@ public sealed class SearchEngine
     private readonly ClipboardHistory? _clips;       // v1.6
     private readonly UsageStore? _usage;             // v2.1 — MRU ranking
     private readonly Favourites? _favs;              // v2.2 — pinned favourites
+    private readonly AiService? _ai;                 // v2.3 — ? answers (cache lives here, requests never block)
+    private readonly BookmarkIndex? _bookmarks;      // v2.3 — B/ Chrome & Edge bookmarks
     private bool _restartPending;                    // v2.2 — a countdown restart is armed
 
     public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null,
                         MacroRecorder? recorder = null, ClipboardHistory? clips = null, UsageStore? usage = null,
-                        Favourites? favourites = null)
+                        Favourites? favourites = null, AiService? ai = null, BookmarkIndex? bookmarks = null)
     {
         _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts; _recorder = recorder; _clips = clips;
         _usage = usage;
         _favs = favourites;
+        _ai = ai;
+        _bookmarks = bookmarks;
     }
 
     public List<ResultItem> Search(string rawQuery)
@@ -93,6 +97,17 @@ public sealed class SearchEngine
         // v1.6 — H/ : Raycast-style clipboard history
         if (query.StartsWith("H/", StringComparison.OrdinalIgnoreCase))
             return ClipboardRows(query[2..].Trim());
+
+        // v2.3 (DEV_PLAN Task 3.2) — B/ : Chrome & Edge bookmarks
+        if (query.StartsWith("B/", StringComparison.OrdinalIgnoreCase))
+            return BookmarkRows(query[2..].Trim());
+
+        // v2.3 (DEV_PLAN Task 3.1, flagship) — ? : AI / natural-language answers.
+        // The prefix row appears instantly; the answer arrives via the AiService
+        // cache (the window fires the request off the UI thread) and this same
+        // query then re-renders with the Answer row — the pipeline stays synchronous.
+        if (query.StartsWith("?"))
+            return AiRows(query[1..].Trim());
 
         // v1.6 — S/ : Raycast-style window management (snap / maximize / center)
         if (query.StartsWith("S/", StringComparison.OrdinalIgnoreCase))
@@ -159,6 +174,8 @@ public sealed class SearchEngine
             new() { Title = "U/  Utilities", Subtitle = "lock · sleep · hibernate · mute · restart · shutdown · bin · night light", Glyph = "U", Kind = ResultKind.Hint, RunArgument = "U/" },
             new() { Title = "H/  Clipboard history", Subtitle = "everything you copied — pick one to copy again (Raycast style)", Glyph = "⧉", Kind = ResultKind.Hint, RunArgument = "H/" },
             new() { Title = "S/  Snap window", Subtitle = "left/right half · maximize · center · restore — for the last window you used", Glyph = "▣", Kind = ResultKind.Hint, RunArgument = "S/" },
+            new() { Title = "B/  Bookmarks", Subtitle = "search your Chrome & Edge bookmarks — e.g.  B/github", Glyph = "B", Kind = ResultKind.Hint, RunArgument = "B/" },
+            new() { Title = "?  Ask AI", Subtitle = "type ? then a question — e.g.  ?regex for an ISO date  (enable in Settings)", Glyph = "?", Kind = ResultKind.Hint, RunArgument = "?" },
             new() { Title = "!  Snippets", Subtitle = "type ! then a name — your paste-anywhere texts, e.g.  !email", Glyph = "S", Kind = ResultKind.Hint, RunArgument = "!" },
             new() { Title = "/sc  Shortcuts & macros", Subtitle = "your saved one-tap launches — e.g.  /sc work", Glyph = "⚡", Kind = ResultKind.Hint, RunArgument = "/sc" },
             new() { Title = "Settings — customize Lumo", Subtitle = "themes · accent colour · glow border · hotkey · index", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
@@ -540,11 +557,114 @@ public sealed class SearchEngine
         return rows;
     }
 
+    // ---------------------------------------------------------------- v2.3 — AI / bookmarks
+
+    private List<ResultItem> AiRows(string q)
+    {
+        var rows = new List<ResultItem>
+        {
+            new() { Title = "AI ANSWER", Subtitle = $"{_settings.AiStyle} · {_settings.AiModel}", Kind = ResultKind.Header },
+        };
+
+        if (_ai is null)
+        {
+            rows.Add(new ResultItem { Title = "AI unavailable this session", Subtitle = "the service failed to start — see log.txt", Glyph = "?", Kind = ResultKind.Hint });
+            return rows;
+        }
+
+        if (!_settings.AiEnabled)
+        {
+            rows.Add(new ResultItem
+            {
+                Title = "AI answers are off",
+                Subtitle = "enable them in Settings → AI — local Ollama (no key) or an Anthropic API key",
+                Glyph = "?", Kind = ResultKind.Hint,
+            });
+            return rows;
+        }
+
+        if (q.Length == 0)
+        {
+            rows.Add(new ResultItem
+            {
+                Title = "Type a question after ?",
+                Subtitle = "e.g.  ?powershell list processes by memory  — the answer appears on this row",
+                Glyph = "?", Kind = ResultKind.Hint,
+            });
+            return rows;
+        }
+
+        // Cached answer → the real row (Enter copies the FULL text, newlines included).
+        if (_ai.TryGetCached(q, out var answer))
+        {
+            rows.Add(new ResultItem
+            {
+                Title = Clip(answer.Replace("\r", "").Split('\n', 2)[0], 110),
+                Subtitle = $"{_settings.AiModel} · answer — press Enter to copy it all",
+                Glyph = "?", Kind = ResultKind.Answer, RunArgument = answer,
+            });
+            return rows;
+        }
+
+        // No answer yet: the ask row doubles as instant feedback while the request
+        // the window fired (MaybeAskAi) is in flight.
+        rows.Add(new ResultItem
+        {
+            Title = $"Ask {_settings.AiModel}: {Clip(q, 76)}",
+            Subtitle = "asking… the answer lands on this view — or press Enter to ask now",
+            Glyph = "?", Kind = ResultKind.Tool, RunArgument = "cmd:ai-ask",
+        });
+        return rows;
+    }
+
+    private List<ResultItem> BookmarkRows(string q)
+    {
+        var rows = new List<ResultItem>
+        {
+            new() { Title = "BOOKMARKS", Subtitle = "Chrome & Edge — read-only, Lumo never edits them", Kind = ResultKind.Header },
+        };
+
+        if (_bookmarks is null || !_bookmarks.Ready)
+        {
+            rows.Add(new ResultItem
+            {
+                Title = _bookmarks is null ? "Bookmarks unavailable this session" : "Loading bookmarks…",
+                Subtitle = "reading your browser bookmark files in the background",
+                Glyph = "B", Kind = ResultKind.Hint,
+            });
+            return rows;
+        }
+
+        _bookmarks.RefreshIfStale();   // ≤ 8 stat calls, B/ only; reload (if any) is off-thread
+
+        foreach (var b in _bookmarks.Query(q, MaxResults))
+        {
+            string sub = b.Folder.Length > 0 ? $"{b.Folder}  ·  {b.Url}" : b.Url;
+            rows.Add(new ResultItem { Title = b.Name, Subtitle = sub, Glyph = "B", Kind = ResultKind.Web, RunArgument = b.Url });
+        }
+
+        if (rows.Count == 1)
+            rows.Add(new ResultItem
+            {
+                Title = q.Length == 0 ? "No bookmarks found" : $"No bookmarks matching \"{q}\"",
+                Subtitle = "Chrome & Edge profiles are picked up automatically (Default, Profile 1, …)",
+                Glyph = "B", Kind = ResultKind.Hint,
+            });
+        return rows;
+    }
+
+    private static string Clip(string s, int n)
+    {
+        s = s?.Trim() ?? "";
+        return s.Length <= n ? s : s[..n] + "…";
+    }
+
     // ---------------------------------------------------------------- helpers
 
     public static bool IsExecutable(ResultItem item) =>
         item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web or ResultKind.Image
-            or ResultKind.Tool or ResultKind.Calculator or ResultKind.Shortcut or ResultKind.Clipboard;
+            or ResultKind.Tool or ResultKind.Calculator or ResultKind.Shortcut or ResultKind.Clipboard
+            or ResultKind.Answer;
 
     /// <summary>
     /// Runs the item. Returns null on success, or a short human-readable
@@ -574,6 +694,10 @@ public sealed class SearchEngine
 
                 case ResultKind.Clipboard:   // v1.6 — copy the entry back to the clipboard
                     if (_clips?.Find(item.RunArgument) is { } e) _clips.Restore(e);
+                    break;
+
+                case ResultKind.Answer:      // v2.3 — copy the full AI answer (newlines included)
+                    TrySetClipboard(item.RunArgument);
                     break;
 
                 case ResultKind.Tool:
@@ -642,7 +766,13 @@ public sealed class SearchEngine
             if (def.IsSnippet)
             {
                 // v1.6 — snippets copy their text; Ctrl+V pastes it anywhere
-                TrySetClipboard(def.Target);
+                // v2.3 (DEV_PLAN Task 3.3) — variables expand first: {{date}} {{time}}
+                // {{datetime}} {{clipboard}} {{key:default}}; {{cursor}} is dropped in
+                // paste mode (the caret lands after pasted text anyway).
+                string text = def.Target;
+                try { text = SnippetExpander.ExpandAll(text, ReadClipboardSafe, DateTime.Now); }
+                catch (Exception ex) { Services.DiagnosticLogger.LogException("SearchEngine.SnippetExpand", ex); }
+                TrySetClipboard(text);
                 return null;
             }
 
@@ -700,7 +830,9 @@ public sealed class SearchEngine
                     case "auto":
                     case "url":
                     default:
-                        OpenAnyTarget(Environment.ExpandEnvironmentVariables(s.Arg));
+                        // v2.3 — macro steps expand snippet variables too: a URL step of
+                        // https://github.com/{{clipboard}} opens the copied repo.
+                        OpenAnyTarget(Environment.ExpandEnvironmentVariables(ExpandForMacro(s.Arg)));
                         break;
                 }
             }
@@ -718,6 +850,33 @@ public sealed class SearchEngine
         if (invalid is not null) return invalid;
         _ = Task.Run(() => RunMacroSteps(steps));
         return null;
+    }
+
+    /// <summary>
+    /// v2.3 — snippet-variable expansion for macro step args. Clipboard reads may be
+    /// required ({{clipboard}}) and this runs on a WORKER thread: hop to the UI
+    /// thread via the dispatcher, exactly like the clip step does.
+    /// </summary>
+    private static string ExpandForMacro(string arg)
+    {
+        try { return SnippetExpander.ExpandAll(arg, ReadClipboardSafe, DateTime.Now); }
+        catch (Exception ex)
+        {
+            Services.DiagnosticLogger.LogException("SearchEngine.MacroExpand", ex);
+            return arg;
+        }
+    }
+
+    /// <summary>Clipboard text from any thread (dispatcher hop when one exists).</summary>
+    private static string? ReadClipboardSafe()
+    {
+        try
+        {
+            var disp = System.Windows.Application.Current?.Dispatcher;
+            if (disp is null || disp.CheckAccess()) return System.Windows.Clipboard.GetText();
+            return disp.Invoke(() => System.Windows.Clipboard.GetText());
+        }
+        catch { return ""; }   // clipboard can be locked — an empty insert beats a crash
     }
 
     /// <summary>Opens a URL or a file/folder path, whichever the target looks like.</summary>

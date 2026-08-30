@@ -43,6 +43,8 @@ public partial class LauncherWindow : Window
     private readonly MacroRecorder? _recorder;       // v1.5
     private readonly ClipboardHistory? _clips;       // v1.6
     private readonly Favourites _favs;               // v2.2 — pinned favourites
+    private readonly AiService _ai = new();          // v2.3 — ? answers (cache + in-flight dedupe)
+    private readonly BookmarkIndex _bookmarks = new(); // v2.3 — B/ Chrome & Edge bookmarks
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
     private HotkeyService? _hotkey;
@@ -94,7 +96,7 @@ public partial class LauncherWindow : Window
         _favs = favourites ?? new Favourites();
         _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
-        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips, usage, _favs);
+        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips, usage, _favs, _ai, _bookmarks);
 
         // v2.2 — placeholder so the ContextMenuOpening routed event always fires;
         // BuildRowMenu swaps in the real menu (or null) before WPF auto-opens it.
@@ -177,6 +179,7 @@ public partial class LauncherWindow : Window
         {
             _apps.BeginIndexInBackground();
             _files.BeginIndexInBackground();
+            _bookmarks.BeginLoadInBackground();   // v2.3 — Chrome/Edge bookmarks for B/
             _statusTimer.Start();
             FocusInput();
             RunSearch(); // seed with default rows
@@ -576,10 +579,64 @@ public partial class LauncherWindow : Window
             _staggerNext = false;
             _prevQuery = q;
             if (stagger) PlayStaggeredEntrance();
+
+            MaybeAskAi();   // v2.3 — ? queries auto-ask once; the answer row appears when the reply lands
         }
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("Window.BindResults", ex);
+        }
+    }
+
+    // ---------------------------------------------------------------- v2.3 — AI ask flow
+
+    private int _aiGen;   // invalidates stale AI replies (query moved on before the answer landed)
+
+    /// <summary>
+    /// ? queries auto-ask: fire ONE bounded request per prompt (deduped inside
+    /// AiService), and when the reply lands while the query is unchanged, re-run
+    /// the search so the cached Answer row appears. The synchronous pipeline is
+    /// never blocked — this is all Task.Run + dispatcher, per agent rule 1.
+    /// </summary>
+    private void MaybeAskAi(bool force = false)
+    {
+        try
+        {
+            string t = Input.Text.TrimStart();
+            if (!t.StartsWith("?") || t.Length < 4) return;   // "?" + at least 2 chars
+            if (!_settings.AiEnabled) return;
+
+            string prompt = t[1..].Trim();
+            if (prompt.Length == 0) return;
+            if (!force && _ai.HasCached(prompt)) return;      // cached → the row already shows the answer
+
+            int gen = ++_aiGen;
+            StatusText.Text = $"Asking {_settings.AiModel}…";
+            _ = Task.Run(async () =>
+            {
+                var reply = await _ai.AskAsync(_settings, prompt).ConfigureAwait(true);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    try
+                    {
+                        if (gen != _aiGen) return;   // stale — the user asked something else
+                        if (reply.Ok)
+                        {
+                            StatusText.Text = "AI answer ready — Enter copies it";
+                            RunSearch();             // re-render: the cached Answer row now exists
+                        }
+                        else
+                        {
+                            StatusText.Text = "AI — " + reply.Error;
+                        }
+                    }
+                    catch (Exception ex) { DiagnosticLogger.LogException("Window.AiApply", ex); }
+                });
+            });
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.MaybeAskAi", ex);
         }
     }
 
@@ -713,6 +770,14 @@ public partial class LauncherWindow : Window
                 return;
             }
 
+            // v2.3 — "Ask …" row: force the request for the current ? query (the
+            // launcher stays open — the answer arrives on the same view).
+            if (item.RunArgument == "cmd:ai-ask")
+            {
+                MaybeAskAi(force: true);
+                return;
+            }
+
             switch (item.Kind)
             {
                 case ResultKind.Hint:
@@ -736,6 +801,13 @@ public partial class LauncherWindow : Window
                 case ResultKind.Clipboard:
                     _engine.Execute(item); // copies the entry back to the clipboard
                     StatusText.Text = "Copied to clipboard";
+                    HideAnimated();
+                    break;
+
+                // v2.3 — AI answers copy the FULL multi-line text, like the calculator.
+                case ResultKind.Answer:
+                    _engine.Execute(item);
+                    StatusText.Text = "Answer copied to clipboard";
                     HideAnimated();
                     break;
 

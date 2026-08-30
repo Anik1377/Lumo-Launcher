@@ -41,6 +41,15 @@ public sealed class Settings
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    // ---- v2.3 (DEV_PLAN Task 3.1) — ? AI answers. Ollama (local) or Anthropic.
+    // AiApiKey NEVER appears in a log line (AiProviders.Redact is mandatory there);
+    // it is stored plaintext in settings.json on this PC only, like every launcher.
+    public bool AiEnabled { get; set; } = false;                       // off until the user opts in
+    public string AiStyle { get; set; } = "ollama";                    // ollama | anthropic
+    public string AiEndpoint { get; set; } = "http://localhost:11434"; // ollama default
+    public string AiModel { get; set; } = "llama3.2";                  // provider model id
+    public string AiApiKey { get; set; } = "";                         // anthropic x-api-key / optional gateway bearer
+
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
     public static Settings Load()
@@ -88,6 +97,11 @@ public sealed class Settings
         s.CornerStyle       = GetStr(root, nameof(CornerStyle), s.CornerStyle);
         s.RowDensity        = GetStr(root, nameof(RowDensity), s.RowDensity);
         s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
+        s.AiEnabled         = GetBool(root, nameof(AiEnabled), s.AiEnabled);
+        s.AiStyle           = GetStr(root, nameof(AiStyle), s.AiStyle);
+        s.AiEndpoint        = GetStr(root, nameof(AiEndpoint), s.AiEndpoint);
+        s.AiModel           = GetStr(root, nameof(AiModel), s.AiModel);
+        s.AiApiKey          = GetStr(root, nameof(AiApiKey), s.AiApiKey);
     }
 
     private static string GetStr(JsonElement root, string name, string fallback)
@@ -188,6 +202,11 @@ public sealed class Settings
         CornerStyle = o.CornerStyle;
         RowDensity = o.RowDensity;
         CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
+        AiEnabled = o.AiEnabled;
+        AiStyle = o.AiStyle;
+        AiEndpoint = o.AiEndpoint;
+        AiModel = o.AiModel;
+        AiApiKey = o.AiApiKey;
     }
 
     /// <summary>

@@ -1,0 +1,167 @@
+using System.Text;
+using System.Text.Json;
+
+namespace Lumo.Core;
+
+/// <summary>
+/// v2.3 (DEV_PLAN Task 3.1) — pure request/response layer for the ? AI answers.
+///
+/// Two provider styles are supported, matching the DEV_PLAN's "Ollama / Anthropic
+/// compatible" brief:
+///
+///   · ollama    — local runtime, default endpoint http://localhost:11434,
+///                 POST {endpoint}/api/chat  (stream:false), no API key needed.
+///   · anthropic — POST {endpoint}/v1/messages with the x-api-key +
+///                 anthropic-version headers (endpoint default https://api.anthropic.com).
+///
+/// Everything here is synchronous and side-effect free so the test harness can
+/// assert on exact URLs, headers and JSON bodies — and on the rule that the API
+/// key NEVER lands in a log line: only Redact()-ed text may be logged.
+/// </summary>
+public static class AiProviders
+{
+    public const string OllamaStyle = "ollama";
+    public const string AnthropicStyle = "anthropic";
+    public const string AnthropicVersion = "2023-06-01";
+    public const int MaxAnswerTokens = 1024;
+
+    /// <summary>A fully-built HTTP request: URL, JSON body and the headers to set.</summary>
+    public sealed record AiRequestSpec(string Url, string Json, IReadOnlyDictionary<string, string> Headers);
+
+    /// <summary>
+    /// Builds the provider request. Returns Ok=false with a short human reason when
+    /// the configuration is incomplete (missing model, missing key for Anthropic, …).
+    /// The prompt is embedded JSON-escaped; the key only ever appears in Headers.
+    /// </summary>
+    public static (bool Ok, AiRequestSpec? Spec, string Error) Build(
+        string? style, string? endpoint, string? model, string? apiKey, string prompt)
+    {
+        try
+        {
+            string promptText = (prompt ?? "").Trim();
+            if (promptText.Length == 0) return (false, null, "empty prompt");
+
+            bool anthropic = IsAnthropic(style, endpoint);
+            string baseUri = NormalizeBase(endpoint, anthropic);
+
+            if (string.IsNullOrWhiteSpace(model))
+                return (false, null, anthropic ? "no model set — pick one in Settings" : "no model set — e.g. llama3.2");
+            if (anthropic && string.IsNullOrWhiteSpace(apiKey))
+                return (false, null, "no API key set — add your Anthropic key in Settings");
+
+            string url, body;
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (anthropic)
+            {
+                url = baseUri + "/v1/messages";
+                body = JsonSerializer.Serialize(new
+                {
+                    model = model!.Trim(),
+                    max_tokens = MaxAnswerTokens,
+                    messages = new[] { new { role = "user", content = promptText } },
+                });
+                headers["x-api-key"] = apiKey!.Trim();
+                headers["anthropic-version"] = AnthropicVersion;
+                headers["content-type"] = "application/json";
+            }
+            else
+            {
+                url = baseUri + "/api/chat";
+                body = JsonSerializer.Serialize(new
+                {
+                    model = model!.Trim(),
+                    stream = false,
+                    messages = new[] { new { role = "user", content = promptText } },
+                });
+                headers["content-type"] = "application/json";
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                    headers["authorization"] = "Bearer " + apiKey.Trim();   // optional gateways only
+            }
+
+            return (true, new AiRequestSpec(url, body, headers), "");
+        }
+        catch (Exception ex)
+        {
+            return (false, null, Redact(apiKey, ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Pulls the answer text out of a provider response. Tolerant: returns null for
+    /// anything unexpected (error payloads, streaming chunks, shape changes).
+    ///   · ollama /api/chat  → { message: { content: "…" } }
+    ///   · ollama /api/generate (fallback) → { response: "…" }
+    ///   · anthropic /v1/messages → { content: [ { type: "text", text: "…" }, … ] }
+    /// </summary>
+    public static string? Extract(string? style, string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return null;
+
+            if (IsAnthropic(style, null))
+            {
+                if (!root.TryGetProperty("content", out var content) || content.ValueKind != JsonValueKind.Array)
+                    return null;
+                var sb = new StringBuilder();
+                foreach (var block in content.EnumerateArray())
+                    if (block.ValueKind == JsonValueKind.Object &&
+                        block.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String)
+                        sb.Append(t.GetString());
+                string joined = sb.ToString().Trim();
+                return joined.Length > 0 ? joined : null;
+            }
+
+            // Ollama chat shape first, generate shape as the fallback.
+            if (root.TryGetProperty("message", out var msg) &&
+                msg.ValueKind == JsonValueKind.Object &&
+                msg.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
+            {
+                string s = c.GetString()?.Trim() ?? "";
+                return s.Length > 0 ? s : null;
+            }
+            if (root.TryGetProperty("response", out var r) && r.ValueKind == JsonValueKind.String)
+            {
+                string s = r.GetString()?.Trim() ?? "";
+                return s.Length > 0 ? s : null;
+            }
+            return null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>True when the style/endpoint pair means "Anthropic Messages API".</summary>
+    public static bool IsAnthropic(string? style, string? endpoint)
+    {
+        if (!string.IsNullOrWhiteSpace(style))
+            return style.Trim().Equals(AnthropicStyle, StringComparison.OrdinalIgnoreCase);
+        // No explicit style: sniff the endpoint, default stays local Ollama.
+        return !string.IsNullOrWhiteSpace(endpoint) &&
+               endpoint.Contains("anthropic", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Trims trailing slashes and scheme typos so endpoint edits can't corrupt URLs.</summary>
+    public static string NormalizeBase(string? endpoint, bool anthropic)
+    {
+        string fallback = anthropic ? "https://api.anthropic.com" : "http://localhost:11434";
+        string s = (endpoint ?? "").Trim();
+        if (s.Length == 0) return fallback;
+        if (!s.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !s.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            s = "http://" + s;   // user typed "localhost:11434" — never https for a local port
+        return s.TrimEnd('/');
+    }
+
+    /// <summary>
+    /// Defence-in-depth for logging: replaces every occurrence of the API key with
+    /// "***". Any log line that could echo request material MUST pass through this.
+    /// </summary>
+    public static string Redact(string? secret, string message)
+    {
+        if (string.IsNullOrEmpty(secret) || string.IsNullOrEmpty(message)) return message ?? "";
+        return message.Replace(secret, "***", StringComparison.OrdinalIgnoreCase);
+    }
+}

@@ -79,11 +79,25 @@ CI runs tests before publish.
 - **Task 2.4 — More system utilities** (hibernate, night light, battery, mute,
   countdown-restart with cancel).
 
-## Phase 3 — v2.3 "Connected" (#6, #7, #9)
+## Phase 3 — v2.3 "Connected" ✅ (shipped in v2.3.0-alpha.1)
 
 - **Task 3.1 — AI / natural-language command (? prefix, flagship).**
-- **Task 3.2 — Bookmarks & browser history B/.**
-- **Task 3.3 — Snippet variable expansion ({{date}}, {{name:…}}, {{cursor}}).**
+  Core/AiProviders.cs (pure request/response layer, Ollama chat + Anthropic
+  Messages shapes, mandatory key redaction) + Services/AiService.cs (45 s
+  timeout, 8-entry answer cache, in-flight dedupe). The window fires ONE
+  off-thread request per settled prompt (generation counter kills stale
+  replies) and re-renders when it lands — the synchronous pipeline only ever
+  reads the cache. Settings → AI page: enable, provider, endpoint, model,
+  key (settings.json only, never logged).
+- **Task 3.2 — Bookmarks & browser history B/.** Core/Bookmarks.cs (pure
+  tolerant parser, 3000-entry cap) + Services/BookmarkIndex.cs (Chrome/Edge
+  profile discovery ≤ 8 files, background load, mtime re-probe, fuzzy over
+  name/folder/URL, newest-first on the empty query). Rows are ordinary Web
+  rows: open / copy / pin all work through the existing paths.
+- **Task 3.3 — Snippet variable expansion.** Core/SnippetExpander.cs
+  ({{date}}/{{time}}/{{datetime}}/{{clipboard}}/{{key:default}}/{{cursor}};
+  unknown tokens stay verbatim, no recursion) applied to snippet copies and
+  macro step targets.
 
 ## Phase 4 — v2.4 "Platform" (#11, #12)
 
