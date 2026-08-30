@@ -1,12 +1,17 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-1.8.0-7C6CFF?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.0.0--alpha.1-CA5010?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license"/>
   <a href="https://github.com/Anik1377/Lumo-Launcher/actions/workflows/build.yml"><img src="https://github.com/Anik1377/Lumo-Launcher/actions/workflows/build.yml/badge.svg" alt="build"/></a>
 </p>
+
+> ⚠️ **ALPHA SOFTWARE — UNSTABLE.** Every release of Lumo is currently an alpha
+> build: features may change without notice, bugs are expected, and there may be
+> crashes. Use at your own risk and please report anything broken in Issues.
 
 **Lumo** is a lightweight, portable, universal launcher built with **C# / WPF / .NET 8**.
 Press a global hotkey from anywhere, type a few characters, and launch apps, files,
@@ -27,10 +32,9 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | ⚡ | **Shortcuts & macros** | Save your own one-tap launches — a URL, a file, a folder, or a multi-step macro — and run them with `/sc name` |
 | 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
-| 🎛️ | **Advanced Settings UI** | macOS-style sidebar settings window: General · Appearance · Hotkey · Search · About — all live-apply |
-| 🪟 | **Glassmorphism UI** | Acrylic blur behind the launcher — the real system backdrop on Win11 22H2+, composition acrylic on Win10 — with a graceful opaque fallback |
-| 🖆️ | **Modern vector icons** | A coherent Fluent-style outline icon set (24×24 stroke paths) for every row, hint and button — razor sharp at any DPI, tinted by your accent |
-| 🌈 | **Glow border effect** | Animated gradient border + ambient accent wash inside the glass: 5 colour presets, solid accent, 3 speeds — pauses when hidden |
+| 🪟 | **Windows 11 design** | Solid Fluent surfaces following the Windows 11 design language: `#202020`/`#F3F3F3` panels, hairline strokes, 4 px control geometry, native DWM rounded corners, Segoe UI — a full-window Settings app in the same style |
+| 🖆️ | **Clean vector icons** | A coherent Fluent-style outline icon set (24×24 stroke paths) for every row, hint and button — razor sharp at any DPI, tinted by your accent |
+| 🌈 | **Rim glow effect** | A minimal accent light that orbits **inside** the window border — never outside — 5 comet presets, solid accent, 3 speeds, pauses when hidden |
 | 📋 | **Clipboard history** | `H/` — your last 50 copies with timestamps, searchable, in memory only |
 | ▣ | **Window management** | `S/` — snap the last window left/right, maximize, center or restore; multi-monitor aware |
 | 📝 | **Snippets** | Save paste-anywhere texts as shortcuts and trigger with `!name` — multi-line supported |
@@ -38,25 +42,33 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🎨 | **Accent theming** | 9 accent presets + custom hex, driving the whole highlight system (accent-tinted selection) |
 | 🌗 | **Dark / light / auto theme** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
 | ⏰ | **Start with Windows** | One toggle in Settings (per-user Run key, no admin rights) |
-| 🧳 | **Truly portable** | One ~340 KB exe, no installer |
+| 🧳 | **Truly portable** | One ~350 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
-## 🆕 What's new in v1.8.0 — the Fully Glass update
+## 🆕 What's new in v2.0.0-alpha.1 — the Windows 11 overhaul
 
-1. **🪟 Much deeper glass** — the glass panels dropped from ~76% to ~47% (dark) /
-   ~62% (light) opacity, so the acrylic blur is now the star: your desktop really
-   glows through the launcher. The Windows-10 acrylic fallback tint was lightened
-   to match.
-2. **✨ Frost sheen + refraction edge** — a diagonal white light-band sweeps the card
-   and a bright hairline catches the top rim: the two details that make glass read
-   as *glass* instead of a tinted rectangle. Both paint only when the backdrop is
-   actually live (zero cost on fallback systems).
-3. **🧊 The Settings window is glass now too** — same real acrylic backdrop as the
-   launcher (it was a layered window before, which can't show blur), with translucent
-   sidebar/cards/fields that keep every control legible, and DWM rounded corners.
-4. Everything else from v1.7.x is untouched: Enter-key fixes, vector icons, live
-   glass toggle in Settings → Appearance.
+1. **🪟 The glass era is over — hello, Windows 11.** Lumo now follows the Microsoft
+   Fluent 2 design language: solid `#202020` (dark) / `#F3F3F3` (light) surfaces,
+   hairline strokes, 4 px-class control geometry, native DWM rounded corners and
+   drop shadows, Segoe UI typography. No acrylic dependency, no fallback surprises —
+   it looks the same crisp native way everywhere.
+2. **🌈 A whole new glow — the rim comet.** The old rainbow border + outer halo are
+   gone. The glow is now a single minimal accent light that **orbits inside the
+   window border** (like modern AI chat boxes): a bright head with a soft tail
+   chasing the rim, nothing ever bleeding outside the window.
+3. **🔍 Win11 search field.** The search row is now a proper Fluent text field:
+   4 px rounded box, hairline stroke, and the 2 px accent focus bar along the
+   bottom edge while you type.
+4. **🖥️ Full-window Settings app.** Settings now opens filling your whole work
+   area like a real Windows 11 system app: a 264 px nav sidebar with monochrome
+   glyphs and the Win11 selection pill (accent bar + tinted row), large page
+   titles, white/dark cards with hairline borders, and Win11-style 40×20 toggles.
+   Includes a proper minimize button and an **ALPHA · UNSTABLE** badge in the
+   title bar so there's never any doubt.
+5. **⚠️ Everything is labelled alpha.** All past and future GitHub releases are
+   marked **[ALPHA — unstable]**, the README carries an alpha badge and warning,
+   and the exe itself reports `2.0.0-alpha.1 (ALPHA — unstable build)`.
 
 ## 🆕 What's new in v1.7.2 — critical launch fix
 
@@ -323,9 +335,11 @@ with the zip attached automatically.
 - [x] Glow border / visual customization (v1.2)
 - [x] Apple-clean UI + fluid motion + auto theme (v1.3)
 - [x] User shortcuts & macros with `/sc` (v1.4)
+- [x] Windows 11 Fluent UI overhaul + full-window Settings app + rim glow (v2.0)
 - [ ] Plugin API for custom commands
 - [ ] Everything SDK backend for instant full-disk search
 - [ ] Result icons extracted from real shortcuts
+- [ ] Pin results / usage-frequency ranking
 
 ## 📄 License
 

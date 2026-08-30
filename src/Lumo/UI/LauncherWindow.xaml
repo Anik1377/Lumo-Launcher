@@ -17,17 +17,15 @@
         PreviewKeyDown="OnPreviewKeyDown">
 
     <!--
-        v1.7 "Glass" — the window IS the glass card.
+        v2.0 "Windows 11" — solid Fluent surfaces, no acrylic.
 
-        How the glassmorphism works (no AllowsTransparency!):
-        · The DWM frame is extended across the whole window (WindowChrome GlassFrameThickness="-1"),
-          so the window is composited by DWM and can show the acrylic backdrop behind it.
-        · GlassBackdrop.cs enables the real system acrylic on Win11 22H2+ (DWMWA_SYSTEMBACKDROP_TYPE),
-          with a composition-attribute acrylic fallback on Windows 10 / early Win11.
-        · The Root card paints translucent colours on top of that blur (Appearance.GlassFor),
-          and falls back to opaque palette colours when blur is unavailable.
-        · On Windows 11 the window itself gets DWM rounded corners (DWMWCP_ROUND, 8 px) —
-          the card radius below matches them exactly.
+        · The card paints opaque Win11 palette colours (Appearance.PaletteFor):
+          dark #202020 / light #F3F3F3, hairline strokes, 4 px-class control geometry.
+        · The window keeps WindowChrome GlassFrameThickness="-1" so DWM still composites
+          the drop shadow, and DWMWCP_ROUND supplies the native Win11 rounded corners
+          (Windows 10 falls back to square corners set in code).
+        · The only glow is the v2.0 rim comet: a minimal accent gradient that orbits
+          INSIDE the 1 px window border (Root.BorderBrush) — nothing bleeds outside.
     -->
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="-1" CaptionHeight="0" CornerRadius="0"
@@ -38,9 +36,9 @@
         <!-- glyph → vector icon (modern outline set, 24×24 stroke paths) -->
         <ui:GlyphIconConverter x:Key="GlyphToIcon"/>
 
-        <!-- kbd-style hint chip, Spotlight/Raycast flavour -->
+        <!-- kbd-style hint chip, Win11 flavour -->
         <Style x:Key="KbdChipBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="Padding" Value="6,2"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource GlyphBoxBrush}"/>
@@ -55,8 +53,8 @@
         </Style>
     </Window.Resources>
 
-    <!-- main glass card (DWM draws the real drop shadow + rounded corners) -->
-    <Border x:Name="Root" CornerRadius="8" BorderThickness="1" Background="#F01C1C1E"
+    <!-- main card (DWM draws the real drop shadow + rounded corners) -->
+    <Border x:Name="Root" CornerRadius="8" BorderThickness="1" Background="#F0202020"
             TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Arial"
             RenderTransformOrigin="0.5,0.5">
         <Border.RenderTransform>
@@ -67,13 +65,10 @@
         </Border.RenderTransform>
 
         <Grid>
-            <!-- ambient accent wash inside the top of the card (the old glow halo, now a light source) -->
+            <!-- v2.0 — whisper of accent light inside the top rim (the glow spilling in);
+                 static, ultra-subtle, never bleeds outside the window -->
             <Border x:Name="GlowHalo" CornerRadius="8" IsHitTestVisible="False" Opacity="0"
-                    VerticalAlignment="Top" Height="150"/>
-
-            <!-- v1.8 — top refraction hairline: bright light catching the rim of the glass -->
-            <Border x:Name="TopLight" Height="1.2" VerticalAlignment="Top" Margin="14,0,14,0"
-                    CornerRadius="1" IsHitTestVisible="False" Opacity="0.85"/>
+                    VerticalAlignment="Top" Height="120"/>
 
             <Grid>
                 <Grid.RowDefinitions>
@@ -83,85 +78,100 @@
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <!-- ================= search row ================= -->
-                <Grid Grid.Row="0" Margin="20,16,14,12">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                <!-- ================= search field (Win11 text box: 4 px radius, hairline
+                     stroke, 2 px accent focus bar — v2.0) ================= -->
+                <Border Grid.Row="0" x:Name="SearchField" Margin="14,12,14,10"
+                        CornerRadius="4" Background="{DynamicResource FieldBrush}"
+                        BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
+                        SnapsToDevicePixels="True">
+                    <Grid>
+                        <Grid Margin="12,7,8,7">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
 
-                    <!-- magnifier icon: shown when no command prefix is active -->
-                    <Grid x:Name="MagnifierIcon" Width="19" Height="19" VerticalAlignment="Center"
-                          Margin="0,2,13,0" IsHitTestVisible="False">
-                        <Ellipse Width="13" Height="13" StrokeThickness="1.7"
-                                 Stroke="{DynamicResource IconBrush}"
-                                 HorizontalAlignment="Left" VerticalAlignment="Top" Margin="1.5,1.5,0,0"/>
-                        <Line X1="13" Y1="13" X2="17.5" Y2="17.5"
-                              Stroke="{DynamicResource IconBrush}" StrokeThickness="1.7" StrokeEndLineCap="Round"/>
+                            <!-- magnifier icon: shown when no command prefix is active -->
+                            <Grid x:Name="MagnifierIcon" Width="17" Height="17" VerticalAlignment="Center"
+                                  Margin="0,2,11,0" IsHitTestVisible="False">
+                                <Ellipse Width="11.5" Height="11.5" StrokeThickness="1.6"
+                                         Stroke="{DynamicResource IconBrush}"
+                                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="1.4,1.4,0,0"/>
+                                <Line X1="11.5" Y1="11.5" X2="15.6" Y2="15.6"
+                                      Stroke="{DynamicResource IconBrush}" StrokeThickness="1.6" StrokeEndLineCap="Round"/>
+                            </Grid>
+
+                            <!-- prefix badge: shown while a command prefix (A/, F/, C/…) is active -->
+                            <TextBlock x:Name="PrefixBadge" Grid.Column="0" Text="L" FontWeight="Bold" FontSize="16"
+                                       Foreground="{DynamicResource AccentBrush}" Margin="2,1,11,0"
+                                       VerticalAlignment="Center" Visibility="Collapsed"/>
+
+                            <Grid Grid.Column="1" VerticalAlignment="Center">
+                                <TextBox x:Name="Input" FontSize="17" FontWeight="Normal"
+                                         Background="Transparent" BorderThickness="0" Padding="0" MinHeight="28"
+                                         Foreground="{DynamicResource TitleBrush}"
+                                         CaretBrush="{DynamicResource AccentBrush}"
+                                         VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                         TextChanged="OnInputTextChanged" PreviewKeyDown="OnInputKeyDown"
+                                         GotKeyboardFocus="OnInputFocusChanged" LostKeyboardFocus="OnInputFocusChanged"/>
+                                <!-- placeholder (Win11 wording, v2.0) -->
+                                <TextBlock Text="Search apps, files and commands…" FontSize="17" Margin="1,0,0,0"
+                                           Foreground="{DynamicResource PlaceholderBrush}" IsHitTestVisible="False"
+                                           VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=Input}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+
+                            <!-- clear button — v1.7 vector cross (also fixed: now actually appears when text is present) -->
+                            <ContentControl x:Name="ClearButton" Grid.Column="2" Width="26" Height="26" VerticalAlignment="Center"
+                                            Focusable="False" Cursor="Hand" MouseLeftButtonUp="OnClearClick"
+                                            ToolTip="Clear (Ctrl+Backspace)">
+                                <ContentControl.Style>
+                                    <Style TargetType="ContentControl">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=Input}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ContentControl.Style>
+                                <ContentControl.Template>
+                                    <ControlTemplate TargetType="ContentControl">
+                                        <Grid Background="Transparent">
+                                            <Path x:Name="ClearGlyph" Data="{x:Static ui:VectorIcons.CloseIcon}"
+                                                  Stroke="{DynamicResource SubtitleBrush}" StrokeThickness="2.2"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                                  Width="10" Height="10" Stretch="Uniform"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="ClearGlyph" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ContentControl.Template>
+                            </ContentControl>
+                        </Grid>
+
+                        <!-- 2 px accent bar along the bottom edge while the field has focus
+                             (the Win11 TextBox focus treatment) -->
+                        <Border x:Name="FocusBar" Height="2" VerticalAlignment="Bottom" Margin="1,0,1,1"
+                                CornerRadius="1" Background="{DynamicResource AccentBrush}"
+                                Visibility="Collapsed" IsHitTestVisible="False"/>
                     </Grid>
-
-                    <!-- prefix badge: shown while a command prefix (A/, F/, C/…) is active -->
-                    <TextBlock x:Name="PrefixBadge" Grid.Column="0" Text="L" FontWeight="Bold" FontSize="17"
-                               Foreground="{DynamicResource AccentBrush}" Margin="2,1,13,0"
-                               VerticalAlignment="Center" Visibility="Collapsed"/>
-
-                    <Grid Grid.Column="1" VerticalAlignment="Center">
-                        <TextBox x:Name="Input" FontSize="19" FontWeight="Normal"
-                                 Background="Transparent" BorderThickness="0" Padding="0" MinHeight="30"
-                                 Foreground="{DynamicResource TitleBrush}"
-                                 CaretBrush="{DynamicResource AccentBrush}"
-                                 VerticalAlignment="Center" VerticalContentAlignment="Center"
-                                 TextChanged="OnInputTextChanged" PreviewKeyDown="OnInputKeyDown"/>
-                        <!-- Apple-style placeholder (Raycast wording, v1.6) -->
-                        <TextBlock Text="Search apps and commands…" FontSize="19" Margin="1,0,0,0"
-                                   Foreground="{DynamicResource PlaceholderBrush}" IsHitTestVisible="False"
-                                   VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding Text, ElementName=Input}" Value="">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
-                    </Grid>
-
-                    <!-- clear button — v1.7 vector cross (also fixed: now actually appears when text is present) -->
-                    <ContentControl x:Name="ClearButton" Grid.Column="2" Width="26" Height="26" VerticalAlignment="Center"
-                                    Focusable="False" Cursor="Hand" MouseLeftButtonUp="OnClearClick"
-                                    ToolTip="Clear (Ctrl+Backspace)">
-                        <ContentControl.Style>
-                            <Style TargetType="ContentControl">
-                                <Setter Property="Visibility" Value="Visible"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding Text, ElementName=Input}" Value="">
-                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ContentControl.Style>
-                        <ContentControl.Template>
-                            <ControlTemplate TargetType="ContentControl">
-                                <Grid Background="Transparent">
-                                    <Path x:Name="ClearGlyph" Data="{x:Static ui:VectorIcons.CloseIcon}"
-                                          Stroke="{DynamicResource SubtitleBrush}" StrokeThickness="2.2"
-                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                          Width="11" Height="11" Stretch="Uniform"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Grid>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="ClearGlyph" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </ContentControl.Template>
-                    </ContentControl>
-                </Grid>
+                </Border>
 
                 <Border Grid.Row="1" Height="1" x:Name="Separator" Margin="16,0,16,0" Opacity="0.9"/>
 
@@ -177,13 +187,13 @@
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="10"
-                                                Padding="2" Margin="4,1">
+                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="4"
+                                                Padding="2" Margin="6,1">
                                             <Grid>
-                                                <!-- accent-tinted overlays, faded in/out for smooth hover & selection -->
-                                                <Border x:Name="HoverOverlay" CornerRadius="10"
+                                                <!-- neutral hover / accent selection overlays (Win11 list item) -->
+                                                <Border x:Name="HoverOverlay" CornerRadius="4"
                                                         Background="{DynamicResource HoverBrush}" Opacity="0"/>
-                                                <Border x:Name="SelectedOverlay" CornerRadius="10"
+                                                <Border x:Name="SelectedOverlay" CornerRadius="4"
                                                         Background="{DynamicResource SelectedBrush}" Opacity="0"/>
                                                 <ContentPresenter/>
                                             </Grid>
@@ -244,7 +254,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Border x:Name="GlyphBox" Grid.Column="0" Width="32" Height="32" CornerRadius="9"
+                                <Border x:Name="GlyphBox" Grid.Column="0" Width="30" Height="30" CornerRadius="4"
                                         Background="{DynamicResource GlyphBoxBrush}">
                                     <Grid>
                                         <!-- real shell icon (app logo / file type); v1.7 vector icon when none -->
@@ -288,7 +298,7 @@
                                 </StackPanel>
 
                                 <!-- kind chip (App / File / Web / Tool …) -->
-                                <Border Grid.Column="2" CornerRadius="5" Padding="7,2.5" VerticalAlignment="Center"
+                                <Border Grid.Column="2" CornerRadius="4" Padding="7,2.5" VerticalAlignment="Center"
                                         Background="{DynamicResource ChipBrush}">
                                     <Border.Style>
                                         <Style TargetType="Border">
@@ -365,10 +375,6 @@
                     </StackPanel>
                 </Grid>
             </Grid>
-
-            <!-- v1.8 — diagonal frost sheen: the light band that sells the glass.
-                 Topmost, non-interactive, painted only when the backdrop is live. -->
-            <Border x:Name="Sheen" CornerRadius="8" IsHitTestVisible="False" Visibility="Collapsed"/>
         </Grid>
     </Border>
 </Window>

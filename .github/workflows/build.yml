@@ -49,3 +49,8 @@ jobs:
         with:
           files: ${{ env.ZIP_NAME }}
           generate_release_notes: true
+          prerelease: true
+          name: "Lumo ${{ github.ref_name }} — ALPHA (unstable)"
+          body: |
+            > ⚠️ **ALPHA BUILD — UNSTABLE.** Lumo is in alpha: expect bugs and
+            breaking changes. Please report issues on the tracker.

@@ -53,8 +53,8 @@ public partial class LauncherWindow : Window
     private bool _staggerNext = true;        // v1.4 — stagger only on show/empty→results, not every keystroke
     private string _prevQuery = "";
 
-    private const double GlowActiveOpacity = 0.50;
-    private const double GlowDimOpacity = 0.16;
+    private const double GlowActiveOpacity = 0.42;   // v2.0 — quieter: minimal rim glow
+    private const double GlowDimOpacity = 0.12;
 
     /// <summary>Human-readable description of the hotkey that actually registered.</summary>
     public string? ActiveHotkeyDescription => _hotkey?.ActiveDescription;
@@ -115,10 +115,10 @@ public partial class LauncherWindow : Window
                     DiagnosticLogger.Log("Window", $"Configured hotkey unavailable — fallback '{active}' active");
             }
 
-            // v1.7 — the HWND now exists: enable the acrylic glass backdrop, then re-run
-            // the palette so the card paints translucent (glass) or opaque (fallback).
+            // v2.0 — the HWND now exists: apply DWM chrome (round corners, dark mode),
+            // then paint the solid Win11 palette.
             _sourceReady = true;
-            GlassBackdrop.Apply(this, _settings.EffectiveDark(), _settings.GlassEffect);
+            GlassBackdrop.Apply(this, _settings.EffectiveDark());
             ApplyTheme();
         }
         catch (Exception ex)
@@ -717,53 +717,60 @@ public partial class LauncherWindow : Window
         {
             bool dark = _settings.EffectiveDark();
 
-            // v1.7 — keep the glass backdrop in sync when theme / glass toggle change live
+            // v2.0 — DWM chrome only (rounded corners + dark-mode context); no acrylic.
             if (_sourceReady)
-                GlassBackdrop.Apply(this, dark, _settings.GlassEffect);
+                GlassBackdrop.Apply(this, dark);
 
-            bool glass = GlassBackdrop.Applied;
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
-            var g = Appearance.GlassFor(dark);
 
             Resources["TitleBrush"] = new SolidColorBrush(p.Title);
             Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
             Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
             Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
             Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["ChipBrush"] = new SolidColorBrush(glass ? g.Chip
-                : (dark ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00)));
+            Resources["ChipBrush"] = new SolidColorBrush(dark
+                ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
             Resources["ChipTextBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["PlaceholderBrush"] = new SolidColorBrush(dark ? FromRgb(0x63, 0x63, 0x66) : FromRgb(0xC7, 0xC7, 0xCC));
+            Resources["PlaceholderBrush"] = new SolidColorBrush(dark ? FromRgb(0x71, 0x71, 0x71) : FromRgb(0x9D, 0x9D, 0x9D));
             Resources["IconBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["GlyphBoxBrush"] = new SolidColorBrush(glass ? g.GlyphBox : p.GlyphBox);
-            Resources["BorderLineBrush"] = new SolidColorBrush(glass ? g.Border : p.Border);
+            Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
+            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
 
-            // glass → translucent panel over the acrylic; fallback → the opaque palette panel.
-            // Without blur the DWM frame would show through rounded corners as artifacts,
-            // so the card goes square when glass is unavailable (Win11 keeps DWM rounding).
-            Root.Background = new SolidColorBrush(glass ? g.Panel : p.Panel);
-            Root.CornerRadius = new CornerRadius(glass ? 8 : 0);
-            GlowHalo.CornerRadius = new CornerRadius(glass ? 8 : 0);
-            _themeBorderBrush = new SolidColorBrush(glass ? g.Border : p.Border);
+            // Win11 rounded corners come from DWM on Windows 11; Windows 10 keeps square
+            // corners (an unpainted radius would otherwise expose raw window corners).
+            float r = GlassBackdrop.IsWin11 ? 8f : 0f;
+            Root.Background = new SolidColorBrush(p.Panel);
+            Root.CornerRadius = new CornerRadius(r);
+            GlowHalo.CornerRadius = new CornerRadius(r);
+            _themeBorderBrush = new SolidColorBrush(p.Border);
             Input.Foreground = new SolidColorBrush(p.Title);
             Input.CaretBrush = new SolidColorBrush(p.Accent);
             Input.SelectionBrush = new SolidColorBrush(Appearance.Tint(p.Accent, 0x55));
             Input.SelectionTextBrush = new SolidColorBrush(p.Title);
-            Separator.Background = new SolidColorBrush(glass ? g.Separator : p.Separator);
+            Separator.Background = new SolidColorBrush(p.Separator);
             PrefixBadge.Foreground = new SolidColorBrush(p.Accent);
-
-            // v1.8 — the fully-glass dressing: diagonal frost sheen + top refraction
-            // hairline. Only meaningful when the acrylic backdrop is actually live;
-            // on the opaque fallback they'd just look like noise on a solid card.
-            Sheen.Background = glass ? Appearance.BuildSheenBrush() : null;
-            Sheen.Visibility = glass ? Visibility.Visible : Visibility.Collapsed;
-            TopLight.Background = glass ? Appearance.BuildEdgeHighlightBrush() : Brushes.Transparent;
-            TopLight.Opacity = glass ? 0.85 : 0;
         }
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("Window.ApplyTheme", ex);
         }
+    }
+
+    /// <summary>
+    /// v2.0 — Win11 text-field focus treatment: show the 2 px accent bar along the
+    /// bottom edge of the search field while it holds keyboard focus.
+    /// </summary>
+    private void OnInputFocusChanged(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        try
+        {
+            bool focused = Input.IsKeyboardFocusWithin;
+            FocusBar.Visibility = focused ? Visibility.Visible : Visibility.Collapsed;
+            SearchField.BorderBrush = focused
+                ? (Brush)FindResource("AccentBrush")
+                : (Brush)FindResource("BorderLineBrush");
+        }
+        catch { }
     }
 
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);

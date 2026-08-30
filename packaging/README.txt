@@ -1,20 +1,40 @@
 ======================================================
-  LUMO v1.8.0  —  universal launcher for Windows
+  LUMO v2.0.0-alpha.1  —  universal launcher for Windows
+  (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.0.0-alpha.1 (the Windows 11 overhaul)
+------------------------------------------------------
+1. GLASS IS GONE - Windows 11 DESIGN IN. Lumo now follows
+   the Microsoft Fluent design language: solid #202020
+   (dark) / #F3F3F3 (light) surfaces, hairline strokes,
+   4 px control geometry, native DWM rounded corners and
+   drop shadows, Segoe UI. No acrylic, no fallbacks -
+   the same crisp native look everywhere.
+2. NEW GLOW: THE RIM COMET - a single minimal accent
+   light orbits INSIDE the window border (bright head +
+   soft tail chasing the rim, like modern AI chat boxes).
+   Nothing bleeds outside the window any more.
+3. WIN11 SEARCH FIELD - rounded 4 px Fluent text box with
+   the 2 px accent focus bar along the bottom while typing.
+4. FULL-WINDOW SETTINGS APP - Settings now opens filling
+   the whole work area like a real Windows 11 system app:
+   nav sidebar with monochrome glyphs + Win11 selection
+   pill, large page titles, cards with hairline borders,
+   40x20 Win11 toggles, minimize button, and an
+   "ALPHA - UNSTABLE" badge in the title bar.
+5. ALL RELEASES MARKED ALPHA - past and future GitHub
+   releases are labelled [ALPHA - unstable].
 
 WHAT'S NEW IN v1.8.0 (the Fully Glass update)
 ---------------------------------------------
-1. MUCH DEEPER GLASS - the panel opacity dropped
-   to ~47% (dark) / ~62% (light), so the acrylic
-   blur really shows your desktop through.
-2. FROST SHEEN + REFRACTION EDGE - a diagonal
-   light band and a bright top hairline sell the
-   glass look (painted only when blur is live).
-3. GLASS SETTINGS WINDOW - the settings window
-   now sits on the same real acrylic backdrop,
-   with translucent sidebar, cards and fields.
-4. Includes all v1.7.x fixes (launch crash,
-   Enter-key dead zones, icons).
+1. MUCH DEEPER GLASS - panel opacity dropped so the acrylic
+   blur really showed your desktop through.
+2. FROST SHEEN + REFRACTION EDGE - diagonal light band and
+   a bright top hairline.
+3. GLASS SETTINGS WINDOW - same acrylic backdrop with
+   translucent sidebar, cards and fields.
+   (All replaced by the v2.0 solid Windows 11 look.)
 
 WHAT'S NEW IN v1.7.2 (critical launch fix)
 ------------------------------------------
@@ -118,8 +138,8 @@ SETTINGS (%APPDATA%\Lumo\settings.json)
    "Theme":             "dark" | "light" | "auto"
    "WebEngine":         "google" | "bing" | "duckduckgo"
    "HideOnFocusLoss":   false
-   "AccentColor":       "#7C6CFF"     (any #RRGGBB)
-   "BorderEffect":      true          (animated glow border)
+   "AccentColor":       "#0078D4"     (any #RRGGBB; Win11 blue default)
+   "BorderEffect":      true          (rim glow - orbits inside the border)
    "BorderStyle":       "Aurora"      (Aurora|Sunset|Ocean|Ember|Mint|Solid)
    "BorderSpeedSec":    3.5           (seconds per rotation; lower = faster)
    "AnimationsEnabled": true          (master motion switch, v1.3)

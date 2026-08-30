@@ -65,7 +65,6 @@ public partial class SettingsWindow : Window
         ApplySelfTheme();
         UpdateRecordButton();   // v1.5.1 — reflect live recording state on open
         UpdatePreview();
-        StartOwnBorder();
         PlayEntrance();
 
         _shortcuts.Changed += () => Dispatcher.InvokeAsync(() => { try { LoadShortcutList(); } catch { } });
@@ -81,17 +80,33 @@ public partial class SettingsWindow : Window
         if (_initialPage > 0) SelectPage(_initialPage);
     }
 
+    // ---------------------------------------------------------------- window chrome
+
     /// <summary>
-    /// v1.8 — the HWND now exists: enable the acrylic glass backdrop for the settings
-    /// window too, then repaint so the surfaces go translucent (or stay opaque when
-    /// the system can't provide blur).
+    /// v2.0 — the settings window opens filling the whole work area (the "full screen
+    /// app" feel, like the real Windows 11 Settings), while staying resizable and
+    /// keeping the taskbar accessible.
     /// </summary>
     protected override void OnSourceInitialized(EventArgs e)
     {
         base.OnSourceInitialized(e);
         _sourceReady = true;
-        try { ApplySelfTheme(); }   // re-applies the backdrop itself, then repaints
+        try
+        {
+            var wa = SystemParameters.WorkArea;
+            Left = wa.Left; Top = wa.Top;
+            Width = wa.Width; Height = wa.Height;
+        }
+        catch { /* keep designed size */ }
+        try { ApplySelfTheme(); }   // reapplies DWM chrome, then repaints
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.OnSourceInitialized", ex); }
+    }
+
+    /// <summary>v2.0 — caption-bar minimize.</summary>
+    private void OnMinimize(object sender, RoutedEventArgs e)
+    {
+        try { WindowState = WindowState.Minimized; }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.Minimize", ex); }
     }
 
     /// <summary>Selects a sidebar page by index (checks the matching nav radio).</summary>
@@ -193,39 +208,22 @@ public partial class SettingsWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.DeleteShortcut", ex); }
     }
 
-    /// <summary>Window springs in — fade + gentle scale, matching the launcher.</summary>
+    /// <summary>Window springs in — fade + gentle scale, a quiet Fluent touch.</summary>
     private void PlayEntrance()
     {
         try
         {
             if (!_settings.AnimationsEnabled) return;
-            RootScale.ScaleX = RootScale.ScaleY = 0.97;
+            RootScale.ScaleX = RootScale.ScaleY = 0.98;
             Root.Opacity = 0;
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180)) { EasingFunction = ease };
-            var scale = new DoubleAnimation(0.97, 1, TimeSpan.FromMilliseconds(220)) { EasingFunction = ease };
+            var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)) { EasingFunction = ease };
+            var scale = new DoubleAnimation(0.98, 1, TimeSpan.FromMilliseconds(200)) { EasingFunction = ease };
             Root.BeginAnimation(OpacityProperty, fade);
             RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
             RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.Entrance", ex); }
-    }
-
-    // ---------------------------------------------------------------- own chrome
-
-    /// <summary>The settings window itself gets the chat-style rotating border.</summary>
-    private void StartOwnBorder()
-    {
-        if (!_settings.AnimationsEnabled) return; // respect reduce-motion
-        try
-        {
-            var anim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(7))
-            {
-                RepeatBehavior = RepeatBehavior.Forever,
-            };
-            SettingsRotation.BeginAnimation(RotateTransform.AngleProperty, anim);
-        }
-        catch (Exception ex) { DiagnosticLogger.LogException("Settings.StartOwnBorder", ex); }
     }
 
     private void ApplySelfTheme()
@@ -234,48 +232,38 @@ public partial class SettingsWindow : Window
         {
             bool dark = _settings.EffectiveDark();
 
-            // v1.8 — keep the settings window's own glass backdrop in sync (theme or
-            // Glass-toggle changes arrive through SyncLive → ApplySelfTheme).
+            // v2.0 — DWM chrome only (rounded corners + dark-mode context); no acrylic.
             if (_sourceReady)
-                GlassBackdrop.Apply(this, dark, _settings.GlassEffect);
-            bool glass = GlassBackdrop.Applied;
-            var g = Appearance.GlassFor(dark);
+                GlassBackdrop.Apply(this, dark);
 
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
 
-            Color field = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xF5, 0xF5, 0xF7);
-            Color card = dark ? FromRgb(0x24, 0x24, 0x26) : Colors.White;
-            Color sidebar = dark ? FromRgb(0x1A, 0x1A, 0x1C) : FromRgb(0xF2, 0xF2, 0xF7);
-            Color segTrack = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xE9, 0xE9, 0xEB);
-            Color segSel = dark ? FromRgb(0x48, 0x48, 0x4A) : Colors.White;
+            // Windows 11 Fluent surface tokens — solid, no blur dependency.
+            Color field   = dark ? FromRgb(0x2D, 0x2D, 0x2D) : FromRgb(0xFB, 0xFB, 0xFB);
+            Color card    = dark ? FromRgb(0x2B, 0x2B, 0x2B) : Colors.White;
+            Color sidebar = dark ? FromRgb(0x1C, 0x1C, 0x1C) : FromRgb(0xEC, 0xEC, 0xEC);
+            Color segTrack = dark ? FromRgb(0x3B, 0x3B, 0x3B) : FromRgb(0xE6, 0xE6, 0xE6);
+            Color segSel  = dark ? FromRgb(0x4A, 0x4A, 0x4A) : Colors.White;
 
             Resources["TitleBrush"] = new SolidColorBrush(p.Title);
             Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
             Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
             Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
             Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["SeparatorBrush"] = new SolidColorBrush(glass ? g.Separator : p.Separator);
-            Resources["BorderLineBrush"] = new SolidColorBrush(glass ? g.Border : p.Border);
+            Resources["SeparatorBrush"] = new SolidColorBrush(p.Separator);
+            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
+            Resources["ChipBrush"] = new SolidColorBrush(dark
+                ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
+            Resources["FieldBrush"] = new SolidColorBrush(field);
+            Resources["CardBrush"] = new SolidColorBrush(card);
+            Resources["SidebarBrush"] = new SolidColorBrush(sidebar);
+            Resources["SegTrackBrush"] = new SolidColorBrush(segTrack);
+            Resources["SegSelBrush"] = new SolidColorBrush(segSel);
 
-            // v1.8 — on glass the big static surfaces go translucent so the acrylic
-            // blur carries through; interactive controls keep enough body to stay legible.
-            Resources["FieldBrush"] = new SolidColorBrush(glass
-                ? (dark ? Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)) : field);
-            Resources["CardBrush"] = new SolidColorBrush(glass
-                ? (dark ? Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x8C, 0xFF, 0xFF, 0xFF)) : card);
-            Resources["SidebarBrush"] = new SolidColorBrush(glass
-                ? (dark ? Color.FromArgb(0x4D, 0x00, 0x00, 0x00) : Color.FromArgb(0x66, 0xFF, 0xFF, 0xFF)) : sidebar);
-            Resources["SegTrackBrush"] = new SolidColorBrush(glass
-                ? (dark ? Color.FromArgb(0x33, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x59, 0xFF, 0xFF, 0xFF)) : segTrack);
-            Resources["SegSelBrush"] = new SolidColorBrush(glass
-                ? (dark ? Color.FromArgb(0xB4, 0x62, 0x62, 0x66) : Color.FromArgb(0xD9, 0xFF, 0xFF, 0xFF)) : segSel);
-
-            // glass → translucent panel over the acrylic; fallback → opaque panel and a
-            // square card (unpainted corners would otherwise show raw DWM frame).
-            Root.Background = new SolidColorBrush(glass ? g.Panel : p.Panel);
-            Root.CornerRadius = new CornerRadius(glass ? 8 : 0);
-            Root.BorderBrush = new SolidColorBrush(glass ? g.Border : p.Border);
-            SettingsHalo.Background = new SolidColorBrush(Color.FromArgb(0x66, p.Accent.R, p.Accent.G, p.Accent.B));
+            float r = GlassBackdrop.IsWin11 ? 8f : 0f;
+            Root.Background = new SolidColorBrush(p.Panel);
+            Root.CornerRadius = new CornerRadius(r);
+            Root.BorderBrush = new SolidColorBrush(p.Border);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.ApplySelfTheme", ex); }
     }
@@ -302,7 +290,6 @@ public partial class SettingsWindow : Window
             }
 
             BorderEffectToggle.IsChecked = _settings.BorderEffect;
-            GlassEffectToggle.IsChecked = _settings.GlassEffect;
             switch (_settings.BorderStyle?.ToLowerInvariant())
             {
                 case "sunset": StyleSunset.IsChecked = true; break;
@@ -348,9 +335,6 @@ public partial class SettingsWindow : Window
             {
                 if (_suppress) return;
                 _settings.AnimationsEnabled = AnimationsToggle.IsChecked == true;
-                // restart or stop the settings window's own border animation live
-                if (_settings.AnimationsEnabled) StartOwnBorder();
-                else SettingsRotation.BeginAnimation(RotateTransform.AngleProperty, null);
                 FooterHint.Text = _settings.AnimationsEnabled
                     ? "Animations on — press Save to keep them"
                     : "Reduced motion — press Save to keep it";
@@ -360,7 +344,6 @@ public partial class SettingsWindow : Window
             EngineDdg.Checked += (_, _) => { if (!_suppress) _settings.WebEngine = "duckduckgo"; };
 
             BorderEffectToggle.Click += (_, _) => SyncLiveAppearance();
-            GlassEffectToggle.Click += (_, _) => SyncLiveAppearance();
             ThemeDark.Checked += (_, _) => SyncLiveAppearance();
             ThemeLight.Checked += (_, _) => SyncLiveAppearance();
             ThemeAuto.Checked += (_, _) => SyncLiveAppearance();
@@ -394,7 +377,6 @@ public partial class SettingsWindow : Window
                 ThemeLight.IsChecked == true ? "light" :
                 ThemeAuto.IsChecked == true ? "auto" : "dark";
             _settings.BorderEffect = BorderEffectToggle.IsChecked == true;
-            _settings.GlassEffect = GlassEffectToggle.IsChecked == true;
             _settings.BorderStyle =
                 StyleSunset.IsChecked == true ? "Sunset" :
                 StyleOcean.IsChecked == true ? "Ocean" :

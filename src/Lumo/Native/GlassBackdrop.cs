@@ -5,30 +5,32 @@ using System.Windows.Interop;
 namespace Lumo.Native;
 
 /// <summary>
-/// v1.7 — the glass (glassmorphism) backdrop behind the launcher window.
+/// v2.0 — window chrome helper (formerly the acrylic glass backdrop).
 ///
-/// Strategy, best → fallback:
-///   1. Windows 11 22H2+ (build ≥ 22621): DWMWA_SYSTEMBACKDROP_TYPE = DWMSBT_TRANSIENTWINDOW —
-///      the real system acrylic, the same backdrop Spotlight-style popovers use.
-///   2. Windows 10 / early Win11 (build ≥ 10240): SetWindowCompositionAttribute with
-///      ACCENT_ENABLE_ACRYLICBLURBEHIND and a themed tint colour (ABGR).
-///   3. Anything else (very old builds, remote sessions, drivers that refuse): no blur —
-///      <see cref="Applied"/> stays false and the palette falls back to an opaque panel.
-///
-/// Requires the window to extend the DWM frame across its whole surface — that is done
-/// in the XAML via <c>WindowChrome GlassFrameThickness="-1"</c> (window must NOT be a
-/// layered window, i.e. AllowsTransparency must stay false for the blur to show).
+/// The glassmorphism era is over: Lumo now uses solid Windows 11 Fluent surfaces, so
+/// there is no acrylic to apply. This helper keeps the two pieces of DWM chrome that
+/// make the launcher and settings window feel native on Windows 11:
+///   • DWMWA_WINDOW_CORNER_PREFERENCE = ROUND  — the 8 px rounded window corners
+///     (silently ignored on Windows 10, where the card keeps square corners).
+///   • DWMWA_USE_IMMERSIVE_DARK_MODE — dark title-bar/decoration context so system
+///     brushes match the active theme.
+/// <see cref="Applied"/> now always reports false; remaining call sites treat that as
+/// "use the solid palette", which is the only look in v2.0.
 /// </summary>
 internal static class GlassBackdrop
 {
-    /// <summary>True when the last Apply() succeeded and blur is live behind the window.</summary>
+    /// <summary>Windows 11 or newer (rounded corners + modern chrome available).</summary>
+    public static bool IsWin11 => Environment.OSVersion.Version.Build >= 22000;
+
+    /// <summary>Legacy flag — always false since v2.0 (no acrylic blur is applied).</summary>
     public static bool Applied { get; private set; }
 
     /// <summary>
-    /// Applies (or removes) the glass backdrop. Safe to call repeatedly — Settings calls it
-    /// live whenever the theme or the glass toggle changes.
+    /// Applies DWM rounding + dark-mode context. Safe to call repeatedly — both windows
+    /// call it on theme changes. The <c>enabled</c> parameter is kept for source
+    /// compatibility with existing call sites and is ignored.
     /// </summary>
-    public static void Apply(Window window, bool dark, bool enabled)
+    public static void Apply(Window window, bool dark, bool enabled = true)
     {
         try
         {
@@ -40,31 +42,10 @@ internal static class GlassBackdrop
             NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, 4);
             UpdateDarkMode(hwnd, dark);
 
-            if (!enabled) { Disable(hwnd); Applied = false; return; }
-
-            // 1) native system acrylic (Windows 11 22H2+)
-            int build = Environment.OSVersion.Version.Build;
-            if (build >= 22621)
-            {
-                int backdrop = NativeMethods.DWMSBT_TRANSIENTWINDOW;
-                if (NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, 4) == 0)
-                {
-                    Applied = true;
-                    return;
-                }
-            }
-
-            // 2) composition-attribute acrylic (Windows 10 / early Win11)
-            //    v1.8 — tint alpha lowered (~56%) so the blur reads much more strongly;
-            //    the translucent glass palette on top keeps text readable.
-            uint tint = dark ? 0x8F141414u : 0x96F7F7F9u; // ABGR — dark smoke / light frost
-            Applied = SetAccent(hwnd, new NativeMethods.ACCENT_POLICY
-            {
-                AccentState = NativeMethods.ACCENT_ENABLE_ACRYLICBLURBEHIND,
-                AccentFlags = 2,
-                GradientColor = tint,
-            });
-            if (!Applied) Disable(hwnd);
+            // belt & braces: make sure no stale acrylic from a pre-2.0 settings file
+            // (or an old running instance's window state) is left behind
+            Disable(hwnd);
+            Applied = false;
         }
         catch
         {
@@ -72,7 +53,7 @@ internal static class GlassBackdrop
         }
     }
 
-    /// <summary>Syncs the DWM dark-mode flag so the system acrylic tints with the theme.</summary>
+    /// <summary>Syncs the DWM dark-mode flag so system decoration tints with the theme.</summary>
     public static void UpdateDarkMode(IntPtr hwnd, bool dark)
     {
         try
@@ -81,6 +62,17 @@ internal static class GlassBackdrop
             NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref v, 4);
         }
         catch { /* best effort */ }
+    }
+
+    private static void Disable(IntPtr hwnd)
+    {
+        try
+        {
+            SetAccent(hwnd, new NativeMethods.ACCENT_POLICY { AccentState = NativeMethods.ACCENT_DISABLED });
+            int auto = 1; // DWMSBT_AUTO — no system backdrop
+            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref auto, 4);
+        }
+        catch { }
     }
 
     private static bool SetAccent(IntPtr hwnd, NativeMethods.ACCENT_POLICY policy)
@@ -100,16 +92,5 @@ internal static class GlassBackdrop
         }
         catch { return false; }
         finally { if (ptr != IntPtr.Zero) Marshal.FreeHGlobal(ptr); }
-    }
-
-    private static void Disable(IntPtr hwnd)
-    {
-        SetAccent(hwnd, new NativeMethods.ACCENT_POLICY { AccentState = NativeMethods.ACCENT_DISABLED });
-        try
-        {
-            int auto = 1; // DWMSBT_AUTO — none
-            NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref auto, 4);
-        }
-        catch { }
     }
 }
