@@ -1,0 +1,209 @@
+<Window x:Class="Lumo.UI.AiChatWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Lumo AI"
+        Width="780" Height="620"
+        MinWidth="560" MinHeight="440"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="Transparent"
+        ShowInTaskbar="True">
+
+    <!--
+        v2.3.0-alpha.3 — the dedicated AI chat tab (AI/ prefix → Enter, or AI/query).
+
+        The design language follows prompt-kit (prompt-kit.com) — the open-source
+        React/Tailwind chat component kit — rebuilt natively in WPF so the launcher
+        keeps its single portable exe (no WebView2, no browser engine, no node
+        bundle): a centred ~720px conversation column, right-aligned accent-tinted
+        user bubbles with 16px radii, full-width assistant replies with a small
+        round avatar dot, a large rounded prompt input with a circular send button
+        (arrow-up, prompt-kit's PromptInputSubmit), three-dot typing indicator,
+        markdown-lite rendering with code blocks, and suggestion chips on the empty
+        state. Colours stay on Lumo's Windows 11 Fluent palette so the window
+        belongs to the launcher family and follows its dark/light theme + accent.
+    -->
+    <WindowChrome.WindowChrome>
+        <WindowChrome GlassFrameThickness="-1" CaptionHeight="0" CornerRadius="0"
+                      UseAeroCaptionButtons="False" ResizeBorderThickness="6"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- prompt-kit PromptInputSubmit — circular accent button, glyph via Tag (send ↑ / stop ■) -->
+        <Style x:Key="SendButton" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Tag" Value="&#xE72A;"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse Fill="{DynamicResource AccentBrush}"/>
+                            <TextBlock x:Name="Glyph" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="13"
+                                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Glyph" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.72"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ghost caption buttons (New chat / minimize / close) -->
+        <Style x:Key="CaptionButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- suggestion chip (prompt-kit's empty-state prompts) -->
+        <Style x:Key="ChipButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
+                                BorderThickness="1" CornerRadius="18" Padding="14,7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Border x:Name="RootCard" Margin="8" CornerRadius="10"
+                Background="{DynamicResource PanelBrush}"
+                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>   <!-- caption -->
+                    <RowDefinition Height="Auto"/>   <!-- AI-off banner -->
+                    <RowDefinition Height="*"/>      <!-- conversation -->
+                    <RowDefinition Height="Auto"/>   <!-- prompt input -->
+                    <RowDefinition Height="Auto"/>   <!-- hints -->
+                </Grid.RowDefinitions>
+
+                <!-- ============ caption ============ -->
+                <Border Grid.Row="0" Background="{DynamicResource SidebarBrush}"
+                        BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="0,0,0,1"
+                        CornerRadius="10,10,0,0" MouseLeftButtonDown="OnDragWindow">
+                    <Grid Height="44" Margin="14,0">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- accent logo dot -->
+                            <Ellipse Width="11" Height="11" Fill="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                            <TextBlock Text="AI Chat" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,0,0"
+                                       Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                            <!-- model chip -->
+                            <Border x:Name="ModelChip" Background="{DynamicResource ChipBrush}" CornerRadius="10"
+                                    Padding="9,3" Margin="12,0,0,0" VerticalAlignment="Center">
+                                <TextBlock x:Name="ModelChipText" FontSize="11"
+                                           Foreground="{DynamicResource SubtitleBrush}"/>
+                            </Border>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <Button x:Name="NewChatButton" Content="New chat" Style="{StaticResource CaptionButton}" Click="OnNewChat"/>
+                            <Button x:Name="MinButton" Content="&#xE70E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                    Style="{StaticResource CaptionButton}" Click="OnMinimize"/>
+                            <Button x:Name="CloseButton" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                    Style="{StaticResource CaptionButton}" Click="OnClose"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- ============ AI-off banner ============ -->
+                <Border x:Name="AiOffBanner" Grid.Row="1" Visibility="Collapsed"
+                        Background="{DynamicResource WarnBrush}" Padding="14,8">
+                    <TextBlock FontSize="11.5" Foreground="{DynamicResource TitleBrush}" TextWrapping="Wrap"
+                               Text="AI is off — enable it in Settings → AI (right-click the launcher → Settings). Local Ollama needs no API key."/>
+                </Border>
+
+                <!-- ============ conversation column ============ -->
+                <Grid Grid.Row="2">
+                    <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto"
+                                  Padding="20,14,20,6" ScrollChanged="OnScrollChanged">
+                        <Grid MaxWidth="720" HorizontalAlignment="Center">
+                            <StackPanel x:Name="MessagesHost"/>
+                        </Grid>
+                    </ScrollViewer>
+
+                    <!-- empty state: prompt-kit style centred welcome + chips -->
+                    <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                MaxWidth="560" TextBlock.TextAlignment="Center">
+                        <Ellipse Width="44" Height="44" HorizontalAlignment="Center" Fill="{DynamicResource AccentBrush}" Opacity="0.92"/>
+                        <TextBlock Text="Ask anything" FontSize="21" FontWeight="SemiBold" Margin="0,16,0,0"
+                                   Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="EmptySub" FontSize="12.5" Margin="0,6,0,0" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource SubtitleBrush}" HorizontalAlignment="Center"/>
+                        <WrapPanel x:Name="ChipHost" HorizontalAlignment="Center" Margin="0,18,0,0"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ============ prompt input (prompt-kit PromptInput) ============ -->
+                <Border Grid.Row="3" Margin="20,8,20,4" CornerRadius="14"
+                        Background="{DynamicResource FieldBrush}"
+                        BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+                    <Grid Margin="10,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="PromptBox" Grid.Column="0" FontSize="14" AcceptsReturn="True"
+                                 MaxHeight="132" VerticalScrollBarVisibility="Auto"
+                                 Background="Transparent" BorderThickness="0" Foreground="{DynamicResource TitleBrush}"
+                                 CaretBrush="{DynamicResource AccentBrush}" VerticalContentAlignment="Center"
+                                 MaxLength="4000" KeyDown="OnPromptKeyDown" TextChanged="OnPromptTextChanged"/>
+                        <Button x:Name="SendButton" Grid.Column="1" Style="{StaticResource SendButton}"
+                                VerticalAlignment="Bottom" Margin="8,0,0,2" Click="OnSendClick"/>
+                        <Button x:Name="StopButton" Grid.Column="1" Style="{StaticResource SendButton}" Tag="&#xE71A;"
+                                VerticalAlignment="Bottom" Margin="8,0,0,2" Visibility="Collapsed" Click="OnStopClick"/>
+                    </Grid>
+                </Border>
+
+                <!-- ============ hints ============ -->
+                <TextBlock Grid.Row="4" Margin="24,0,24,12" FontSize="11"
+                           Foreground="{DynamicResource SubtitleBrush}" HorizontalAlignment="Center"
+                           Text="Enter to send · Shift+Enter for a new line · Esc closes the chat"/>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

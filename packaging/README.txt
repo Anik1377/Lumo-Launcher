@@ -1,7 +1,35 @@
 ======================================================
-  LUMO v2.3.0-alpha.2  —  universal launcher for Windows
+  LUMO v2.3.0-alpha.3  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.3.0-alpha.3 (the AI chat tab)
+---------------------------------------------------------------
+1. A DEDICATED AI CHAT WINDOW - type AI/ and press Enter
+   (or type AI/ then your question and press Enter). A
+   full conversation window opens: chat bubbles, the
+   whole history in context, markdown answers, code
+   blocks with Copy, a stop button, and per-answer copy.
+   "AI" alone also offers the chat on Enter.
+2. STREAMING ANSWERS - local Ollama models stream token
+   by token (true streaming); Anthropic plays back with
+   a typewriter reveal, so both feel alive. A three-dot
+   thinking indicator pulses while the model works.
+3. PROMPT-KIT DESIGN LANGUAGE - the UI follows the
+   open-source prompt-kit chat kit (prompt-kit.com),
+   rebuilt natively in WPF: centred conversation column,
+   accent user bubbles with a sharp tail corner, avatar
+   dot replies, suggestion chips on the empty state, a
+   big rounded prompt input with a circular send button.
+   NO browser engine is embedded - the portable exe
+   promise holds (still one ~500 KB Lumo.exe).
+4. SMART CONTEXT - the chat remembers your conversation
+   (last 16 turns are sent per request, so local models
+   stay fast) and the AI-off state shows a guidance
+   banner instead of failing silently.
+5. MORE TESTS - the suite grew from 92 to 117: the
+   multi-turn request builder, both streaming parsers,
+   the key-never-in-body rule and the markdown renderer.
 
 WHAT'S NEW IN v2.3.0-alpha.2 (one-click local AI setup)
 ---------------------------------------------------------------

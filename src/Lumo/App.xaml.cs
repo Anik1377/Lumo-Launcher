@@ -13,6 +13,7 @@ public partial class App : Application
     private TrayController? _tray;
     private LauncherWindow? _window;
     private SettingsWindow? _settingsWindow;
+    private AiChatWindow? _aiChatWindow;      // v2.3.0-alpha.3 — dedicated AI chat tab
     private Settings _settings = new();
     private ShortcutStore? _shortcuts;
     private MacroRecorder? _recorder;
@@ -85,6 +86,13 @@ public partial class App : Application
             _window.SettingsPageRequested += page =>
             {
                 try { OpenSettings(initialPage: page); } catch (Exception ex) { DiagnosticLogger.LogException("App.SettingsPage", ex); }
+            };
+
+            // v2.3.0-alpha.3 — the dedicated AI chat window (AI/ prefix). Singleton:
+            // a second AI/ just focuses the open window and forwards the new question.
+            _window.AiChatRequested += query =>
+            {
+                try { OpenAiChat(query); } catch (Exception ex) { DiagnosticLogger.LogException("App.OpenAiChat", ex); }
             };
 
             // v1.5 — a finished recording opens the visual builder with the captured steps
@@ -187,6 +195,35 @@ public partial class App : Application
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("App.OpenShortcutEditor", ex);
+        }
+    }
+
+    /// <summary>
+    /// v2.3.0-alpha.3 — open (or focus) the dedicated AI chat window. Singleton per
+    /// app lifetime: a second AI/ activation just focuses it and forwards the new
+    /// question. Reuses the launcher's AiService (one cache, one log stream).
+    /// </summary>
+    private void OpenAiChat(string? query)
+    {
+        try
+        {
+            if (_window is null) return;
+            if (_aiChatWindow is { IsLoaded: true })
+            {
+                _aiChatWindow.Activate();
+                if (!string.IsNullOrWhiteSpace(query)) _aiChatWindow.SendUserMessage(query!);
+                return;
+            }
+
+            _aiChatWindow = new AiChatWindow(_settings, _window.Ai);
+            _aiChatWindow.Closed += (_, _) => _aiChatWindow = null;
+            _aiChatWindow.Show();
+            _aiChatWindow.Activate();
+            if (!string.IsNullOrWhiteSpace(query)) _aiChatWindow.SendUserMessage(query!);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("App.OpenAiChat", ex);
         }
     }
 

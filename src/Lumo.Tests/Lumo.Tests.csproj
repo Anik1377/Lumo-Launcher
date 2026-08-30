@@ -32,6 +32,7 @@
     <Compile Include="../Lumo/Core/AiProviders.cs" Link="Core/AiProviders.cs" />
     <Compile Include="../Lumo/Core/Bookmarks.cs" Link="Core/Bookmarks.cs" />
     <Compile Include="../Lumo/Core/SnippetExpander.cs" Link="Core/SnippetExpander.cs" />
+    <Compile Include="../Lumo/Core/MarkdownLite.cs" Link="Core/MarkdownLite.cs" />
     <Compile Include="../Lumo/Services/UsageStore.cs" Link="Services/UsageStore.cs" />
     <Compile Include="../Lumo/Services/Favourites.cs" Link="Services/Favourites.cs" />
     <Compile Include="../Lumo/Services/DiagnosticLogger.cs" Link="Services/DiagnosticLogger.cs" />

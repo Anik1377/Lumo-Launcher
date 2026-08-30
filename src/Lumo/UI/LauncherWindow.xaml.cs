@@ -44,6 +44,9 @@ public partial class LauncherWindow : Window
     private readonly ClipboardHistory? _clips;       // v1.6
     private readonly Favourites _favs;               // v2.2 — pinned favourites
     private readonly AiService _ai = new();          // v2.3 — ? answers (cache + in-flight dedupe)
+
+    /// <summary>v2.3.0-alpha.3 — the shared AI service, reused by the chat window (one cache, one log).</summary>
+    public AiService Ai => _ai;
     private readonly BookmarkIndex _bookmarks = new(); // v2.3 — B/ Chrome & Edge bookmarks
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
@@ -88,6 +91,13 @@ public partial class LauncherWindow : Window
     /// straight on Settings → AI with the one-click Ollama installer.
     /// </summary>
     public event Action<int>? SettingsPageRequested;
+
+    /// <summary>
+    /// v2.3.0-alpha.3 — open (or focus) the dedicated AI chat window; the payload
+    /// is the question to auto-send ("AI/why is the sky blue") or null/empty to
+    /// just open the empty chat. Raised by the AI/ rows ("cmd:ai-chat").
+    /// </summary>
+    public event Action<string?>? AiChatRequested;
 
     /// <summary>v1.5 — recording finished; App opens the builder with the captured steps.</summary>
     public event Action<List<MacroStep>, string?>? RecordFinishRequested;
@@ -816,6 +826,15 @@ public partial class LauncherWindow : Window
             {
                 HideAnimated();
                 SettingsPageRequested?.Invoke(6);
+                return;
+            }
+
+            // v2.3.0-alpha.3 — the AI/ rows: open the dedicated chat window and let
+            // it auto-send the typed question (ForwardText), or just open empty.
+            if (item.RunArgument == "cmd:ai-chat")
+            {
+                HideAnimated();
+                AiChatRequested?.Invoke(item.ForwardText);
                 return;
             }
 

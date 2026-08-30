@@ -28,6 +28,19 @@ public static class AiProviders
     /// <summary>A fully-built HTTP request: URL, JSON body and the headers to set.</summary>
     public sealed record AiRequestSpec(string Url, string Json, IReadOnlyDictionary<string, string> Headers);
 
+    /// <summary>v2.3.0-alpha.3 — one conversation turn for the AI chat tab ("user" | "assistant").</summary>
+    public sealed record AiTurn(string Role, string Content);
+
+    /// <summary>
+    /// One decoded streaming chunk. Delta is the text to append; Done ends the
+    /// generation; Error carries a short human reason (Delta "" then). Tolerant
+    /// parsers below NEVER throw — a garbage line yields an empty chunk.
+    /// </summary>
+    public sealed record StreamChunk(string Delta, bool Done, string Error)
+    {
+        public static StreamChunk Empty { get; } = new("", false, "");
+    }
+
     /// <summary>
     /// Builds the provider request. Returns Ok=false with a short human reason when
     /// the configuration is incomplete (missing model, missing key for Anthropic, …).
@@ -85,6 +98,136 @@ public static class AiProviders
         {
             return (false, null, Redact(apiKey, ex.Message));
         }
+    }
+
+    /// <summary>
+    /// v2.3.0-alpha.3 — multi-turn variant for the AI chat tab. Same contract as
+    /// <see cref="Build"/>, but the body carries the whole conversation:
+    ///   · ollama    → /api/chat { model, stream:true, messages:[…] }  (token streaming)
+    ///   · anthropic → /v1/messages { model, max_tokens, messages:[…] } (buffered;
+    ///                 the window plays a typewriter reveal so it feels the same)
+    /// The key only ever travels in headers, as before.
+    /// </summary>
+    public static (bool Ok, AiRequestSpec? Spec, string Error) BuildChat(
+        string? style, string? endpoint, string? model, string? apiKey, IReadOnlyList<AiTurn> turns)
+    {
+        try
+        {
+            bool anthropic = IsAnthropic(style, endpoint);
+            string baseUri = NormalizeBase(endpoint, anthropic);
+
+            if (turns.Count == 0 || string.IsNullOrWhiteSpace(turns[^1].Content))
+                return (false, null, "empty prompt");
+            if (string.IsNullOrWhiteSpace(model))
+                return (false, null, anthropic ? "no model set — pick one in Settings" : "no model set — e.g. llama3.2");
+            if (anthropic && string.IsNullOrWhiteSpace(apiKey))
+                return (false, null, "no API key set — add your Anthropic key in Settings");
+
+            var messages = turns
+                .Where(t => !string.IsNullOrWhiteSpace(t.Content) &&
+                            (t.Role == "user" || t.Role == "assistant"))
+                .Select(t => new { role = t.Role, content = t.Content })
+                .ToArray();
+            if (messages.Length == 0)
+                return (false, null, "empty prompt");
+
+            string url, body;
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            if (anthropic)
+            {
+                url = baseUri + "/v1/messages";
+                body = JsonSerializer.Serialize(new { model = model!.Trim(), max_tokens = MaxAnswerTokens, messages });
+                headers["x-api-key"] = apiKey!.Trim();
+                headers["anthropic-version"] = AnthropicVersion;
+                headers["content-type"] = "application/json";
+            }
+            else
+            {
+                url = baseUri + "/api/chat";
+                body = JsonSerializer.Serialize(new { model = model!.Trim(), stream = true, messages });
+                headers["content-type"] = "application/json";
+                if (!string.IsNullOrWhiteSpace(apiKey))
+                    headers["authorization"] = "Bearer " + apiKey.Trim();   // optional gateways only
+            }
+
+            return (true, new AiRequestSpec(url, body, headers), "");
+        }
+        catch (Exception ex)
+        {
+            return (false, null, Redact(apiKey, ex.Message));
+        }
+    }
+
+    // ---------------------------------------------------------------- v2.3.0-alpha.3 — streaming parsers
+
+    /// <summary>
+    /// One NDJSON line of Ollama's streamed /api/chat (stream:true):
+    /// { "message": { "role":"assistant", "content":"tok" }, "done": false }
+    /// The final line carries "done":true (its content is usually "").
+    /// </summary>
+    public static StreamChunk ParseOllamaStreamLine(string? json)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(json)) return StreamChunk.Empty;
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return StreamChunk.Empty;
+
+            if (root.TryGetProperty("error", out var err) && err.ValueKind == JsonValueKind.String)
+                return new StreamChunk("", true, err.GetString() ?? "provider error");
+
+            bool done = root.TryGetProperty("done", out var d) && d.ValueKind == JsonValueKind.True;
+            string delta = "";
+            if (root.TryGetProperty("message", out var msg) &&
+                msg.ValueKind == JsonValueKind.Object &&
+                msg.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String)
+                delta = c.GetString() ?? "";
+            return new StreamChunk(delta, done, "");
+        }
+        catch { return StreamChunk.Empty; }
+    }
+
+    /// <summary>
+    /// One line of Anthropic's SSE stream ("data: {…}"). content_block_delta
+    /// carries text deltas, message_stop ends the turn, event errors surface
+    /// their message. Non-data lines (event:, comments, blank) → empty chunk.
+    /// </summary>
+    public static StreamChunk ParseAnthropicSseLine(string? line)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(line)) return StreamChunk.Empty;
+            string s = line.Trim();
+            if (!s.StartsWith("data:", StringComparison.OrdinalIgnoreCase)) return StreamChunk.Empty;
+            s = s[5..].Trim();
+            if (s.Length == 0 || s == "[DONE]") return StreamChunk.Empty;
+
+            using var doc = JsonDocument.Parse(s);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return StreamChunk.Empty;
+
+            string type = root.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String ? t.GetString() ?? "" : "";
+
+            if (type == "error")
+            {
+                string msg = "provider error";
+                if (root.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.Object &&
+                    e.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String)
+                    msg = m.GetString() ?? msg;
+                return new StreamChunk("", true, msg);
+            }
+            if (type == "message_stop") return new StreamChunk("", true, "");
+            if (type == "content_block_delta" &&
+                root.TryGetProperty("delta", out var delta) &&
+                delta.ValueKind == JsonValueKind.Object &&
+                delta.TryGetProperty("text", out var tx) && tx.ValueKind == JsonValueKind.String)
+                return new StreamChunk(tx.GetString() ?? "", false, "");
+
+            return StreamChunk.Empty;
+        }
+        catch { return StreamChunk.Empty; }
     }
 
     /// <summary>

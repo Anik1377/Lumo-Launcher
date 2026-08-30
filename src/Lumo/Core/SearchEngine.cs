@@ -76,6 +76,14 @@ public sealed class SearchEngine
         var query = (rawQuery ?? string.Empty).Trim();
         if (query.Length == 0) return DefaultRows();
 
+        // v2.3.0-alpha.3 — AI/ : the dedicated AI chat tab. Checked BEFORE A/ so the
+        // longer prefix wins — "ai/…" must never fall through to app search. "AI"
+        // alone (Enter) opens the chat too, exactly like the user brief asks.
+        if (query.StartsWith("AI/", StringComparison.OrdinalIgnoreCase))
+            return AiChatRows(query[3..].Trim());
+        if (query.Equals("AI", StringComparison.OrdinalIgnoreCase))
+            return AiChatRows("");
+
         if (query.StartsWith("A/", StringComparison.OrdinalIgnoreCase))
             return AppRows(query[2..].Trim());
 
@@ -175,6 +183,7 @@ public sealed class SearchEngine
             new() { Title = "H/  Clipboard history", Subtitle = "everything you copied — pick one to copy again (Raycast style)", Glyph = "⧉", Kind = ResultKind.Hint, RunArgument = "H/" },
             new() { Title = "S/  Snap window", Subtitle = "left/right half · maximize · center · restore — for the last window you used", Glyph = "▣", Kind = ResultKind.Hint, RunArgument = "S/" },
             new() { Title = "B/  Bookmarks", Subtitle = "search your Chrome & Edge bookmarks — e.g.  B/github", Glyph = "B", Kind = ResultKind.Hint, RunArgument = "B/" },
+            new() { Title = "AI/  AI chat", Subtitle = "Enter opens the chat window — or type a question:  AI/explain quantum computing", Glyph = "✦", Kind = ResultKind.Hint, RunArgument = "AI/", ForwardText = "" },
             new() { Title = "?  Ask AI", Subtitle = "type ? then a question — e.g.  ?regex for an ISO date  (enable in Settings)", Glyph = "?", Kind = ResultKind.Hint, RunArgument = "?" },
             new() { Title = "!  Snippets", Subtitle = "type ! then a name — your paste-anywhere texts, e.g.  !email", Glyph = "S", Kind = ResultKind.Hint, RunArgument = "!" },
             new() { Title = "/sc  Shortcuts & macros", Subtitle = "your saved one-tap launches — e.g.  /sc work", Glyph = "⚡", Kind = ResultKind.Hint, RunArgument = "/sc" },
@@ -635,6 +644,35 @@ public sealed class SearchEngine
             Subtitle = "asking… the answer lands on this view — or press Enter to ask now",
             Glyph = "?", Kind = ResultKind.Tool, RunArgument = "cmd:ai-ask",
         });
+        return rows;
+    }
+
+    /// <summary>
+    /// v2.3.0-alpha.3 — AI/ rows: the entry point of the dedicated chat tab.
+    /// One actionable row; Enter opens (or focuses) the chat window and — when a
+    /// question was typed — the window auto-sends it. Works even while AI is off;
+    /// the chat window itself explains how to enable it (banner + error surface).
+    /// </summary>
+    private List<ResultItem> AiChatRows(string q)
+    {
+        var rows = new List<ResultItem>
+        {
+            new() { Title = "AI CHAT", Subtitle = $"{_settings.AiModel} · full conversation with streaming answers", Kind = ResultKind.Header },
+        };
+
+        rows.Add(q.Length == 0
+            ? new ResultItem
+            {
+                Title = "Open the AI chat",
+                Subtitle = "Enter opens a full chat window — history, markdown, code blocks, stop button",
+                Glyph = "✦", Kind = ResultKind.Tool, RunArgument = "cmd:ai-chat",
+            }
+            : new ResultItem
+            {
+                Title = $"Ask in chat: {Clip(q, 74)}",
+                Subtitle = "Enter opens the chat window and sends this question",
+                Glyph = "✦", Kind = ResultKind.Tool, RunArgument = "cmd:ai-chat", ForwardText = q,
+            });
         return rows;
     }
 

@@ -49,6 +49,13 @@ public sealed class ResultItem
 
     /// <summary>True when this row's RunArgument is currently pinned (star stays visible, filled).</summary>
     public bool Pinned { get; set; }
+
+    /// <summary>
+    /// v2.3.0-alpha.3 — optional payload forwarded to the action target (the AI chat
+    /// row carries the typed question here so the chat window can auto-send it).
+    /// Pure string, no WPF type — the test target compiles this file as-is.
+    /// </summary>
+    public string? ForwardText { get; init; }
 }
 
 public enum ResultKind
