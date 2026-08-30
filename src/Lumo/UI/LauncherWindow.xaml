@@ -24,8 +24,9 @@
         · The window keeps WindowChrome GlassFrameThickness="-1" so DWM still composites
           the drop shadow, and DWMWCP_ROUND supplies the native Win11 rounded corners
           (Windows 10 falls back to square corners set in code).
-        · The only glow is the v2.0 rim comet: a minimal accent gradient that orbits
-          INSIDE the 1 px window border (Root.BorderBrush) — nothing bleeds outside.
+        · The only glow is the v2.0.1 rim comet (z.ai-style): two soft light blobs orbit
+          the TRUE window perimeter on a path animation, clipped to the window — the
+          light only ever exists INSIDE the rim, never bleeding outside.
     -->
     <WindowChrome.WindowChrome>
         <WindowChrome GlassFrameThickness="-1" CaptionHeight="0" CornerRadius="0"
@@ -53,8 +54,9 @@
         </Style>
     </Window.Resources>
 
-    <!-- main card (DWM draws the real drop shadow + rounded corners) -->
-    <Border x:Name="Root" CornerRadius="8" BorderThickness="1" Background="#F0202020"
+    <!-- main card (DWM draws the real drop shadow + rounded corners);
+         the hairline ring lives on RimLine, Root itself has no border -->
+    <Border x:Name="Root" CornerRadius="8" BorderThickness="0" Background="#FF202020"
             TextElement.FontFamily="Segoe UI Variable Display, Segoe UI, Arial"
             RenderTransformOrigin="0.5,0.5">
         <Border.RenderTransform>
@@ -65,10 +67,37 @@
         </Border.RenderTransform>
 
         <Grid>
-            <!-- v2.0 — whisper of accent light inside the top rim (the glow spilling in);
-                 static, ultra-subtle, never bleeds outside the window -->
-            <Border x:Name="GlowHalo" CornerRadius="8" IsHitTestVisible="False" Opacity="0"
-                    VerticalAlignment="Top" Height="120"/>
+            <!-- ============================================================
+                 v2.0.1 rim comet (z.ai chat-box style), layers bottom → top:
+                   RimLine  — static hairline ring; always present for definition
+                   GlowClip — the orbiting light; CLIPPED to the rounded window
+                              rect in code so the blobs can only glow INSIDE
+                   GlowCover— opaque surface patch inset by the rim thickness;
+                              hides everything of the blobs but the outer band
+                 The content grid below paints over the rest. No outer bleed,
+                 no halo, no spinning gradient — just light chasing the rim.
+            ============================================================== -->
+            <Border x:Name="RimLine" CornerRadius="8" BorderThickness="1" IsHitTestVisible="False"/>
+            <Border x:Name="GlowClip" CornerRadius="8" IsHitTestVisible="False" Opacity="0">
+                <Grid>
+                    <!-- head: bright core; negative margins put each blob's CENTRE at (0,0),
+                         so the path animation just targets the perimeter coordinates -->
+                    <Ellipse x:Name="GlowHead" Width="300" Height="300"
+                             HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-150,-150,0,0">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="GlowHeadPos" X="0" Y="0"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <!-- tail: larger + fainter, lagging behind the head (BeginTime set in code) -->
+                    <Ellipse x:Name="GlowTail" Width="460" Height="460"
+                             HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-230,-230,0,0">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="GlowTailPos" X="0" Y="0"/>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </Grid>
+            </Border>
+            <Border x:Name="GlowCover" CornerRadius="5" Margin="3" IsHitTestVisible="False"/>
 
             <Grid>
                 <Grid.RowDefinitions>

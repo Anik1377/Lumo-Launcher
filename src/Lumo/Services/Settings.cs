@@ -23,7 +23,7 @@ public sealed class Settings
     public string AccentColor { get; set; } = "#7C6CFF";   // hex, used by text/caret/highlights
     public bool BorderEffect { get; set; } = true;         // animated glow border around the launcher
     public string BorderStyle { get; set; } = "Aurora";    // Aurora | Sunset | Ocean | Ember | Mint | Solid
-    public double BorderSpeedSec { get; set; } = 3.5;      // seconds per full rotation (2 = fast, 6 = slow)
+    public double BorderSpeedSec { get; set; } = 9.0;      // seconds per perimeter lap (6 = fast, 14 = slow)
     public bool StartWithWindows { get; set; } = false;    // HKCU Run key (applied on Save)
     public int MaxIndexedFiles { get; set; } = 150_000;    // file-index cap (applied on next rebuild)
 

@@ -21,8 +21,9 @@ namespace Lumo.UI;
 /// The launcher window — v1.3 "Apple-clean" refresh.
 ///
 /// Design language: iOS system greys, accent-tinted selection, soft layered shadow,
-/// staggered result-row entrances, spring-ish scale-in, and the rotating glow border
-/// that dims + pauses whenever the window is hidden or inactive (zero idle CPU).
+/// staggered result-row entrances, spring-ish scale-in, and the v2.0.1 rim comet
+/// (z.ai-style light chasing the border from inside) that dims + pauses whenever the
+/// window is hidden or inactive (zero idle CPU).
 ///
 /// FIX (v1.1, kept) — the search pipeline is fully synchronous, in-memory and bounded;
 /// results arrive via an 80 ms debounce; every event handler is wrapped in try/catch
@@ -44,17 +45,16 @@ public partial class LauncherWindow : Window
     private bool _allowClose;
     private IntPtr _hwnd;
     private Brush _themeBorderBrush = Brushes.DimGray;
-    private RotateTransform? _rotBorder;
-    private RotateTransform? _rotHalo;
-    private Storyboard? _borderStoryboard;
+    private Storyboard? _glowStoryboard;     // v2.0.1 — perimeter comet path storyboard
+    private PathGeometry? _glowPath;         // unfrozen — figures swap live as the window resizes
     private bool _glowRunning;               // animation clock currently active
-    private bool _glowDimmed;                // window inactive → halo dimmed
+    private bool _glowDimmed;                // window inactive → comet dimmed
     private int _animGen;                    // invalidates stale hide-completion callbacks
     private bool _staggerNext = true;        // v1.4 — stagger only on show/empty→results, not every keystroke
     private string _prevQuery = "";
 
-    private const double GlowActiveOpacity = 0.42;   // v2.0 — quieter: minimal rim glow
-    private const double GlowDimOpacity = 0.12;
+    private const double GlowActiveOpacity = 0.9;    // v2.0.1 — comet shows only in a thin rim band
+    private const double GlowDimOpacity = 0.35;
 
     /// <summary>Human-readable description of the hotkey that actually registered.</summary>
     public string? ActiveHotkeyDescription => _hotkey?.ActiveDescription;
@@ -91,6 +91,10 @@ public partial class LauncherWindow : Window
 
         _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _statusTimer.Tick += (_, _) => { try { UpdateStatusText(); } catch { } };
+
+        // v2.0.1 — track size: rebuild the comet clip + perimeter path as the window
+        // height follows the result list (SizeToContent).
+        Root.SizeChanged += OnRootSizeChanged;
 
         ApplyTheme();
         ApplyBorderEffect();
@@ -217,7 +221,7 @@ public partial class LauncherWindow : Window
             Root.Opacity = 0;
             RootScale.ScaleX = RootScale.ScaleY = 0.94;
             RootShift.Y = 14;
-            GlowHalo.Opacity = 0;
+            GlowClip.Opacity = 0;
             _staggerNext = true;   // v1.4 — cascade the fresh result list on (re)open
 
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
@@ -231,7 +235,7 @@ public partial class LauncherWindow : Window
             RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
             RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
             RootShift.BeginAnimation(TranslateTransform.YProperty, slide);
-            GlowHalo.BeginAnimation(UIElement.OpacityProperty, glow);
+            GlowClip.BeginAnimation(UIElement.OpacityProperty, glow);
 
             ResumeGlow();
         }
@@ -246,7 +250,7 @@ public partial class LauncherWindow : Window
         Root.Opacity = 1;
         RootScale.ScaleX = RootScale.ScaleY = 1;
         RootShift.Y = 0;
-        GlowHalo.Opacity = _glowDimmed ? GlowDimOpacity : CurrentGlowOpacity();
+        GlowClip.Opacity = _glowDimmed ? GlowDimOpacity : CurrentGlowOpacity();
     }
 
     /// <summary>Quick fade-out, then really hide. Safe against rapid toggle races.</summary>
@@ -320,14 +324,14 @@ public partial class LauncherWindow : Window
         {
             if (_settings.HideOnFocusLoss) { Hide(); return; }
 
-            // stays visible → dim the glow + pause the border animation (no idle CPU)
+            // stays visible → dim the comet + pause the animation (no idle CPU)
             _glowDimmed = true;
             PauseGlow();
             if (_settings.AnimationsEnabled && IsVisible)
-                GlowHalo.BeginAnimation(OpacityProperty,
-                    new DoubleAnimation(GlowHalo.Opacity, GlowDimOpacity, TimeSpan.FromMilliseconds(300)));
+                GlowClip.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(GlowClip.Opacity, GlowDimOpacity, TimeSpan.FromMilliseconds(300)));
             else
-                GlowHalo.Opacity = GlowDimOpacity;
+                GlowClip.Opacity = GlowDimOpacity;
         }
         catch { }
     }
@@ -339,13 +343,13 @@ public partial class LauncherWindow : Window
             _glowDimmed = false;
             if (_settings.AnimationsEnabled && IsVisible)
             {
-                GlowHalo.BeginAnimation(OpacityProperty,
-                    new DoubleAnimation(GlowHalo.Opacity, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(300)));
+                GlowClip.BeginAnimation(OpacityProperty,
+                    new DoubleAnimation(GlowClip.Opacity, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(300)));
                 ResumeGlow();
             }
             else
             {
-                GlowHalo.Opacity = CurrentGlowOpacity();
+                GlowClip.Opacity = CurrentGlowOpacity();
                 ResumeGlow();
             }
         }
@@ -741,8 +745,19 @@ public partial class LauncherWindow : Window
             float r = GlassBackdrop.IsWin11 ? 8f : 0f;
             Root.Background = new SolidColorBrush(p.Panel);
             Root.CornerRadius = new CornerRadius(r);
-            GlowHalo.CornerRadius = new CornerRadius(r);
             _themeBorderBrush = new SolidColorBrush(p.Border);
+
+            // v2.0.1 — rim comet geometry follows the theme radius: hairline ring for
+            // definition, clipped orbit host, and the cover patch inset by the rim
+            // thickness (painted with the SAME opaque panel → the comet shows only
+            // in the outer 3 px band).
+            RimLine.CornerRadius = new CornerRadius(r);
+            RimLine.BorderBrush = _themeBorderBrush;
+            GlowClip.CornerRadius = new CornerRadius(r);
+            GlowCover.CornerRadius = new CornerRadius(Math.Max(0, r - 3));
+            GlowCover.Background = Root.Background;
+            if (ActualWidth >= 40 && ActualHeight >= 40)
+                UpdateGlowGeometry(new Size(ActualWidth, ActualHeight));
             Input.Foreground = new SolidColorBrush(p.Title);
             Input.CaretBrush = new SolidColorBrush(p.Accent);
             Input.SelectionBrush = new SolidColorBrush(Appearance.Tint(p.Accent, 0x55));
@@ -778,49 +793,45 @@ public partial class LauncherWindow : Window
     private double CurrentGlowOpacity() => _glowDimmed ? GlowDimOpacity : GlowActiveOpacity;
 
     /// <summary>
-    /// The glow effect, v1.7: the animated gradient border stroke stays, but the halo is
-    /// now an ambient accent wash INSIDE the top of the glass card (a soft light source
-    /// fading down into the panel) instead of a blurred copy bleeding out behind the window.
-    /// v1.3's controllable storyboard is kept so it can pause whenever the window is
-    /// hidden or inactive (zero idle CPU).
+    /// The glow effect, v2.0.1 — the z.ai chat-box comet. Two soft light blobs orbit
+    /// the true window perimeter (DoubleAnimationUsingPath along a rounded-rect path);
+    /// the orbit host is clipped to the window, so the light only ever exists INSIDE
+    /// the rim — no outer bleed, no halo, no spinning gradient. The storyboard stays
+    /// controllable so it pauses whenever the window is hidden or inactive (zero idle
+    /// CPU). "Solid" style = static accent ring, no motion.
     /// </summary>
     public void ApplyBorderEffect()
     {
         try
         {
-            _borderStoryboard?.Remove(this);
-            _borderStoryboard = null;
-            _glowRunning = false;
+            StopGlow();
+            RimLine.BorderBrush = _themeBorderBrush;
 
             if (_settings.BorderEffect)
             {
-                var borderBrush = Appearance.BuildBorderBrush(_settings.BorderStyle, _settings.AccentColor, out var rotBorder);
+                if (Appearance.IsAnimatedStyle(_settings.BorderStyle))
+                {
+                    Appearance.BuildCometBrushes(_settings.BorderStyle, _settings.AccentColor, out var head, out var tail);
+                    GlowHead.Fill = head;
+                    GlowTail.Fill = tail;
+                    GlowClip.Visibility = Visibility.Visible;
+                    GlowClip.Opacity = CurrentGlowOpacity();
 
-                Root.BorderBrush = borderBrush;
-                GlowHalo.Background = Appearance.BuildWashBrush(_settings.BorderStyle, _settings.AccentColor);
-                GlowHalo.Visibility = Visibility.Visible;
-
-                double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 3.5 : _settings.BorderSpeedSec;
-                sec = Math.Clamp(sec, 1.0, 12.0);
-
-                var sb = new Storyboard();
-                var anim = new DoubleAnimation(0, 360, TimeSpan.FromSeconds(sec)) { RepeatBehavior = RepeatBehavior.Forever };
-                Storyboard.SetTarget(anim, rotBorder);
-                Storyboard.SetTargetProperty(anim, new PropertyPath(RotateTransform.AngleProperty));
-                sb.Children.Add(anim);
-
-                _rotBorder = rotBorder;
-                _rotHalo = null;
-                _borderStoryboard = sb;
-                sb.Begin(this, true); // isControllable → pause/resume supported
-                _glowRunning = true;
-                GlowHalo.Opacity = CurrentGlowOpacity();
+                    _glowPath ??= new PathGeometry();
+                    if (ActualWidth >= 40 && ActualHeight >= 40)
+                        UpdateGlowGeometry(new Size(ActualWidth, ActualHeight));
+                    StartGlowStoryboard();
+                }
+                else
+                {
+                    // "Solid" — static accent-coloured ring, zero motion
+                    GlowClip.Visibility = Visibility.Collapsed;
+                    RimLine.BorderBrush = Appearance.BuildStaticRimBrush(_settings.BorderStyle, _settings.AccentColor);
+                }
             }
             else
             {
-                StopBorderAnimation();
-                Root.BorderBrush = _themeBorderBrush;
-                GlowHalo.Visibility = Visibility.Collapsed;
+                GlowClip.Visibility = Visibility.Collapsed;
             }
         }
         catch (Exception ex)
@@ -829,18 +840,100 @@ public partial class LauncherWindow : Window
         }
     }
 
-    private void StopBorderAnimation()
+    private void StartGlowStoryboard()
     {
         try
         {
-            _borderStoryboard?.Remove(this);
-            _rotBorder?.BeginAnimation(RotateTransform.AngleProperty, null);
-            _rotHalo?.BeginAnimation(RotateTransform.AngleProperty, null);
+            _glowStoryboard?.Remove(this);
+            _glowStoryboard = null;
+            if (_glowPath is null) return;
+
+            // 3.5 s (the v2.0.0 default) was tuned for brush rotation; a blob travelling
+            // the real perimeter reads best at a calm pace. Old saved values clamp in.
+            double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 9.0 : Math.Clamp(_settings.BorderSpeedSec, 4.0, 30.0);
+            var dur = TimeSpan.FromSeconds(sec);
+
+            var sb = new Storyboard();
+            AddPathAnimations(sb, "GlowHeadPos", dur, TimeSpan.Zero);
+            AddPathAnimations(sb, "GlowTailPos", dur, TimeSpan.FromSeconds(-sec * 0.07));   // tail trails the head
+
+            _glowStoryboard = sb;
+            sb.Begin(this, isControllable: true);
+            _glowRunning = true;
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.StartGlow", ex);
+        }
+    }
+
+    private void AddPathAnimations(Storyboard sb, string targetName, Duration dur, TimeSpan begin)
+    {
+        foreach (var src in new[] { PathAnimationSource.X, PathAnimationSource.Y })
+        {
+            var anim = new DoubleAnimationUsingPath
+            {
+                PathGeometry = _glowPath!,
+                Source = src,
+                Duration = dur,
+                RepeatBehavior = RepeatBehavior.Forever,
+                BeginTime = begin,
+            };
+            Storyboard.SetTargetName(anim, targetName);
+            Storyboard.SetTargetProperty(anim, new PropertyPath(
+                src == PathAnimationSource.X ? TranslateTransform.XProperty : TranslateTransform.YProperty));
+            sb.Children.Add(anim);
+        }
+    }
+
+    private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        try
+        {
+            if (e.NewSize.Width >= 40 && e.NewSize.Height >= 40)
+                UpdateGlowGeometry(e.NewSize);
         }
         catch { }
-        _rotBorder = null;
-        _rotHalo = null;
-        _borderStoryboard = null;
+    }
+
+    /// <summary>
+    /// Rebuilds the rounded-rect clip and the perimeter path the comet travels. The
+    /// path geometry is mutated IN PLACE (never frozen) so the running storyboard
+    /// picks up the new outline without a restart — the comet never snaps back to its
+    /// start when the result list changes the window height.
+    /// </summary>
+    private void UpdateGlowGeometry(Size size)
+    {
+        double r = GlassBackdrop.IsWin11 ? 8f : 0f;
+        GlowClip.Clip = new RectangleGeometry(new Rect(0, 0, size.Width, size.Height), r, r);
+
+        if (_glowPath is null) return;
+        _glowPath.Figures.Clear();
+        _glowPath.Figures.Add(BuildPerimeterFigure(size.Width, size.Height, 1.5, Math.Max(2, r - 1.5)));
+    }
+
+    /// <summary>Closed rounded-rectangle outline (clockwise from the top-left corner).</summary>
+    private static PathFigure BuildPerimeterFigure(double w, double h, double inset, double radius)
+    {
+        double x0 = inset, y0 = inset, x1 = w - inset, y1 = h - inset;
+        double r = Math.Max(2, Math.Min(radius, Math.Min(x1 - x0, y1 - y0) / 2));
+
+        var fig = new PathFigure { StartPoint = new Point(x0 + r, y0), IsClosed = true };
+        fig.Segments.Add(new LineSegment(new Point(x1 - r, y0), true));
+        fig.Segments.Add(new ArcSegment(new Point(x1, y0 + r), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+        fig.Segments.Add(new LineSegment(new Point(x1, y1 - r), true));
+        fig.Segments.Add(new ArcSegment(new Point(x1 - r, y1), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+        fig.Segments.Add(new LineSegment(new Point(x0 + r, y1), true));
+        fig.Segments.Add(new ArcSegment(new Point(x0, y1 - r), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+        fig.Segments.Add(new LineSegment(new Point(x0, y0 + r), true));
+        fig.Segments.Add(new ArcSegment(new Point(x0 + r, y0), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
+        return fig;
+    }
+
+    private void StopGlow()
+    {
+        try { _glowStoryboard?.Remove(this); } catch { }
+        _glowStoryboard = null;
         _glowRunning = false;
     }
 
@@ -848,7 +941,7 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            if (_borderStoryboard is { } sb && _glowRunning) { sb.Pause(this); _glowRunning = false; }
+            if (_glowStoryboard is { } sb && _glowRunning) { sb.Pause(this); _glowRunning = false; }
         }
         catch { }
     }
@@ -857,7 +950,7 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            if (_borderStoryboard is { } sb && !_glowRunning) { sb.Resume(this); _glowRunning = true; }
+            if (_glowStoryboard is { } sb && !_glowRunning) { sb.Resume(this); _glowRunning = true; }
         }
         catch { }
     }

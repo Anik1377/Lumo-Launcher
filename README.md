@@ -34,7 +34,7 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
 | 🪟 | **Windows 11 design** | Solid Fluent surfaces following the Windows 11 design language: `#202020`/`#F3F3F3` panels, hairline strokes, 4 px control geometry, native DWM rounded corners, Segoe UI — a full-window Settings app in the same style |
 | 🖆️ | **Clean vector icons** | A coherent Fluent-style outline icon set (24×24 stroke paths) for every row, hint and button — razor sharp at any DPI, tinted by your accent |
-| 🌈 | **Rim glow effect** | A minimal accent light that orbits **inside** the window border — never outside — 5 comet presets, solid accent, 3 speeds, pauses when hidden |
+| 🌈 | **Rim glow effect** | A soft comet of light that orbits the **true window perimeter, inside the rim** — never outside — 5 presets, solid accent, 3 speeds, pauses when hidden |
 | 📋 | **Clipboard history** | `H/` — your last 50 copies with timestamps, searchable, in memory only |
 | ▣ | **Window management** | `S/` — snap the last window left/right, maximize, center or restore; multi-monitor aware |
 | 📝 | **Snippets** | Save paste-anywhere texts as shortcuts and trigger with `!name` — multi-line supported |
@@ -45,6 +45,29 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~350 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+
+## 🆕 What's new in v2.0.0-alpha.2 — the rim comet, rebuilt
+
+The alpha.1 glow used a **spinning gradient brush on the 1 px window border**. On a
+720 px-wide rectangle that never looks right: the bright head slides diagonally
+across the edges at uneven speed, stalls in the corners, and a 1 px stroke makes
+it flicker. alpha.2 replaces the mechanism with the way modern AI chat boxes
+actually do it:
+
+1. **🌠 True perimeter comet.** Two soft radial light blobs — a bright head and a
+   larger, fainter tail — now travel the **real window outline** (a rounded-rect
+   path animation), so the light rounds every corner at constant speed instead of
+   sweeping diagonally across the frame.
+2. **🔒 Inside only — guaranteed.** The orbit layer is geometrically clipped to the
+   window, and an opaque surface patch covers everything but the outer 3 px band.
+   The glow physically cannot bleed outside the window or wash over content.
+3. **🪶 Calmer & minimal.** The loop slowed from a frantic 3.5 s to a silky 9 s
+   (Fast 6 / Normal 9 / Slow 14). No more static top wash — the comet is the only
+   glow, exactly like the z.ai chat box.
+4. **📐 Resize-proof.** The perimeter path rebuilds in place as the result list
+   changes the window height — the comet never snaps back to its start.
+5. **⚙️ Settings preview fixed** to show the style's actual palette (the old
+   animated-border preview no longer matches the real effect).
 
 ## 🆕 What's new in v2.0.0-alpha.1 — the Windows 11 overhaul
 

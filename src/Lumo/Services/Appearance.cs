@@ -13,10 +13,12 @@ namespace Lumo.Services;
 /// • v2.0 — Windows 11 "Fluent 2" design tokens: solid surfaces (#202020 / #F3F3F3),
 ///   4 px-class control geometry, neutral hover fills and accent-tinted selection —
 ///   the glassmorphism era is over, this is a native-feeling Windows 11 app now.
-/// • Rim glow — a single comet-like accent gradient that orbits INSIDE the window
-///   border (no outer bleed, no halo): the minimal animated-rim look of modern AI
-///   chat boxes. Any stop set loops seamlessly because a 360° rotation of the brush
-///   transform lands exactly back on its start.
+/// • Rim glow (v2.0.1, rewritten) — the z.ai chat-box comet: two soft radial light
+///   blobs (bright head + fainter tail) that orbit the TRUE window perimeter via a
+///   path animation, clipped to the window so the light only ever exists INSIDE the
+///   rim — nothing bleeds outside, no spinning diagonal gradient. A rotating brush
+///   on a rectangle never follows the border (the head slides across edges at uneven
+///   speed and stalls at corners); a blob that travels the outline does.
 /// • v1.3 — "auto" theme reads the Windows personalization setting.
 /// </summary>
 public static class Appearance
@@ -36,9 +38,9 @@ public static class Appearance
         "#038387", // cyan-deep
     };
 
-    // v2.0 "comet" rim presets — one bright head + a fading tail, the rest of the rim
-    // stays quiet so the effect reads as light chasing the border (z.ai-style), not a
-    // rainbow fence. Loop is seamless: a full 360° brush rotation returns to itself.
+    // v2.0 "comet" rim presets — stops[0] is the bright core colour, stops[1] the
+    // body colour of the orbiting light (z.ai-style head + tail); the rest of the rim
+    // stays quiet so the effect reads as light chasing the border, not a rainbow fence.
     private static readonly Dictionary<string, string[]> BorderPresets = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Aurora"] = new[] { "#FFBFD0FF", "#FF6366F1", "#0022D3EE", "#00000000" },
@@ -60,53 +62,93 @@ public static class Appearance
         return Color.FromRgb(0x00, 0x78, 0xD4);   // Windows 11 system blue
     }
 
-    /// <summary>
-    /// Builds the border brush for the glow effect. Returns the brush and (for animated
-    /// styles) the rotation transform the caller must animate 0→360°.
-    /// </summary>
-    public static Brush BuildBorderBrush(string? styleName, string? accentHex, out RotateTransform? rotation)
-    {
-        rotation = null;
+    /// <summary>True when the style is an animated comet preset (everything but "Solid").</summary>
+    public static bool IsAnimatedStyle(string? styleName) => BorderPresets.ContainsKey(styleName ?? "");
 
+    /// <summary>
+    /// v2.0.1 — the two radial light blobs of the rim comet. The head is a small bright
+    /// core that fades through the body colour to transparent; the tail is a larger,
+    /// much fainter blob the caller orbits slightly BEHIND the head, producing the
+    /// trailing comet streak. Both are frozen — the caller only moves their positions.
+    /// </summary>
+    public static void BuildCometBrushes(string? styleName, string? accentHex, out Brush head, out Brush tail)
+    {
+        Color core, body;
         if (BorderPresets.TryGetValue(styleName ?? "", out var stops))
         {
-            var rot = new RotateTransform(0, 0.5, 0.5);
-            rotation = rot;
-            var brush = new LinearGradientBrush
-            {
-                StartPoint = new Point(0, 0),
-                EndPoint = new Point(1, 1),
-                RelativeTransform = rot,
-                MappingMode = BrushMappingMode.RelativeToBoundingBox,
-            };
-            foreach (var hex in stops)
-                brush.GradientStops.Add(new GradientStop(ParseColor(hex), 0.0));
-            // even out the offsets
-            for (int i = 0; i < brush.GradientStops.Count; i++)
-                brush.GradientStops[i].Offset = i / (double)(brush.GradientStops.Count - 1);
-            // NOTE: intentionally NOT frozen — the caller animates the RelativeTransform.
-            return brush;
+            core = ParseColor(stops[0]);
+            body = ParseColor(stops[1]);
+        }
+        else
+        {
+            body = ParseAccent(accentHex);
+            core = Lighten(body, 0.55);
         }
 
-        // "Solid" (or anything unknown) → static accent-coloured border, no animation.
+        var hb = new RadialGradientBrush();
+        hb.GradientStops.Add(new GradientStop(core, 0.0));
+        hb.GradientStops.Add(new GradientStop(Color.FromArgb(0xE0, body.R, body.G, body.B), 0.30));
+        hb.GradientStops.Add(new GradientStop(Color.FromArgb(0x42, body.R, body.G, body.B), 0.58));
+        hb.GradientStops.Add(new GradientStop(Colors.Transparent, 1.0));
+        hb.Freeze();
+        head = hb;
+
+        var tb = new RadialGradientBrush();
+        tb.GradientStops.Add(new GradientStop(Color.FromArgb(0x55, body.R, body.G, body.B), 0.0));
+        tb.GradientStops.Add(new GradientStop(Color.FromArgb(0x1E, body.R, body.G, body.B), 0.5));
+        tb.GradientStops.Add(new GradientStop(Colors.Transparent, 1.0));
+        tb.Freeze();
+        tail = tb;
+    }
+
+    /// <summary>"Solid" style — a static accent-coloured ring, no motion at all.</summary>
+    public static Brush BuildStaticRimBrush(string? styleName, string? accentHex)
+    {
         var solid = new SolidColorBrush(ParseAccent(accentHex));
         solid.Freeze();
         return solid;
     }
 
-    /// <summary>A brighter, semi-transparent accent used for the halo glow behind the window.</summary>
-    public static Brush BuildHaloBrush(string? styleName, string? accentHex, out RotateTransform? rotation)
+    /// <summary>
+    /// Static preview brush for the settings Appearance card — the comet palette laid
+    /// out as a diagonal gradient (bright core → body → deep body), no animation, so
+    /// the style's colours are readable at a glance.
+    /// </summary>
+    public static Brush BuildPreviewBrush(string? styleName, string? accentHex)
     {
-        var brush = BuildBorderBrush(styleName, accentHex, out rotation);
-        if (brush is SolidColorBrush solid)
+        Color core, body;
+        if (BorderPresets.TryGetValue(styleName ?? "", out var stops))
         {
-            var c = solid.Color;
-            var soft = new SolidColorBrush(Color.FromArgb(0x88, c.R, c.G, c.B));
-            soft.Freeze();
-            return soft;
+            core = ParseColor(stops[0]);
+            body = ParseColor(stops[1]);
         }
-        return brush; // gradient halo — the launcher lowers overall opacity for softness
+        else
+        {
+            body = ParseAccent(accentHex);
+            core = Lighten(body, 0.55);
+        }
+
+        var b = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 1),
+        };
+        b.GradientStops.Add(new GradientStop(core, 0.0));
+        b.GradientStops.Add(new GradientStop(body, 0.45));
+        b.GradientStops.Add(new GradientStop(Darken(body, 0.45), 1.0));
+        b.Freeze();
+        return b;
     }
+
+    private static Color Lighten(Color c, double f) => Color.FromRgb(
+        (byte)(c.R + (255 - c.R) * f),
+        (byte)(c.G + (255 - c.G) * f),
+        (byte)(c.B + (255 - c.B) * f));
+
+    private static Color Darken(Color c, double f) => Color.FromRgb(
+        (byte)(c.R * (1 - f)),
+        (byte)(c.G * (1 - f)),
+        (byte)(c.B * (1 - f)));
 
     private static Color ParseColor(string hex)
     {
@@ -160,34 +202,6 @@ public static class Appearance
 
     /// <summary>accent with the given alpha — the base for tinted highlights.</summary>
     public static Color Tint(Color accent, byte alpha) => Color.FromArgb(alpha, accent.R, accent.G, accent.B);
-
-    // ---------------------------------------------------------------- rim wash (v2.0)
-
-    /// <summary>
-    /// v2.0 — a whisper of accent light INSIDE the top of the card, reading as the rim
-    /// glow spilling a few pixels over the edge (never bleeding outside the window).
-    /// Kept very quiet so the comet border stays the star.
-    /// </summary>
-    public static Brush BuildWashBrush(string? styleName, string? accentHex)
-    {
-        Color tint;
-        if (BorderPresets.TryGetValue(styleName ?? "", out var stops))
-            tint = ParseColor(stops[0]);
-        else
-            tint = ParseAccent(accentHex);
-
-        var brush = new LinearGradientBrush
-        {
-            StartPoint = new Point(0, 0),
-            EndPoint = new Point(0, 1),
-            MappingMode = BrushMappingMode.RelativeToBoundingBox,
-        };
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x2E, tint.R, tint.G, tint.B), 0.0));
-        brush.GradientStops.Add(new GradientStop(Color.FromArgb(0x0E, tint.R, tint.G, tint.B), 0.45));
-        brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1.0));
-        brush.Freeze();
-        return brush;
-    }
 
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
 

@@ -42,7 +42,8 @@ public partial class SettingsWindow : Window
     private bool _suppress;                   // guard while programmatically wiring controls
     private string _pendingHotkey = "";
     private bool _pendingStartWithWindows;
-    private RotateTransform? _previewRotation;
+    // (_previewRotation removed in v2.0.1 — the rim comet lives on the launcher only;
+    //  the settings preview card shows a static gradient of the style's palette)
     private bool _sourceReady;                // v1.8 — glass needs the HWND; set in OnSourceInitialized
 
     public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex,
@@ -301,8 +302,8 @@ public partial class SettingsWindow : Window
             }
 
             double s = _settings.BorderSpeedSec;
-            if (s <= 2.6) SpeedFast.IsChecked = true;
-            else if (s <= 4.6) SpeedNormal.IsChecked = true;
+            if (s <= 7.0) SpeedFast.IsChecked = true;        // v2.0.1 speeds: 6 / 9 / 14
+            else if (s <= 11.0) SpeedNormal.IsChecked = true;
             else SpeedSlow.IsChecked = true;
 
             if (string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase))
@@ -384,8 +385,8 @@ public partial class SettingsWindow : Window
                 StyleMint.IsChecked == true ? "Mint" :
                 StyleSolid.IsChecked == true ? "Solid" : "Aurora";
             _settings.BorderSpeedSec =
-                SpeedFast.IsChecked == true ? 2.0 :
-                SpeedSlow.IsChecked == true ? 6.0 : 3.5;
+                SpeedFast.IsChecked == true ? 6.0 :
+                SpeedSlow.IsChecked == true ? 14.0 : 9.0;
 
             ApplySelfTheme();
             UpdatePreview();
@@ -402,17 +403,12 @@ public partial class SettingsWindow : Window
         {
             if (_settings.BorderEffect)
             {
-                var border = Appearance.BuildBorderBrush(_settings.BorderStyle, _settings.AccentColor, out var rot);
-                PreviewCard.BorderBrush = border;
-                _previewRotation = rot;
-                double sec = Math.Clamp(_settings.BorderSpeedSec, 1.0, 12.0);
-                rot?.BeginAnimation(RotateTransform.AngleProperty,
-                    new DoubleAnimation(0, 360, TimeSpan.FromSeconds(sec)) { RepeatBehavior = RepeatBehavior.Forever });
+                // v2.0.1 — static palette gradient (head → body → deep body). The real
+                // comet runs live on the launcher window behind the settings app.
+                PreviewCard.BorderBrush = Appearance.BuildPreviewBrush(_settings.BorderStyle, _settings.AccentColor);
             }
             else
             {
-                _previewRotation?.BeginAnimation(RotateTransform.AngleProperty, null);
-                _previewRotation = null;
                 bool dark = !string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase);
                 PreviewCard.BorderBrush = new SolidColorBrush(dark ? FromRgb(0x33, 0x36, 0x4A) : FromRgb(0xE2, 0xE4, 0xEC));
             }

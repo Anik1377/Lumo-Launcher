@@ -1,7 +1,21 @@
 ======================================================
-  LUMO v2.0.0-alpha.1  —  universal launcher for Windows
+  LUMO v2.0.0-alpha.2  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.0.0-alpha.2 (the rim comet, rebuilt)
+-----------------------------------------------------
+1. TRUE PERIMETER COMET - the glow is now a bright head
+   plus a soft tail that travel the REAL window outline
+   (rounded-rect path animation) at constant speed,
+   rounding every corner - no more diagonal sweeping.
+2. INSIDE ONLY - the orbit layer is clipped to the
+   window and an opaque patch covers everything but the
+   outer 3 px band, so the light can never bleed outside
+   or wash over content (z.ai chat-box style).
+3. CALMER - 9 s per lap by default (Fast 6 / Normal 9 /
+   Slow 14). The old static top wash is gone; the comet
+   is the only glow.
 
 WHAT'S NEW IN v2.0.0-alpha.1 (the Windows 11 overhaul)
 ------------------------------------------------------
