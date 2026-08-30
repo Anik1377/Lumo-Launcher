@@ -18,6 +18,7 @@ public partial class App : Application
     private MacroRecorder? _recorder;
     private ClipboardHistory? _clips;
     private UsageStore? _usage;                      // v2.1 — MRU ranking
+    private Favourites? _favs;                       // v2.2 — pinned favourites
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -60,7 +61,9 @@ public partial class App : Application
             _clips = new ClipboardHistory();          // v1.6 — clipboard history (UI-thread timer)
             _usage = new UsageStore();                // v2.1 — launch frequency for MRU ranking
             _usage.Load();
-            _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips, _usage);
+            _favs = new Favourites();                 // v2.2 — pinned favourites
+            _favs.Load();
+            _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips, _usage, _favs);
             MainWindow = _window;
 
             _window.SettingsRequested += () =>

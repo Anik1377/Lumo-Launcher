@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0--alpha.1-CA5010?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.2.0--alpha.1-CA5010?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -45,6 +45,41 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🧳 | **Truly portable** | One ~350 KB exe, no installer |
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
+| ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`) any result: open containing folder, copy path/name, open a terminal there, run as administrator, pin to favourites |
+| ★ | **Pinned favourites** | A FAVOURITES section leads the empty view — pin anything and it's one keystroke away (`favourites.json`) |
+| 👁️ | **Preview pane** | `Tab` previews the selection — text-file heads (binary-safe, 512 KB cap), image thumbnails, clipboard entries, URLs — read off-thread with stale-read protection |
+
+## 🆕 What's new in v2.2.0-alpha.1 — Actions (DEV_PLAN Phase 2)
+
+The second slice of the [development plan](DEV_PLAN.md): the launcher stops being
+just a list of rows and starts acting on them.
+
+1. **✂️ Row quick actions (Task 2.1).** Right-click any result — or press
+   `Ctrl+→` — for a native Win11-styled context menu: **open the containing
+   folder** (`explorer /select` pre-selects the file), **copy path**, **copy
+   name**, **open in terminal** (Windows Terminal, cmd fallback, starting in the
+   right folder), **run as administrator** (UAC, with a graceful "elevation
+   cancelled" status), and **pin / unpin favourites**. Each row type gets only
+   the actions that make sense for it; the menu is rebuilt on every open.
+2. **★ Pinned favourites (Task 2.2).** Pin anything — an app, a file, a URL, a
+   shortcut — and it appears under a FAVOURITES header at the top of the empty
+   view, Raycast-style. Keys are the result's `RunArgument` (OrdinalIgnoreCase);
+   display data is persisted in `%APPDATA%\Lumo\favourites.json` (tolerant JSON,
+   single-flight background save, temp-file swap — the same contract as
+   `usage.json`), and shell icons are refreshed live at render time.
+3. **👁️ Preview pane (Task 2.3).** Press `Tab` to flip open a preview of the
+   selected row: the head of text files (first 200 lines / 512 KB, binary-safe
+   with a `FileShare.ReadWrite` open so locked files still preview), image
+   thumbnails (decoded at 240 px), clipboard entries, snippet bodies, and web
+   URLs. Selection changes are debounced 120 ms, file reads run on a worker
+   thread, and a generation counter drops anything stale — arrow-key walks never
+   block or mis-render. `Esc` closes the preview first, then the window.
+4. **🛠️ More system utilities (Task 2.4).** `U/` grows: **hibernate**
+   (`SetSuspendState`), **mute / unmute volume** (`VK_VOLUME_MUTE` media key),
+   **night light** and **battery** settings pages (`ms-settings:` URIs), and
+   **restart in 10 seconds** — which arms a cancellable countdown and floats a
+   "✕ Cancel pending restart" row (`shutdown /a`) to the top of `U/` until the
+   timer fires or you abort.
 
 ## 🆕 What's new in v2.1.0-alpha.1 — Smarter (DEV_PLAN Phases 0 + 1)
 

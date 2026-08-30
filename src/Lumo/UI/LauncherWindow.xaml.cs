@@ -1,10 +1,13 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Lumo.Core;
 using Lumo.Native;
@@ -39,6 +42,7 @@ public partial class LauncherWindow : Window
     private readonly ShortcutStore? _shortcuts;      // v1.4
     private readonly MacroRecorder? _recorder;       // v1.5
     private readonly ClipboardHistory? _clips;       // v1.6
+    private readonly Favourites _favs;               // v2.2 — pinned favourites
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
     private HotkeyService? _hotkey;
@@ -56,6 +60,11 @@ public partial class LauncherWindow : Window
     private int _animGen;                    // invalidates stale hide-completion callbacks
     private bool _staggerNext = true;        // v1.4 — stagger only on show/empty→results, not every keystroke
     private string _prevQuery = "";
+
+    // v2.2 (DEV_PLAN Task 2.3) — preview pane state
+    private bool _previewOpen;
+    private int _previewGen;                 // invalidates stale preview reads
+    private readonly DispatcherTimer _previewDebounce;   // 120 ms selection debounce
 
     private const double GlowDimFactor = 0.4;        // dimmed = 40 % of the active brightness
 
@@ -75,16 +84,28 @@ public partial class LauncherWindow : Window
     public event Action<List<MacroStep>, string?>? RecordFinishRequested;
 
     public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null,
-                          ClipboardHistory? clips = null, UsageStore? usage = null)
+                          ClipboardHistory? clips = null, UsageStore? usage = null, Favourites? favourites = null)
     {
         InitializeComponent();
         _settings = settings;
         _shortcuts = shortcuts;
         _recorder = recorder;
         _clips = clips;
+        _favs = favourites ?? new Favourites();
         _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
-        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips, usage);
+        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips, usage, _favs);
+
+        // v2.2 — placeholder so the ContextMenuOpening routed event always fires;
+        // BuildRowMenu swaps in the real menu (or null) before WPF auto-opens it.
+        Results.ContextMenu = new ContextMenu();
+
+        _previewDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };   // v2.2
+        _previewDebounce.Tick += (_, _) =>
+        {
+            try { _previewDebounce.Stop(); RenderPreview(); }
+            catch (Exception ex) { DiagnosticLogger.LogException("Window.PreviewDebounce", ex); }
+        };
 
         _debounce = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -282,6 +303,7 @@ public partial class LauncherWindow : Window
     {
         try
         {
+            if (_previewOpen) ClosePreview();   // v2.2 — fresh open next time
             PauseGlow();
             if (!MotionOk() || !IsVisible) { Hide(); return; }
 
@@ -433,6 +455,19 @@ public partial class LauncherWindow : Window
                     ExecuteSelected();
                     e.Handled = true;
                     break;
+
+                // v2.2 (DEV_PLAN Task 2.3) — Tab (or Ctrl+Tab) toggles the preview pane
+                case Key.Tab:
+                    TogglePreview();
+                    e.Handled = true;
+                    break;
+
+                // v2.2 (DEV_PLAN Task 2.1) — Ctrl+→ opens the row's quick-action menu
+                case Key.Right when Keyboard.Modifiers == ModifierKeys.Control:
+                    OpenRowMenuKeyboard();
+                    e.Handled = true;
+                    break;
+
                 case Key.Escape:
                     HideAnimated();
                     e.Handled = true;
@@ -455,6 +490,14 @@ public partial class LauncherWindow : Window
         {
             if (e.Key == Key.Escape)
             {
+                // v2.2 — Escape closes the preview pane first; a second Esc hides the window
+                if (_previewOpen)
+                {
+                    ClosePreview();
+                    e.Handled = true;
+                    return;
+                }
+
                 // v1.5.1 — Escape during a recording cancels it first.
                 // Before, the window hid but the recorder stayed live invisibly.
                 if (_recorder is { Active: true })
@@ -726,6 +769,450 @@ public partial class LauncherWindow : Window
             DiagnosticLogger.LogException("Window.ExecuteSelected", ex);
         }
     }
+
+    // ------------------------------------------------- v2.2 row quick actions (Task 2.1)
+
+    /// <summary>Right-click selects the row under the cursor first, so the menu
+    /// describes what the pointer is actually on — standard list behaviour. Rows that
+    /// cannot carry actions (headers/hints/errors) clear the selection instead, so no
+    /// menu ever describes the wrong row.</summary>
+    private void OnResultsRightDown(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            if (e.OriginalSource is not DependencyObject d) return;
+            if (ItemsControl.ContainerFromElement(Results, d) is not ListBoxItem lbi) return;
+            Results.SelectedItem = lbi.Content is ResultItem
+            {
+                Kind: not ResultKind.Header and not ResultKind.Hint and not ResultKind.Error
+            } item ? item : null;
+        }
+        catch { }
+    }
+
+    /// <summary>The menu is rebuilt for the selected row every time it opens.</summary>
+    private void OnResultsContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        try { BuildRowMenu(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("Window.RowMenuOpening", ex); }
+    }
+
+    /// <summary>Ctrl+→ opens the same menu, anchored under the selected row.</summary>
+    private void OpenRowMenuKeyboard()
+    {
+        try
+        {
+            BuildRowMenu();
+            if (Results.ContextMenu is not ContextMenu menu) return;
+            if (Results.ItemContainerGenerator.ContainerFromItem(Results.SelectedItem) is ListBoxItem lbi)
+            {
+                menu.PlacementTarget = lbi;
+                menu.Placement = PlacementMode.Bottom;
+            }
+            menu.IsOpen = true;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Window.RowMenuKeyboard", ex); }
+    }
+
+    private void BuildRowMenu()
+    {
+        if (Results.SelectedItem is not ResultItem item)
+        {
+            Results.ContextMenu = null;
+            return;
+        }
+
+        var actions = RowActions.For(item, _favs.IsPinned(item.RunArgument));
+        if (actions.Count == 0)
+        {
+            Results.ContextMenu = null;
+            return;
+        }
+
+        var menu = new ContextMenu();
+        foreach (var a in actions)
+        {
+            var mi = new MenuItem { Header = RowActions.Label(a) };
+            var captured = a;
+            mi.Click += (_, _) =>
+            {
+                try { ExecuteRowAction(item, captured); }
+                catch (Exception ex) { DiagnosticLogger.LogException("Window.RowActionClick", ex); }
+            };
+            menu.Items.Add(mi);
+        }
+        Results.ContextMenu = menu;
+    }
+
+    /// <summary>Runs one quick action. The launcher stays open — these are helpers
+    /// you fire without losing your place (Apple §4: the work happens in place).</summary>
+    private void ExecuteRowAction(ResultItem item, RowAction action)
+    {
+        switch (action)
+        {
+            case RowAction.OpenContainingFolder:
+                OpenContainingFolder(item.RunArgument);
+                break;
+
+            case RowAction.CopyPath:
+                TryClipboardText(item.RunArgument);
+                StatusText.Text = "Copied path";
+                break;
+
+            case RowAction.CopyName:
+                TryClipboardText(item.Title);
+                StatusText.Text = "Copied name";
+                break;
+
+            case RowAction.OpenTerminal:
+                OpenTerminalHere(item.RunArgument);
+                break;
+
+            case RowAction.RunAsAdmin:
+                RunElevated(item.RunArgument);
+                break;
+
+            case RowAction.Pin:
+                _favs.Add(item.RunArgument, item.Title, item.Subtitle, item.Glyph, item.Kind.ToString());
+                StatusText.Text = "★ Pinned to favourites";
+                RunSearch();   // the FAVOURITES section appears immediately on the empty view
+                break;
+
+            case RowAction.Unpin:
+                _favs.Remove(item.RunArgument);
+                StatusText.Text = "Unpinned";
+                RunSearch();
+                break;
+        }
+    }
+
+    private static void TryClipboardText(string? s)
+    {
+        if (string.IsNullOrEmpty(s)) return;
+        try { Clipboard.SetText(s); } catch { /* clipboard can be locked */ }
+    }
+
+    private static void OpenContainingFolder(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+        if (path.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            // web rows have no folder — open the URL itself
+            Process.Start(new ProcessStartInfo { FileName = path, UseShellExecute = true });
+            return;
+        }
+
+        string full = Environment.ExpandEnvironmentVariables(path);
+        if (Directory.Exists(full))
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{full}\"") { UseShellExecute = true });
+        else if (File.Exists(full))
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{full}\"") { UseShellExecute = true });
+    }
+
+    /// <summary>Windows Terminal first, classic cmd fallback — both start IN the folder.</summary>
+    private void OpenTerminalHere(string path)
+    {
+        try
+        {
+            string dir = "";
+            if (!string.IsNullOrWhiteSpace(path) && !path.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                string full = Environment.ExpandEnvironmentVariables(path);
+                dir = Directory.Exists(full) ? full : Path.GetDirectoryName(full) ?? "";
+            }
+            if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
+            {
+                StatusText.Text = "No folder to open a terminal in";
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo("wt.exe", $"-d \"{dir}\"") { UseShellExecute = true });
+            }
+            catch
+            {
+                Process.Start(new ProcessStartInfo("cmd.exe", $"/K cd /d \"{dir}\"") { UseShellExecute = true });
+            }
+            StatusText.Text = "Terminal opened";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.OpenTerminal", ex);
+            StatusText.Text = "Couldn't open a terminal";
+        }
+    }
+
+    private void RunElevated(string path)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(Environment.ExpandEnvironmentVariables(path)))
+            {
+                StatusText.Text = "File not found";
+                return;
+            }
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = Environment.ExpandEnvironmentVariables(path),
+                UseShellExecute = true,
+                Verb = "runas",
+            });
+            StatusText.Text = "Launched as administrator";
+        }
+        catch (System.ComponentModel.Win32Exception w) when (w.NativeErrorCode == 1223)
+        {
+            StatusText.Text = "Elevation cancelled";   // UAC prompt dismissed — not an error
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.RunAsAdmin", ex);
+            StatusText.Text = "Couldn't elevate: " + ex.Message;
+        }
+    }
+
+    // ------------------------------------------------- v2.2 preview pane (Task 2.3)
+
+    private const long PreviewMaxBytes = 512 * 1024;   // never read more than half a MB
+    private const int PreviewMaxLines = 200;           // head of the file only
+
+    private void OnResultsSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        try
+        {
+            if (!_previewOpen) return;
+            _previewDebounce.Stop();
+            _previewDebounce.Start();   // 120 ms debounce — fast arrow-key walks don't thrash reads
+        }
+        catch { }
+    }
+
+    private void TogglePreview()
+    {
+        try
+        {
+            _previewOpen = !_previewOpen;
+            PreviewPane.Visibility = _previewOpen ? Visibility.Visible : Visibility.Collapsed;
+            if (_previewOpen)
+            {
+                _previewDebounce.Stop();
+                RenderPreview();
+            }
+            else
+            {
+                _previewGen++;   // invalidate any in-flight read
+                ClearPreview();
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Window.TogglePreview", ex); }
+    }
+
+    private void ClosePreview()
+    {
+        if (_previewOpen) TogglePreview();
+    }
+
+    private void ClearPreview()
+    {
+        PreviewText.Text = "";
+        PreviewText.Visibility = Visibility.Collapsed;
+        PreviewImage.Source = null;
+        PreviewImage.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Fills the pane for the current selection. File contents are read on a worker
+    /// thread (rule 1 — never block the UI thread) and guarded by a generation
+    /// counter, so a slow read for row 12 can never land after the user has already
+    /// moved to row 14.
+    /// </summary>
+    private void RenderPreview()
+    {
+        try
+        {
+            int gen = ++_previewGen;
+            ClearPreview();
+            if (Results.SelectedItem is not ResultItem item) return;
+
+            PreviewTitle.Text = item.Title;
+            PreviewMeta.Text = "";
+
+            switch (item.Kind)
+            {
+                case ResultKind.Header:
+                case ResultKind.Hint:
+                case ResultKind.Error:
+                    PreviewMeta.Text = "nothing to preview";
+                    return;
+
+                case ResultKind.Web:
+                case ResultKind.Image:
+                    PreviewMeta.Text = "web result";
+                    PreviewText.Text = item.RunArgument;
+                    PreviewText.Visibility = Visibility.Visible;
+                    return;
+
+                case ResultKind.Calculator:
+                    PreviewMeta.Text = "calculator";
+                    PreviewText.Text = item.RunArgument + "  (Enter copies)";
+                    PreviewText.Visibility = Visibility.Visible;
+                    return;
+
+                case ResultKind.Clipboard:
+                    if (_clips?.Find(item.RunArgument) is not { } ce)
+                    {
+                        PreviewMeta.Text = "entry no longer in history";
+                        return;
+                    }
+                    PreviewMeta.Text = $"{ce.Text.Length:N0} chars";
+                    PreviewText.Text = TruncateHead(ce.Text.Replace("\r", ""), PreviewMaxLines);
+                    PreviewText.Visibility = Visibility.Visible;
+                    return;
+
+                case ResultKind.Shortcut:
+                    if (_shortcuts?.Find(item.RunArgument) is not { } def)
+                    {
+                        PreviewMeta.Text = "shortcut missing";
+                        return;
+                    }
+                    PreviewMeta.Text = def.Describe();
+                    if (def.IsSnippet)
+                    {
+                        PreviewText.Text = TruncateHead(def.Target.Replace("\r", ""), PreviewMaxLines);
+                        PreviewText.Visibility = Visibility.Visible;
+                    }
+                    else if (File.Exists(Environment.ExpandEnvironmentVariables(def.Target)))
+                    {
+                        PreviewPathAsync(gen, Environment.ExpandEnvironmentVariables(def.Target));
+                    }
+                    else
+                    {
+                        PreviewText.Text = def.Target;
+                        PreviewText.Visibility = Visibility.Visible;
+                    }
+                    return;
+
+                case ResultKind.Tool:
+                    PreviewMeta.Text = "command";
+                    PreviewText.Text = item.RunArgument;
+                    PreviewText.Visibility = Visibility.Visible;
+                    return;
+
+                case ResultKind.App:
+                case ResultKind.File:
+                    PreviewPathAsync(gen, Environment.ExpandEnvironmentVariables(item.RunArgument));
+                    return;
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Window.RenderPreview", ex); }
+    }
+
+    private void PreviewPathAsync(int gen, string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                PreviewMeta.Text = "folder";
+                PreviewText.Text = path;
+                PreviewText.Visibility = Visibility.Visible;
+                return;
+            }
+            if (!File.Exists(path))
+            {
+                PreviewMeta.Text = "file not found";
+                return;
+            }
+
+            var fi = new FileInfo(path);
+            long len = fi.Length;
+
+            if (IsImageExtension(fi.Extension))
+            {
+                PreviewMeta.Text = $"{len / 1024d:N0} KB · image";
+                string p = path;
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        if (len > 48 * 1024 * 1024) throw new IOException("image too large to preview");
+                        byte[] bytes = File.ReadAllBytes(p);
+                        Dispatcher.BeginInvoke(() =>
+                        {
+                            if (gen != _previewGen || !_previewOpen) return;   // stale — drop
+                            try
+                            {
+                                var img = new BitmapImage();
+                                using var ms = new MemoryStream(bytes);
+                                img.BeginInit();
+                                img.DecodePixelWidth = 240;   // thumbnail decode — cheap on RAM
+                                img.CacheOption = BitmapCacheOption.OnLoad;
+                                img.StreamSource = ms;
+                                img.EndInit();
+                                img.Freeze();
+                                PreviewImage.Source = img;
+                                PreviewImage.Visibility = Visibility.Visible;
+                            }
+                            catch
+                            {
+                                PreviewText.Text = "(couldn't decode image)";
+                                PreviewText.Visibility = Visibility.Visible;
+                            }
+                        });
+                    }
+                    catch (Exception ex) { DiagnosticLogger.LogException("Preview.Image", ex); }
+                });
+                return;
+            }
+
+            PreviewMeta.Text = $"{len / 1024d:N0} KB" + (len > PreviewMaxBytes ? " · head only" : "");
+            string file = path;
+            Task.Run(() =>
+            {
+                try
+                {
+                    string head = ReadTextHead(file, PreviewMaxBytes, PreviewMaxLines);
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (gen != _previewGen || !_previewOpen) return;   // stale — drop
+                        PreviewText.Text = head;
+                        PreviewText.Visibility = Visibility.Visible;
+                    });
+                }
+                catch (Exception ex) { DiagnosticLogger.LogException("Preview.Text", ex); }
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Window.PreviewPath", ex); }
+    }
+
+    /// <summary>Reads at most <paramref name="maxBytes"/> bytes / <paramref name="maxLines"/>
+    /// lines of a file, sharing read/write so files open in other apps don't block us.</summary>
+    private static string ReadTextHead(string path, long maxBytes, int maxLines)
+    {
+        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        int cap = (int)Math.Min(maxBytes, fs.Length);
+        var buf = new byte[cap];
+        int read = 0;
+        while (read < cap)
+        {
+            int n = fs.Read(buf, read, cap - read);
+            if (n <= 0) break;
+            read += n;
+        }
+        string s = System.Text.Encoding.UTF8.GetString(buf, 0, read);
+        if (s.Contains('\0')) return "(binary file — no text preview)";
+        return TruncateHead(s, maxLines);
+    }
+
+    private static string TruncateHead(string s, int maxLines)
+    {
+        if (s.Length == 0) return "(empty)";
+        var lines = s.Replace("\r\n", "\n").Split('\n');
+        if (lines.Length <= maxLines) return s;
+        return string.Join('\n', lines[..maxLines]) + $"\n… ({lines.Length - maxLines:N0} more lines)";
+    }
+
+    private static bool IsImageExtension(string ext) => ext.ToLowerInvariant() is ".png" or ".jpg" or ".jpeg" or ".gif" or ".bmp" or ".webp" or ".ico";
 
     // ---------------------------------------------------------------- status & theme
 

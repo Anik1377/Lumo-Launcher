@@ -63,12 +63,16 @@ public sealed class SearchEngine
     private readonly MacroRecorder? _recorder;       // v1.5
     private readonly ClipboardHistory? _clips;       // v1.6
     private readonly UsageStore? _usage;             // v2.1 — MRU ranking
+    private readonly Favourites? _favs;              // v2.2 — pinned favourites
+    private bool _restartPending;                    // v2.2 — a countdown restart is armed
 
     public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null,
-                        MacroRecorder? recorder = null, ClipboardHistory? clips = null, UsageStore? usage = null)
+                        MacroRecorder? recorder = null, ClipboardHistory? clips = null, UsageStore? usage = null,
+                        Favourites? favourites = null)
     {
         _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts; _recorder = recorder; _clips = clips;
         _usage = usage;
+        _favs = favourites;
     }
 
     public List<ResultItem> Search(string rawQuery)
@@ -135,20 +139,43 @@ public sealed class SearchEngine
 
     private List<ResultItem> DefaultRows()
     {
-        var rows = new List<ResultItem>
+        var rows = new List<ResultItem>();
+
+        // v2.2 (DEV_PLAN Task 2.2) — pinned favourites lead the empty view, Raycast-style.
+        // Row data comes from the store; the shell icon is refreshed live for app/file rows.
+        if (_favs is { Count: > 0 })
+        {
+            rows.Add(new ResultItem { Title = "FAVOURITES", Subtitle = "pinned — right-click any result to pin or unpin", Kind = ResultKind.Header });
+            foreach (var f in _favs.Snapshot())
+            {
+                if (rows.Count >= 7) break;   // header + up to 6 favourites
+                var kind = Enum.TryParse<ResultKind>(f.Kind, out var k) ? k : ResultKind.Tool;
+                rows.Add(new ResultItem
+                {
+                    Title = f.Title,
+                    Subtitle = f.Subtitle,
+                    Glyph = string.IsNullOrWhiteSpace(f.Glyph) ? "★" : f.Glyph,
+                    Kind = kind,
+                    RunArgument = f.Key,
+                    Icon = kind is ResultKind.App or ResultKind.File ? Services.AppIcons.ForPath(f.Key) : null,
+                });
+            }
+        }
+
+        rows.AddRange(new List<ResultItem>
         {
             new() { Title = "A/  Applications", Subtitle = "Type A/ then a name — e.g.  A/chrome", Glyph = "A", Kind = ResultKind.Hint, RunArgument = "A/" },
             new() { Title = "F/  Files", Subtitle = "Type F/ then part of a file name", Glyph = "F", Kind = ResultKind.Hint, RunArgument = "F/" },
             new() { Title = "C/  Calculator", Subtitle = "e.g.  C/(1920*1080)/3", Glyph = "C", Kind = ResultKind.Hint, RunArgument = "C/" },
             new() { Title = "W/  Web search", Subtitle = "e.g.  W/weather tomorrow — or switch per query: W/github · W/youtube · W/ddg · W/wiki", Glyph = "W", Kind = ResultKind.Hint, RunArgument = "W/" },
             new() { Title = "I/  Image search", Subtitle = "e.g.  I/mountain sunrise", Glyph = "I", Kind = ResultKind.Hint, RunArgument = "I/" },
-            new() { Title = "U/  Utilities", Subtitle = "lock · sleep · restart · shutdown · empty bin", Glyph = "U", Kind = ResultKind.Hint, RunArgument = "U/" },
+            new() { Title = "U/  Utilities", Subtitle = "lock · sleep · hibernate · mute · restart · shutdown · bin · night light", Glyph = "U", Kind = ResultKind.Hint, RunArgument = "U/" },
             new() { Title = "H/  Clipboard history", Subtitle = "everything you copied — pick one to copy again (Raycast style)", Glyph = "⧉", Kind = ResultKind.Hint, RunArgument = "H/" },
             new() { Title = "S/  Snap window", Subtitle = "left/right half · maximize · center · restore — for the last window you used", Glyph = "▣", Kind = ResultKind.Hint, RunArgument = "S/" },
             new() { Title = "!  Snippets", Subtitle = "type ! then a name — your paste-anywhere texts, e.g.  !email", Glyph = "S", Kind = ResultKind.Hint, RunArgument = "!" },
             new() { Title = "/sc  Shortcuts & macros", Subtitle = "your saved one-tap launches — e.g.  /sc work", Glyph = "⚡", Kind = ResultKind.Hint, RunArgument = "/sc" },
             new() { Title = "Settings — customize Lumo", Subtitle = "themes · accent colour · glow border · hotkey · index", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
-        };
+        });
 
         // v1.5 — record a macro straight from the empty view
         AddRecordRows(rows, "");
@@ -353,17 +380,28 @@ public sealed class SearchEngine
 
     private List<ResultItem> ToolRows(string q)
     {
-        var tools = new List<ResultItem>
+        var tools = new List<ResultItem>();
+
+        // v2.2 — while a countdown restart is armed, the abort row leads the list
+        if (_restartPending)
+            tools.Add(new() { Title = "✕ Cancel pending restart", Subtitle = "shutdown /a — aborts the 10-second countdown", Glyph = "✕", Kind = ResultKind.Tool, RunArgument = "cmd:restart-cancel" });
+
+        tools.AddRange(new List<ResultItem>
         {
             new() { Title = "Lock computer",       Subtitle = "Windows + L equivalent",                 Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:lock" },
             new() { Title = "Sleep computer",      Subtitle = "Standby",                                Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:sleep" },
+            new() { Title = "Hibernate computer",  Subtitle = "session saved to disk, then powers off", Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:hibernate" },
+            new() { Title = "Mute / unmute volume", Subtitle = "toggles the system volume",              Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:mute" },
+            new() { Title = "Night light settings", Subtitle = "opens Windows › night light",            Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:nightlight" },
+            new() { Title = "Battery settings",     Subtitle = "opens Windows › battery saver",          Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:battery" },
             new() { Title = "Empty Recycle Bin",   Subtitle = "No confirmation",                        Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:emptybin" },
             new() { Title = "Restart computer",    Subtitle = "shutdown /r /t 0",                       Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:restart" },
+            new() { Title = "Restart in 10 seconds", Subtitle = "shutdown /r /t 10 — search “cancel” to abort", Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:restart-countdown" },
             new() { Title = "Shut down computer",  Subtitle = "shutdown /s /t 0",                       Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:shutdown" },
             new() { Title = "Open settings window", Subtitle = "full customization UI (v1.3)",              Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
             new() { Title = "Open settings file",  Subtitle = "edit settings.json directly",               Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:settings" },
             new() { Title = "Open diagnostics log",Subtitle = AppPaths.LogFile,                         Glyph = "U", Kind = ResultKind.Tool, RunArgument = "cmd:log" },
-        };
+        });
 
         if (q.Length == 0) return tools;
         var filtered = tools
@@ -583,6 +621,14 @@ public sealed class SearchEngine
             case "cmd:emptybin": Native.NativeMethods.EmptyRecycleBin(); break;
             case "cmd:restart": OpenCommand("shutdown", "/r /t 0"); break;
             case "cmd:shutdown": OpenCommand("shutdown", "/s /t 0"); break;
+
+            // v2.2 (DEV_PLAN Task 2.4) — more system utilities
+            case "cmd:hibernate": Native.NativeMethods.HibernateComputer(); break;
+            case "cmd:mute": Native.NativeMethods.ToggleMute(); break;
+            case "cmd:nightlight": OpenUrl("ms-settings:nightlight"); break;
+            case "cmd:battery": OpenUrl("ms-settings:batterysaver"); break;
+            case "cmd:restart-countdown": OpenCommand("shutdown", "/r /t 10"); _restartPending = true; break;
+            case "cmd:restart-cancel": OpenCommand("shutdown", "/a"); _restartPending = false; break;
             case "cmd:settings": OpenPath(AppPaths.SettingsDir); break;
             case "cmd:log": OpenPath(AppPaths.DataDir); break;
             case "cmd:clear-clipboard": _clips?.Clear(); break;

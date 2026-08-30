@@ -61,7 +61,7 @@ CI runs tests before publish.
   (github/youtube/ddg/maps/wiki/images/so/npm/nuget/news/amazon/scholar/…);
   Settings.CustomWebProviders (tolerant read + RestoreFrom) override built-ins.
 
-## Phase 2 — v2.2 "Actions" (#4, #5, #8, #10)
+## Phase 2 — v2.2 "Actions" ✅ (shipped in v2.2.0-alpha.1)
 
 - **Task 2.1 — Quick actions on result rows:** right-click / Ctrl+→ context menu
   (OpenContainingFolder, CopyPath, CopyName, OpenTerminal, RunAsAdmin, Pin).

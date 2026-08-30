@@ -56,6 +56,20 @@ internal static class NativeMethods
 
     [DllImport("powrprof.dll")] private static extern uint SetSuspendState(bool hibernate, bool forceCritical, bool disableWakeEvent);
     public static void SleepComputer() => SetSuspendState(false, false, false);
+    /// <summary>v2.2 — full hibernation: session state is written to hiberfil.sys and the PC powers off.</summary>
+    public static void HibernateComputer() => SetSuspendState(true, false, false);
+
+    /// <summary>v2.2 — toggles the system volume by sending the VK_VOLUME_MUTE media key.</summary>
+    private const byte VK_VOLUME_MUTE = 0xAD;
+
+    [DllImport("user32.dll")]
+    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+
+    public static void ToggleMute()
+    {
+        try { keybd_event(VK_VOLUME_MUTE, 0, 0, UIntPtr.Zero); }
+        catch { /* best effort */ }
+    }
 
     private const int SHERB_NOCONFIRMATION = 0x1;
     private const int SHERB_NOPROGRESSUI = 0x2;

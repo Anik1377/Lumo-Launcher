@@ -326,3 +326,109 @@ public class UsageStoreTests
         Assert.True(Fuzzy.ScoreWithUsage(baseScore, high) > Fuzzy.ScoreWithUsage(baseScore, low));
     }
 }
+
+// ---- v2.2 Favourites (DEV_PLAN Task 2.2) --------------------------------------
+
+public class FavouritesTests
+{
+    private static string TempFile() =>
+        System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"lumo-favs-{Guid.NewGuid():N}.json");
+
+    [Fact]
+    public void Add_Remove_Toggle_Semantics()
+    {
+        var favs = new Favourites(TempFile());
+        Assert.True(favs.Add(@"C:\Apps\Chrome.lnk", "Chrome", "Application", "A", "App"));
+        Assert.True(favs.IsPinned(@"C:\APPS\CHROME.LNK"));   // OrdinalIgnoreCase keys
+        Assert.False(favs.Add(@"C:\Apps\Chrome.lnk", "Chrome", "Application", "A", "App")); // idempotent
+        Assert.Equal(1, favs.Count);
+
+        Assert.True(favs.Remove(@"c:\apps\chrome.lnk"));
+        Assert.False(favs.IsPinned(@"C:\Apps\Chrome.lnk"));
+        Assert.False(favs.Remove(@"C:\Apps\Chrome.lnk"));    // second remove is a no-op
+    }
+
+    [Fact]
+    public void Empty_Or_Whitespace_Keys_Are_Ignored()
+    {
+        var favs = new Favourites(TempFile());
+        Assert.False(favs.Add("", "x", "", "", "App"));
+        Assert.False(favs.Add("   ", "x", "", "", "App"));
+        Assert.False(favs.Add(null, "x", "", "", "App"));
+        Assert.False(favs.IsPinned(""));
+        Assert.False(favs.Remove(null));
+        Assert.Equal(0, favs.Count);
+    }
+
+    [Fact]
+    public void Snapshot_Preserves_Insertion_Order()
+    {
+        var favs = new Favourites(TempFile());
+        favs.Add("a", "First", "", "★", "App");
+        favs.Add("b", "Second", "", "★", "File");
+        favs.Add("c", "Third", "", "★", "Web");
+
+        var snap = favs.Snapshot();
+        Assert.Equal(3, snap.Count);
+        Assert.Equal("First", snap[0].Title);
+        Assert.Equal("Second", snap[1].Title);
+        Assert.Equal("Third", snap[2].Title);
+        Assert.Equal("File", snap[1].Kind);
+    }
+
+    [Fact]
+    public void Save_Load_Round_Trip_Keeps_Order_And_Data()
+    {
+        string file = TempFile();
+        try
+        {
+            var favs = new Favourites(file);
+            favs.Add(@"C:\Tools\build.exe", "build", @"C:\Tools", "A", "App");
+            favs.Add("https://github.com/Anik1377/Lumo-Launcher", "Lumo", "web", "W", "Web");
+            favs.Save();   // synchronous — no background race in tests
+
+            var reloaded = new Favourites(file);
+            reloaded.Load();
+            Assert.Equal(2, reloaded.Count);
+            var snap = reloaded.Snapshot();
+            Assert.Equal(@"C:\Tools\build.exe", snap[0].Key);
+            Assert.Equal("build", snap[0].Title);
+            Assert.Equal("App", snap[0].Kind);
+            Assert.Equal("Lumo", snap[1].Title);
+            Assert.True(reloaded.IsPinned(@"HTTPS://GITHUB.COM/ANIK1377/LUMO-LAUNCHER"));
+        }
+        finally { try { System.IO.File.Delete(file); } catch { } }
+    }
+
+    [Fact]
+    public void Corrupt_File_Is_Tolerated_And_Store_Still_Works()
+    {
+        string file = TempFile();
+        try
+        {
+            System.IO.File.WriteAllText(file, "[{ broken json");
+            var favs = new Favourites(file);
+            favs.Load();                                    // must not throw
+            Assert.Equal(0, favs.Count);
+            Assert.True(favs.Add("k", "n", "s", "★", "App")); // and the store still works
+            favs.Save();
+        }
+        finally { try { System.IO.File.Delete(file); } catch { } }
+    }
+
+    [Fact]
+    public void Duplicate_Keys_Skipped_On_Load()
+    {
+        string file = TempFile();
+        try
+        {
+            System.IO.File.WriteAllText(file,
+                """[{"Key":"a","Title":"1","Subtitle":"","Glyph":"★","Kind":"App"},{"Key":"A","Title":"2","Subtitle":"","Glyph":"★","Kind":"App"}]""");
+            var favs = new Favourites(file);
+            favs.Load();
+            Assert.Equal(1, favs.Count);                    // case-insensitive dedupe
+            Assert.Equal("1", favs.Snapshot()[0].Title);    // first wins
+        }
+        finally { try { System.IO.File.Delete(file); } catch { } }
+    }
+}

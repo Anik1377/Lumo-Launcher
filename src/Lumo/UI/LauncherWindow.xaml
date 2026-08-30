@@ -161,7 +161,49 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-    </Window.Resources>
+        <!-- v2.2 — row context menu (Win11 flyout look: rounded card, hairline stroke,
+         soft shadow, hover row). Only plain click items are used, so a simple
+         template pair is enough — no submenus / checkables needed. -->
+    <Style TargetType="ContextMenu">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Margin="10" Background="{DynamicResource FieldBrush}"
+                            BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
+                            CornerRadius="8" Padding="5">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.35"/>
+                        </Border.Effect>
+                        <StackPanel IsItemsHost="True"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Bd" CornerRadius="4" Padding="11,6.5" Background="Transparent">
+                        <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+</Window.Resources>
 
     <!-- main card (DWM draws the real drop shadow + rounded corners);
          the hairline ring lives on RimLine, Root itself has no border -->
@@ -220,6 +262,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
@@ -325,6 +368,9 @@
                 <ListBox x:Name="Results" Grid.Row="2" Margin="10,8,10,4" BorderThickness="0"
                          Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          MouseDoubleClick="OnResultDoubleClick"
+                         SelectionChanged="OnResultsSelectionChanged"
+                         MouseRightButtonDown="OnResultsRightDown"
+                         ContextMenuOpening="OnResultsContextMenuOpening"
                          VirtualizingPanel.ScrollUnit="Pixel">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
@@ -487,10 +533,44 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
+                <!-- ================= preview pane (v2.2 — Tab toggles; Esc closes) ================= -->
+                <Border x:Name="PreviewPane" Grid.Row="3" Margin="14,2,14,2" CornerRadius="6"
+                        Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
+                        BorderThickness="1" Visibility="Collapsed" Focusable="False">
+                    <Grid MaxHeight="200" Margin="12,8,12,10">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0" Margin="0,0,0,7">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="PreviewTitle" FontSize="12.5" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TitleBrush}" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock x:Name="PreviewMeta" Grid.Column="1" FontSize="10.5" Margin="12,1,0,0"
+                                       Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <Grid>
+                                <TextBlock x:Name="PreviewText" FontFamily="Consolas, Cascadia Mono, Segoe UI"
+                                           FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}"
+                                           TextWrapping="Wrap" Text="" Visibility="Collapsed"/>
+                                <Image x:Name="PreviewImage" Stretch="Uniform" StretchDirection="DownOnly" MaxHeight="175"
+                                       HorizontalAlignment="Left" RenderOptions.BitmapScalingMode="HighQuality"
+                                       Visibility="Collapsed"/>
+                            </Grid>
+                        </ScrollViewer>
+                    </Grid>
+                </Border>
+
                 <!-- ================= status bar (Raycast footer) ================= -->
-                <Border Grid.Row="3" Height="1" VerticalAlignment="Top" Margin="16,0,16,0"
+                <Border Grid.Row="4" Height="1" VerticalAlignment="Top" Margin="16,0,16,0"
                         x:Name="FooterRule" Opacity="0.55"/>
-                <Grid Grid.Row="3" Margin="20,10,14,11">
+                <Grid Grid.Row="4" Margin="20,10,14,11">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -505,6 +585,9 @@
                         </Border>
                         <Border Style="{StaticResource KbdChipBorder}" Margin="0,0,5,0">
                             <TextBlock Style="{StaticResource KbdChipText}" Text="&#x2193;&#x2191; select"/>
+                        </Border>
+                        <Border Style="{StaticResource KbdChipBorder}" Margin="0,0,5,0">
+                            <TextBlock Style="{StaticResource KbdChipText}" Text="tab preview"/>
                         </Border>
                         <Border Style="{StaticResource KbdChipBorder}" Margin="0,0,12,0">
                             <TextBlock Style="{StaticResource KbdChipText}" Text="esc hide"/>
