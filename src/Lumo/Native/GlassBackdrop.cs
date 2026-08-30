@@ -1,55 +1,80 @@
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 
 namespace Lumo.Native;
 
 /// <summary>
-/// v2.0 — window chrome helper (formerly the acrylic glass backdrop).
+/// v2.4.0-alpha.2 — window chrome helper, frosted-glass edition.
 ///
-/// The glassmorphism era is over: Lumo now uses solid Windows 11 Fluent surfaces, so
-/// there is no acrylic to apply. This helper keeps the two pieces of DWM chrome that
-/// make the launcher and settings window feel native on Windows 11:
-///   • DWMWA_WINDOW_CORNER_PREFERENCE = ROUND  — the 8 px rounded window corners
+/// The launcher regains the Raycast material: a real DWM acrylic blur-behind
+/// (SetWindowCompositionAttribute → ACCENT_ENABLE_ACRYLICBLURBEHIND) under a
+/// translucent panel brush, so the frosted desktop shows through the card —
+/// the signature Raycast depth, natively. Settings and AI chat stay on solid
+/// Fluent surfaces (typing-heavy windows read better without live blur).
+///
+/// The helper keeps the two pieces of DWM chrome every window needs:
+///   • DWMWA_WINDOW_CORNER_PREFERENCE = ROUND  — rounded window corners
 ///     (silently ignored on Windows 10, where the card keeps square corners).
-///   • DWMWA_USE_IMMERSIVE_DARK_MODE — dark title-bar/decoration context so system
-///     brushes match the active theme.
-/// <see cref="Applied"/> now always reports false; remaining call sites treat that as
-/// "use the solid palette", which is the only look in v2.0.
+///   • DWMWA_USE_IMMERSIVE_DARK_MODE — dark title-bar/decoration context so
+///     system brushes match the active theme.
 /// </summary>
 internal static class GlassBackdrop
 {
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    private const int SM_REMOTESESSION = 0x1000;
+
+    private static bool IsRemoteSession
+    {
+        get { try { return GetSystemMetrics(SM_REMOTESESSION) != 0; } catch { return false; } }
+    }
+
     /// <summary>Windows 11 or newer (rounded corners + modern chrome available).</summary>
     public static bool IsWin11 => Environment.OSVersion.Version.Build >= 22000;
 
-    /// <summary>Legacy flag — always false since v2.0 (no acrylic blur is applied).</summary>
+    /// <summary>
+    /// Minimum build for trustworthy acrylic via SetWindowCompositionAttribute
+    /// (Windows 10 April 2018 Update). Older builds render black edges on
+    /// chromeless windows, so they keep the solid palette.
+    /// </summary>
+    public static bool IsAcrylicSafeBuild => Environment.OSVersion.Version.Build >= 17134;
+
+    /// <summary>True when the LAST Apply call enabled acrylic on that window.</summary>
     public static bool Applied { get; private set; }
 
     /// <summary>
-    /// Applies DWM rounding + dark-mode context. Safe to call repeatedly — both windows
-    /// call it on theme changes. The <c>enabled</c> parameter is kept for source
-    /// compatibility with existing call sites and is ignored.
+    /// Applies DWM rounding + dark-mode context, and — when <paramref name="acrylic"/>
+    /// is requested and the platform allows it — the acrylic blur-behind.
+    /// Returns true when acrylic is actually active (the caller then paints the
+    /// window surface translucent so the frosted desktop shows through).
+    /// Safe to call repeatedly — windows call it on theme changes.
     /// </summary>
-    public static void Apply(Window window, bool dark, bool enabled = true)
+    public static bool Apply(Window window, bool dark, bool acrylic = false)
     {
         try
         {
             IntPtr hwnd = new WindowInteropHelper(window).EnsureHandle();
-            if (hwnd == IntPtr.Zero) { Applied = false; return; }
+            if (hwnd == IntPtr.Zero) { Applied = false; return false; }
 
             // rounded window corners (Win11; silently ignored on Win10)
             int round = NativeMethods.DWMWCP_ROUND;
             NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref round, 4);
             UpdateDarkMode(hwnd, dark);
 
-            // belt & braces: make sure no stale acrylic from a pre-2.0 settings file
-            // (or an old running instance's window state) is left behind
-            Disable(hwnd);
-            Applied = false;
+            bool enabled = acrylic && IsAcrylicSafeBuild && !IsRemoteSession
+                           && EnableAcrylic(hwnd, dark);
+            if (!enabled)
+                Disable(hwnd);
+            Applied = enabled;
+            return enabled;
         }
         catch
         {
             Applied = false;
+            return false;
         }
     }
 
@@ -73,6 +98,32 @@ internal static class GlassBackdrop
             NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_SYSTEMBACKDROP_TYPE, ref auto, 4);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// Enables the acrylic blur-behind with a barely-there tint of the panel colour —
+    /// the frost itself. The window's WPF surface paints the readable part on top
+    /// (translucent panel), so the combined material lands around Raycast's
+    /// rgba(28,28,30,0.9) over a live desktop blur.
+    /// GradientColor is 0xAABBGGRR (ABGR) — pack from the WPF colour accordingly.
+    /// </summary>
+    private static bool EnableAcrylic(IntPtr hwnd, bool dark)
+    {
+        try
+        {
+            // #0E0F12 dark / #FAFAFB light — the panel tier of the ladder
+            Color tint = dark ? Color.FromRgb(0x0E, 0x0F, 0x12) : Color.FromRgb(0xFA, 0xFA, 0xFB);
+            uint abgr = (uint)(0x40u << 24 | (uint)tint.B << 16 | (uint)tint.G << 8 | tint.R);
+            var policy = new NativeMethods.ACCENT_POLICY
+            {
+                AccentState = NativeMethods.ACCENT_ENABLE_ACRYLICBLURBEHIND,
+                AccentFlags = 2,          // draw all borders off — the card paints its own hairline
+                GradientColor = abgr,
+                AnimationId = 0,
+            };
+            return SetAccent(hwnd, policy);
+        }
+        catch { return false; }
     }
 
     private static bool SetAccent(IntPtr hwnd, NativeMethods.ACCENT_POLICY policy)

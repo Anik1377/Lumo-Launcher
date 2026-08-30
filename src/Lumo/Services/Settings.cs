@@ -38,6 +38,11 @@ public sealed class Settings
     public string CornerStyle { get; set; } = "rounded";   // rounded (Win11 8 px) | square
     public string RowDensity { get; set; } = "comfortable"; // comfortable | compact
 
+    // ---- v2.4.0-alpha.2 — frosted-glass launcher (Raycast material)
+    // Real DWM acrylic blur-behind under a translucent panel brush. Falls back to
+    // the solid palette on unsupported builds / remote sessions / failed calls.
+    public bool Acrylic { get; set; } = true;
+
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -96,6 +101,7 @@ public sealed class Settings
         s.WindowWidth       = GetNum(root, nameof(WindowWidth), s.WindowWidth);
         s.CornerStyle       = GetStr(root, nameof(CornerStyle), s.CornerStyle);
         s.RowDensity        = GetStr(root, nameof(RowDensity), s.RowDensity);
+        s.Acrylic           = GetBool(root, nameof(Acrylic), s.Acrylic);
         s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
         s.AiEnabled         = GetBool(root, nameof(AiEnabled), s.AiEnabled);
         s.AiStyle           = GetStr(root, nameof(AiStyle), s.AiStyle);
@@ -209,6 +215,7 @@ public sealed class Settings
         WindowWidth = o.WindowWidth;
         CornerStyle = o.CornerStyle;
         RowDensity = o.RowDensity;
+        Acrylic = o.Acrylic;
         CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
         AiEnabled = o.AiEnabled;
         AiStyle = o.AiStyle;

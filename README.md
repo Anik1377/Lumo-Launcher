@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.4.0--alpha.1-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.4.0--alpha.2-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -50,6 +50,26 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`, again to close) any result: **Open** (the Enter path), containing folder, copy path/name, terminal there, run as administrator, pin — with a separator before the pin pair |
 | ★ | **Pinned favourites** | A FAVOURITES section leads the empty view, newest pin first (up to 12) — pin via the menu **or the hover ★ right on the row** (`favourites.json`) |
 | 👁️ | **Preview pane** | `Tab` previews the selection — text-file heads (binary-safe, 512 KB cap), image thumbnails, clipboard entries, URLs — read off-thread with stale-read protection |
+
+## 🆕 What's new in v2.4.0-alpha.2 — the frosted-glass material
+
+The launcher goes from "styled like Raycast" to **made of the same material**:
+
+1. **🧊 Real frosted glass.** The launcher card is now translucent with a genuine
+   DWM acrylic blur-behind (`SetWindowCompositionAttribute` → acrylic) under a
+   translucent panel brush — the frosted desktop shows through the palette, the
+   signature Raycast depth, natively (no WebView, still one portable exe).
+   Automatic fallback to the solid card on pre-17134 builds, remote sessions,
+   or a refused compositor call; opt out with `"Acrylic": false` in
+   `settings.json`.
+2. **🎯 The active row wears the accent.** Following Raycast's DESIGN.md —
+   *"the accent ONLY for the active row title and the caret"* — the selected
+   row's title now tints to your accent while selection itself stays quiet.
+3. **🔠 Uppercase section headers.** The root list groups like Raycast's home
+   screen: 11 px, semibold, muted, uppercase.
+4. **⌨️ Raycast keycaps.** Footer hint chips tighten to spec — 4 px radius,
+   min-width 20, brighter 11 px text.
+5. **📏 A 54 px search band** and 16 px input type for the flush header.
 
 ## 🆕 What's new in v2.4.0-alpha.1 — the Raycast-grade UI overhaul
 

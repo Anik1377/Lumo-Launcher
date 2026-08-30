@@ -41,21 +41,26 @@
     <Window.Resources>
         <!-- glyph → vector icon (modern outline set, 24×24 stroke paths) -->
         <ui:GlyphIconConverter x:Key="GlyphToIcon"/>
+        <ui:UpperTextConverter x:Key="Upper"/>
 
-        <!-- kbd-style hint chip — Raycast keycap: quiet raised fill, hairline, no glow -->
+        <!-- kbd-style hint chip — Raycast keycap: quiet raised fill, hairline, no glow.
+             DESIGN.md §kbd: 4px radius, 2×6 padding, min-width 20, 11px/500 -->
         <Style x:Key="KbdChipBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="5"/>
-            <Setter Property="Padding" Value="7,2.5"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="MinWidth" Value="20"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="Background" Value="{DynamicResource GlyphBoxBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style x:Key="KbdChipText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10.5"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="Opacity" Value="0.75"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
 
         <!-- Apple craft — slim overlay scrollbar (Spotlight/Raycast): an 8 px invisible
@@ -284,9 +289,9 @@
                 </Grid.RowDefinitions>
 
                 <!-- ================= search row (Raycast: the input IS the header —
-                     flush with the card top, no boxed field, generous 52 px band) ================= -->
+                     flush with the card top, no boxed field, 54 px band) ================= -->
                 <Grid Grid.Row="0" x:Name="SearchField" Background="Transparent" SnapsToDevicePixels="True">
-                    <Grid Margin="18,10,14,10">
+                    <Grid Margin="18,11,14,11">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
@@ -309,15 +314,15 @@
                                    VerticalAlignment="Center" Visibility="Collapsed"/>
 
                         <Grid Grid.Column="1" VerticalAlignment="Center">
-                            <TextBox x:Name="Input" FontSize="16.5" FontWeight="Normal"
-                                     Background="Transparent" BorderThickness="0" Padding="0" MinHeight="30"
+                            <TextBox x:Name="Input" FontSize="16" FontWeight="Normal"
+                                     Background="Transparent" BorderThickness="0" Padding="0" MinHeight="32"
                                      Foreground="{DynamicResource TitleBrush}"
                                      CaretBrush="{DynamicResource AccentBrush}"
                                      VerticalAlignment="Center" VerticalContentAlignment="Center"
                                      TextChanged="OnInputTextChanged" PreviewKeyDown="OnInputKeyDown"
                                      GotKeyboardFocus="OnInputFocusChanged" LostKeyboardFocus="OnInputFocusChanged"/>
                             <!-- placeholder (Raycast tone-of-voice: lowercase, quiet) -->
-                            <TextBlock Text="Search apps, files and commands…" FontSize="16.5" Margin="1,0,0,0"
+                            <TextBlock Text="Search apps, files and commands…" FontSize="16" Margin="1,0,0,0"
                                        Foreground="{DynamicResource PlaceholderBrush}" IsHitTestVisible="False"
                                        VerticalAlignment="Center">
                                 <TextBlock.Style>
@@ -388,13 +393,13 @@
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6"
+                                        <Border x:Name="Bd" Background="Transparent" CornerRadius="8"
                                                 Padding="0" Margin="5,1">
                                             <Grid>
                                                 <!-- neutral hover / quiet selection overlays (Raycast active row) -->
-                                                <Border x:Name="HoverOverlay" CornerRadius="6"
+                                                <Border x:Name="HoverOverlay" CornerRadius="8"
                                                         Background="{DynamicResource HoverBrush}" Opacity="0"/>
-                                                <Border x:Name="SelectedOverlay" CornerRadius="6"
+                                                <Border x:Name="SelectedOverlay" CornerRadius="8"
                                                         Background="{DynamicResource SelectedBrush}" Opacity="0"/>
                                                 <!-- v2.0.1 — selection pill: 3 px accent punctuation on the left edge -->
                                                 <Border x:Name="SelPill" Width="3" CornerRadius="1.5"
@@ -465,11 +470,11 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
-                                <Border x:Name="GlyphBox" Grid.Column="0" Width="30" Height="30" CornerRadius="8"
+                                <Border x:Name="GlyphBox" Grid.Column="0" Width="28" Height="28" CornerRadius="6"
                                         Background="{DynamicResource GlyphBoxBrush}">
                                     <Grid>
                                         <!-- real shell icon (app logo / file type); v1.7 vector icon when none -->
-                                        <Image Source="{Binding Icon}" Width="25" Height="25" Stretch="Uniform"
+                                        <Image Source="{Binding Icon}" Width="23" Height="23" Stretch="Uniform"
                                                RenderOptions.BitmapScalingMode="HighQuality"
                                                HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Image.Style>
@@ -485,7 +490,7 @@
                                         <Path x:Name="KindIcon" Data="{Binding Glyph, Converter={StaticResource GlyphToIcon}}"
                                               Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.9"
                                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                              Width="18" Height="18" Stretch="Uniform"
+                                              Width="17" Height="17" Stretch="Uniform"
                                               HorizontalAlignment="Center" VerticalAlignment="Center">
                                             <Path.Style>
                                                 <Style TargetType="Path">
@@ -504,7 +509,7 @@
                                 <StackPanel x:Name="RowText" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,10,0">
                                     <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="14" FontWeight="Medium"
                                                Foreground="{DynamicResource TitleBrush}" TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock x:Name="SubtitleText" Text="{Binding Subtitle}" FontSize="11.5" Margin="0,1.5,0,0"
+                                    <TextBlock x:Name="SubtitleText" Text="{Binding Subtitle}" FontSize="12.5" Margin="0,2,0,0"
                                                Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
 
@@ -557,15 +562,24 @@
                             </Grid>
 
                             <DataTemplate.Triggers>
+                                <!-- v2.4.0-alpha.2 — Raycast's signature: the ACTIVE row's title
+                                     takes the accent (DESIGN.md: "accent ONLY for the active row
+                                     title and the caret"). Declared BEFORE the header trigger so
+                                     section headers keep their muted caption even if selected. -->
+                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                    <Setter TargetName="TitleText" Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                </DataTrigger>
                                 <!-- v1.6 — Raycast-style section headers: no tile, no chip,
-                                     small muted caption with extra breathing room above -->
+                                     small muted UPPERCASE caption with extra breathing room above
+                                     (v2.4.0-alpha.2: 11px SemiBold + uppercase per DESIGN.md §4) -->
                                 <DataTrigger Binding="{Binding Kind}" Value="Header">
                                     <Setter TargetName="GlyphBox" Property="Visibility" Value="Collapsed"/>
                                     <Setter TargetName="SubtitleText" Property="Visibility" Value="Collapsed"/>
                                     <Setter TargetName="TitleText" Property="FontSize" Value="11"/>
-                                    <Setter TargetName="TitleText" Property="FontWeight" Value="Medium"/>
+                                    <Setter TargetName="TitleText" Property="FontWeight" Value="SemiBold"/>
                                     <Setter TargetName="TitleText" Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
-                                    <Setter TargetName="RowText" Property="Margin" Value="12,9,10,2"/>
+                                    <Setter TargetName="TitleText" Property="Text" Value="{Binding Title, Converter={StaticResource Upper}}"/>
+                                    <Setter TargetName="RowText" Property="Margin" Value="14,10,10,3"/>
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>

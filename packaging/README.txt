@@ -1,7 +1,26 @@
 ======================================================
-  LUMO v2.4.0-alpha.1  —  universal launcher for Windows
+  LUMO v2.4.0-alpha.2  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.4.0-alpha.2 (the frosted-glass material)
+---------------------------------------------------------------
+1. REAL FROSTED GLASS. The launcher card is now translucent
+   with a genuine Windows acrylic blur-behind - the frosted
+   desktop shows through the palette exactly like Raycast.
+   Falls back to the solid card automatically on older
+   Windows builds, remote sessions, or if the compositor
+   refuses (set "Acrylic": false in settings.json to opt out).
+2. RAYCAST ROW ANATOMY. The selected row's title now takes
+   the accent colour - Raycast's most recognizable tell -
+   while selection stays quiet. Rows round to 8 px, icons
+   sit in 28 px tiles, subtitles breathe at 12.5 px.
+3. UPPERCASE SECTION HEADERS. 11 px, semibold, muted - the
+   root list now groups exactly like Raycast's home screen.
+4. RAYCAST KEYCAPS. Footer hint chips tighten to the DESIGN
+   spec: 4 px radius, min-width 20, brighter 11 px text.
+5. A 54 PX SEARCH BAND. The input-as-header gets one more
+   notch of breathing room at 16 px input type.
 
 WHAT'S NEW IN v2.4.0-alpha.1 (the Raycast-grade UI overhaul)
 ---------------------------------------------------------------

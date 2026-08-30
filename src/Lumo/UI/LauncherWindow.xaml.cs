@@ -177,10 +177,10 @@ public partial class LauncherWindow : Window
                     DiagnosticLogger.Log("Window", $"Configured hotkey unavailable — fallback '{active}' active");
             }
 
-            // v2.0 — the HWND now exists: apply DWM chrome (round corners, dark mode),
-            // then paint the solid Win11 palette.
+            // v2.0 → v2.4.0-alpha.2 — the HWND now exists; ApplyTheme applies DWM
+            // chrome (round corners, dark mode) and the material (acrylic or solid)
+            // in one place.
             _sourceReady = true;
-            GlassBackdrop.Apply(this, _settings.EffectiveDark());
             ApplyTheme();
         }
         catch (Exception ex)
@@ -1444,9 +1444,12 @@ public partial class LauncherWindow : Window
         {
             bool dark = _settings.EffectiveDark();
 
-            // v2.0 — DWM chrome only (rounded corners + dark-mode context); no acrylic.
+            // v2.4.0-alpha.2 — Raycast material: frosted-glass acrylic blur-behind for
+            // the launcher (falls back to the solid palette when unsupported); returns
+            // whether the glass is actually live so the surface paints translucent.
+            bool glass = false;
             if (_sourceReady)
-                GlassBackdrop.Apply(this, dark);
+                glass = GlassBackdrop.Apply(this, dark, acrylic: _settings.Acrylic);
 
             var p = Appearance.PaletteFor(dark, _settings.AccentColor);
 
@@ -1476,20 +1479,28 @@ public partial class LauncherWindow : Window
             bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
             float r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
             double t = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
-            Root.Background = new SolidColorBrush(p.Panel);
+
+            // v2.4.0-alpha.2 — when the acrylic glass is live, the card itself becomes
+            // translucent so the frosted desktop shows through (Raycast rgba(28,28,30,.9));
+            // content-tier surfaces (fields, chips, tiles) stay OPAQUE for readability.
+            byte panelAlpha = glass ? (byte)0xB4 : (byte)0xFF;
+            Root.Background = new SolidColorBrush(Color.FromArgb(panelAlpha, p.Panel.R, p.Panel.G, p.Panel.B));
             Root.CornerRadius = new CornerRadius(r);
             _themeBorderBrush = new SolidColorBrush(p.Border);
 
             // v2.0.1 — rim comet geometry follows the theme radius: hairline ring for
             // definition, clipped orbit host, and the cover patch inset by the rim
-            // thickness (painted with the SAME opaque panel → the comet shows only
-            // in the outer band).
+            // thickness (painted with the SAME panel fill → the comet shows only
+            // in the outer band). On glass the cover goes slightly more translucent
+            // than the panel so the interior blobs read as light diffusing through
+            // the frost instead of a hard edge-lit band.
             RimLine.CornerRadius = new CornerRadius(r);
             RimLine.BorderBrush = _themeBorderBrush;
             GlowClip.CornerRadius = new CornerRadius(r);
             GlowCover.CornerRadius = new CornerRadius(Math.Max(0, r - t));
             GlowCover.Margin = new Thickness(t);
-            GlowCover.Background = Root.Background;
+            GlowCover.Background = new SolidColorBrush(
+                Color.FromArgb(glass ? (byte)0xC0 : (byte)0xFF, p.Panel.R, p.Panel.G, p.Panel.B));
             Resources["ResultRowPad"] = string.Equals(_settings.RowDensity, "compact", StringComparison.OrdinalIgnoreCase)
                 ? new Thickness(14, 4, 14, 4)
                 : new Thickness(14, 7, 14, 7);
