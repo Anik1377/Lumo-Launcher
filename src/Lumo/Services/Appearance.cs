@@ -183,7 +183,7 @@ public static class Appearance
                 Title:    FromRgb(0xFF, 0xFF, 0xFF),   // TextFillColorPrimary dark
                 Subtitle: FromRgb(0xC8, 0xC8, 0xC8),   // TextFillColorSecondary dark
                 Hover:    Color.FromArgb(0x12, 0xFF, 0xFF, 0xFF),   // SubtleFillColorSecondary-ish
-                Selected: Tint(accent, 0x36),          // accent @ 21% — nav/list selection
+                Selected: Tint(accent, 0x2E),          // accent @ 18% — softer with the new selection pill
                 GlyphBox: FromRgb(0x2D, 0x2D, 0x2D),
                 Accent:   accent,
                 Separator: FromRgb(0x33, 0x33, 0x33))
@@ -194,7 +194,7 @@ public static class Appearance
                 Title:    FromRgb(0x1B, 0x1B, 0x1B),   // TextFillColorPrimary light
                 Subtitle: FromRgb(0x5F, 0x5F, 0x5F),   // TextFillColorSecondary light
                 Hover:    Color.FromArgb(0x0D, 0x00, 0x00, 0x00),
-                Selected: Tint(accent, 0x2A),
+                Selected: Tint(accent, 0x26),
                 GlyphBox: FromRgb(0xFB, 0xFB, 0xFB),
                 Accent:   accent,
                 Separator: FromRgb(0xE0, 0xE0, 0xE0));

@@ -46,6 +46,22 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
+## 🆕 What's new in v2.0.0-alpha.3 — accent fixes + advanced customization
+
+1. **🎯 Search-field accent overlap fixed.** While typing, the field used to paint
+   a full accent border **and** the 2 px accent bar — two accent layers stacked on
+   one box. The Win11-correct treatment now: hairline stroke always, accent only
+   in the 2 px bottom focus bar.
+2. **💊 Win11 selection pill.** The selected result row gets a 3 px accent bar on
+   its left edge (like Win11 list/nav selection), and the accent row tint was
+   softened from 21 % → 18 % (dark) / 15 % (light) so content stays readable.
+3. **🎛️ Advanced customization** (Settings → Appearance, all applied live):
+   - **Glow brightness** — 40–100 % rim comet opacity
+   - **Rim thickness** — 2–6 px glowing band
+   - **Launcher width** — 560–900 px window width
+   - **Corner radius** — Win11 rounded (8 px) or square
+   - **Result density** — comfortable or compact rows
+
 ## 🆕 What's new in v2.0.0-alpha.2 — the rim comet, rebuilt
 
 The alpha.1 glow used a **spinning gradient brush on the 1 px window border**. On a

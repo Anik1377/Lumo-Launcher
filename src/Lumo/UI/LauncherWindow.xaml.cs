@@ -53,8 +53,7 @@ public partial class LauncherWindow : Window
     private bool _staggerNext = true;        // v1.4 — stagger only on show/empty→results, not every keystroke
     private string _prevQuery = "";
 
-    private const double GlowActiveOpacity = 0.9;    // v2.0.1 — comet shows only in a thin rim band
-    private const double GlowDimOpacity = 0.35;
+    private const double GlowDimFactor = 0.4;        // dimmed = 40 % of the active brightness
 
     /// <summary>Human-readable description of the hotkey that actually registered.</summary>
     public string? ActiveHotkeyDescription => _hotkey?.ActiveDescription;
@@ -95,9 +94,17 @@ public partial class LauncherWindow : Window
         // v2.0.1 — track size: rebuild the comet clip + perimeter path as the window
         // height follows the result list (SizeToContent).
         Root.SizeChanged += OnRootSizeChanged;
+        ApplyWindowSize();
 
         ApplyTheme();
         ApplyBorderEffect();
+    }
+
+    /// <summary>v2.0.1 — honours the user's launcher width preference (560–900 DIP).</summary>
+    private void ApplyWindowSize()
+    {
+        try { Width = Math.Clamp(_settings.WindowWidth, 560, 900); }
+        catch { }
     }
 
     // ---------------------------------------------------------------- lifecycle
@@ -250,7 +257,7 @@ public partial class LauncherWindow : Window
         Root.Opacity = 1;
         RootScale.ScaleX = RootScale.ScaleY = 1;
         RootShift.Y = 0;
-        GlowClip.Opacity = _glowDimmed ? GlowDimOpacity : CurrentGlowOpacity();
+        GlowClip.Opacity = CurrentGlowOpacity();
     }
 
     /// <summary>Quick fade-out, then really hide. Safe against rapid toggle races.</summary>
@@ -329,9 +336,9 @@ public partial class LauncherWindow : Window
             PauseGlow();
             if (_settings.AnimationsEnabled && IsVisible)
                 GlowClip.BeginAnimation(OpacityProperty,
-                    new DoubleAnimation(GlowClip.Opacity, GlowDimOpacity, TimeSpan.FromMilliseconds(300)));
+                    new DoubleAnimation(GlowClip.Opacity, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(300)));
             else
-                GlowClip.Opacity = GlowDimOpacity;
+                GlowClip.Opacity = CurrentGlowOpacity();
         }
         catch { }
     }
@@ -742,7 +749,10 @@ public partial class LauncherWindow : Window
 
             // Win11 rounded corners come from DWM on Windows 11; Windows 10 keeps square
             // corners (an unpainted radius would otherwise expose raw window corners).
-            float r = GlassBackdrop.IsWin11 ? 8f : 0f;
+            // v2.0.1 — the user can also force square corners from Settings → Appearance.
+            bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
+            float r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
+            double t = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
             Root.Background = new SolidColorBrush(p.Panel);
             Root.CornerRadius = new CornerRadius(r);
             _themeBorderBrush = new SolidColorBrush(p.Border);
@@ -750,12 +760,16 @@ public partial class LauncherWindow : Window
             // v2.0.1 — rim comet geometry follows the theme radius: hairline ring for
             // definition, clipped orbit host, and the cover patch inset by the rim
             // thickness (painted with the SAME opaque panel → the comet shows only
-            // in the outer 3 px band).
+            // in the outer band).
             RimLine.CornerRadius = new CornerRadius(r);
             RimLine.BorderBrush = _themeBorderBrush;
             GlowClip.CornerRadius = new CornerRadius(r);
-            GlowCover.CornerRadius = new CornerRadius(Math.Max(0, r - 3));
+            GlowCover.CornerRadius = new CornerRadius(Math.Max(0, r - t));
+            GlowCover.Margin = new Thickness(t);
             GlowCover.Background = Root.Background;
+            Resources["ResultRowPad"] = string.Equals(_settings.RowDensity, "compact", StringComparison.OrdinalIgnoreCase)
+                ? new Thickness(10, 3, 10, 3)
+                : new Thickness(10, 6, 10, 6);
             if (ActualWidth >= 40 && ActualHeight >= 40)
                 UpdateGlowGeometry(new Size(ActualWidth, ActualHeight));
             Input.Foreground = new SolidColorBrush(p.Title);
@@ -781,16 +795,22 @@ public partial class LauncherWindow : Window
         {
             bool focused = Input.IsKeyboardFocusWithin;
             FocusBar.Visibility = focused ? Visibility.Visible : Visibility.Collapsed;
-            SearchField.BorderBrush = focused
-                ? (Brush)FindResource("AccentBrush")
-                : (Brush)FindResource("BorderLineBrush");
+            // v2.0.1 FIX — the Win11 text-field treatment keeps the hairline stroke in
+            // BOTH states: the accent lives ONLY in the 2 px bottom bar. (Painting the
+            // whole border accent + the bar overlapped two accent layers on one box.)
+            SearchField.BorderBrush = (Brush)FindResource("BorderLineBrush");
         }
         catch { }
     }
 
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
 
-    private double CurrentGlowOpacity() => _glowDimmed ? GlowDimOpacity : GlowActiveOpacity;
+    private double CurrentGlowOpacity()
+    {
+        // v2.0.1 — user-tunable brightness (Settings → Appearance → Glow brightness)
+        double active = Math.Clamp(_settings.GlowOpacity, 0.4, 1.0);
+        return _glowDimmed ? active * GlowDimFactor : active;
+    }
 
     /// <summary>
     /// The glow effect, v2.0.1 — the z.ai chat-box comet. Two soft light blobs orbit
@@ -904,12 +924,15 @@ public partial class LauncherWindow : Window
     /// </summary>
     private void UpdateGlowGeometry(Size size)
     {
-        double r = GlassBackdrop.IsWin11 ? 8f : 0f;
+        bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
+        double r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
+        double t = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
         GlowClip.Clip = new RectangleGeometry(new Rect(0, 0, size.Width, size.Height), r, r);
 
         if (_glowPath is null) return;
         _glowPath.Figures.Clear();
-        _glowPath.Figures.Add(BuildPerimeterFigure(size.Width, size.Height, 1.5, Math.Max(2, r - 1.5)));
+        // the blob CENTRES travel exactly on the middle of the glowing band
+        _glowPath.Figures.Add(BuildPerimeterFigure(size.Width, size.Height, t / 2, Math.Max(2, r - t / 2)));
     }
 
     /// <summary>Closed rounded-rectangle outline (clockwise from the top-left corner).</summary>
@@ -955,11 +978,12 @@ public partial class LauncherWindow : Window
         catch { }
     }
 
-    /// <summary>Re-apply theme + border effect (used live by the settings window).</summary>
+    /// <summary>Re-apply theme + border effect + window size (used live by the settings window).</summary>
     public void RefreshAppearance()
     {
         ApplyTheme();
         ApplyBorderEffect();
+        ApplyWindowSize();
     }
 
     /// <summary>Re-register the global hotkey after the user changed it in Settings.</summary>

@@ -496,6 +496,80 @@
                                             </StackPanel>
                                         </Grid>
 
+                                        <!-- v2.0.1 — advanced fine-tuning -->
+                                        <Grid Margin="0,14,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <Grid>
+                                                    <TextBlock Text="Glow brightness" Style="{StaticResource SettingName}"/>
+                                                    <TextBlock x:Name="GlowOpacityValue" Text="90%" HorizontalAlignment="Right"
+                                                               FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
+                                                </Grid>
+                                                <Slider x:Name="GlowOpacitySlider" Minimum="40" Maximum="100" TickFrequency="5"
+                                                        IsSnapToTickEnabled="True" Margin="0,8,14,0"
+                                                        Foreground="{DynamicResource AccentBrush}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" MinWidth="220" Margin="24,0,0,0">
+                                                <Grid>
+                                                    <TextBlock Text="Rim thickness" Style="{StaticResource SettingName}"/>
+                                                    <TextBlock x:Name="RimThicknessValue" Text="3 px" HorizontalAlignment="Right"
+                                                               FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
+                                                </Grid>
+                                                <Slider x:Name="RimThicknessSlider" Minimum="2" Maximum="6" TickFrequency="0.5"
+                                                        IsSnapToTickEnabled="True" Margin="0,8,0,0"
+                                                        Foreground="{DynamicResource AccentBrush}"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,14,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <Grid>
+                                                    <TextBlock Text="Launcher width" Style="{StaticResource SettingName}"/>
+                                                    <TextBlock x:Name="WidthValue" Text="720 px" HorizontalAlignment="Right"
+                                                               FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
+                                                </Grid>
+                                                <Slider x:Name="WidthSlider" Minimum="560" Maximum="900" TickFrequency="10"
+                                                        IsSnapToTickEnabled="True" Margin="0,8,14,0"
+                                                        Foreground="{DynamicResource AccentBrush}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Margin="24,0,0,0">
+                                                <TextBlock Text="Corner radius" Style="{StaticResource SettingName}"/>
+                                                <Border Background="{DynamicResource SegTrackBrush}" CornerRadius="9"
+                                                        Padding="3" Margin="0,8,0,0" HorizontalAlignment="Right">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <RadioButton x:Name="CornerRounded" Content="Win11 rounded" Style="{StaticResource SegRadio}" GroupName="Corner"/>
+                                                        <RadioButton x:Name="CornerSquare" Content="Square" Style="{StaticResource SegRadio}" GroupName="Corner"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <Grid Margin="0,14,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Result density" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}"
+                                                           Text="Compact tightens the result rows so more fit on screen."/>
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Background="{DynamicResource SegTrackBrush}" CornerRadius="9"
+                                                    Padding="3" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <RadioButton x:Name="DensityComfortable" Content="Comfortable" Style="{StaticResource SegRadio}" GroupName="Density"/>
+                                                    <RadioButton x:Name="DensityCompact" Content="Compact" Style="{StaticResource SegRadio}" GroupName="Density"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+
                                         <!-- live preview strip -->
                                         <Border Margin="0,16,0,0" CornerRadius="12" BorderThickness="1.4" Height="64"
                                                 x:Name="PreviewCard" Background="{DynamicResource FieldBrush}">

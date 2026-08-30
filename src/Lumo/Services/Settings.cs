@@ -29,7 +29,14 @@ public sealed class Settings
 
     // ---- v1.3 customization -------------------------------------------------
     public bool AnimationsEnabled { get; set; } = true;    // master switch for every animation
-    public bool GlassEffect { get; set; } = true;          // v1.7 acrylic glass backdrop (graceful fallback)
+    public bool GlassEffect { get; set; } = true;          // v1.7 legacy key (unused since v2.0, kept for JSON back-compat)
+
+    // ---- v2.0.1 advanced customization --------------------------------------
+    public double GlowOpacity { get; set; } = 0.9;         // rim comet brightness (0.40–1.00)
+    public double RimThickness { get; set; } = 3.0;        // glowing rim band width in px (2–6)
+    public double WindowWidth { get; set; } = 720.0;       // launcher width in DIP (560–900)
+    public string CornerStyle { get; set; } = "rounded";   // rounded (Win11 8 px) | square
+    public string RowDensity { get; set; } = "comfortable"; // comfortable | compact
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
@@ -59,6 +66,11 @@ public sealed class Settings
                     s.MaxIndexedFiles   = (int)Math.Clamp(GetNum(root, nameof(MaxIndexedFiles), s.MaxIndexedFiles), 10_000, 500_000);
                     s.AnimationsEnabled = GetBool(root, nameof(AnimationsEnabled), s.AnimationsEnabled);
                     s.GlassEffect       = GetBool(root, nameof(GlassEffect), s.GlassEffect);
+                    s.GlowOpacity       = GetNum(root, nameof(GlowOpacity), s.GlowOpacity);
+                    s.RimThickness      = GetNum(root, nameof(RimThickness), s.RimThickness);
+                    s.WindowWidth       = GetNum(root, nameof(WindowWidth), s.WindowWidth);
+                    s.CornerStyle       = GetStr(root, nameof(CornerStyle), s.CornerStyle);
+                    s.RowDensity        = GetStr(root, nameof(RowDensity), s.RowDensity);
                 }
             }
         }
@@ -140,6 +152,11 @@ public sealed class Settings
         StartWithWindows = o.StartWithWindows;
         MaxIndexedFiles = o.MaxIndexedFiles;
         AnimationsEnabled = o.AnimationsEnabled;
+        GlowOpacity = o.GlowOpacity;
+        RimThickness = o.RimThickness;
+        WindowWidth = o.WindowWidth;
+        CornerStyle = o.CornerStyle;
+        RowDensity = o.RowDensity;
     }
 
     /// <summary>

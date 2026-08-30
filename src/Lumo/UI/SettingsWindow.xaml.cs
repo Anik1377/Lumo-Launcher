@@ -316,6 +316,20 @@ public partial class SettingsWindow : Window
             AccentHexBox.Text = _settings.AccentColor;
             MarkSelectedSwatch(_settings.AccentColor);
 
+            // v2.0.1 — advanced fine-tuning
+            GlowOpacitySlider.Value = Math.Clamp(_settings.GlowOpacity, 0.4, 1.0) * 100.0;
+            RimThicknessSlider.Value = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
+            WidthSlider.Value = Math.Clamp(_settings.WindowWidth, 560, 900);
+            if (string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase))
+                CornerSquare.IsChecked = true;
+            else
+                CornerRounded.IsChecked = true;
+            if (string.Equals(_settings.RowDensity, "compact", StringComparison.OrdinalIgnoreCase))
+                DensityCompact.IsChecked = true;
+            else
+                DensityComfortable.IsChecked = true;
+            UpdateAdvLabels();
+
             MaxFilesSlider.Value = Math.Clamp(_settings.MaxIndexedFiles, 10_000, 300_000);
             MaxFilesLabel.Text = ((int)MaxFilesSlider.Value).ToString("N0");
 
@@ -358,6 +372,15 @@ public partial class SettingsWindow : Window
             SpeedNormal.Checked += (_, _) => SyncLiveAppearance();
             SpeedSlow.Checked += (_, _) => SyncLiveAppearance();
 
+            // v2.0.1 — advanced fine-tuning wiring (all live)
+            GlowOpacitySlider.ValueChanged += (_, _) => { UpdateAdvLabels(); SyncLiveAppearance(); };
+            RimThicknessSlider.ValueChanged += (_, _) => { UpdateAdvLabels(); SyncLiveAppearance(); };
+            WidthSlider.ValueChanged += (_, _) => { UpdateAdvLabels(); SyncLiveAppearance(); };
+            CornerRounded.Checked += (_, _) => SyncLiveAppearance();
+            CornerSquare.Checked += (_, _) => SyncLiveAppearance();
+            DensityComfortable.Checked += (_, _) => SyncLiveAppearance();
+            DensityCompact.Checked += (_, _) => SyncLiveAppearance();
+
             MaxFilesSlider.ValueChanged += (_, _) =>
             {
                 MaxFilesLabel.Text = ((int)MaxFilesSlider.Value).ToString("N0");
@@ -388,6 +411,13 @@ public partial class SettingsWindow : Window
                 SpeedFast.IsChecked == true ? 6.0 :
                 SpeedSlow.IsChecked == true ? 14.0 : 9.0;
 
+            // v2.0.1 — advanced fine-tuning
+            _settings.GlowOpacity = Math.Clamp(GlowOpacitySlider.Value, 40, 100) / 100.0;
+            _settings.RimThickness = Math.Clamp(RimThicknessSlider.Value, 2.0, 6.0);
+            _settings.WindowWidth = Math.Clamp(WidthSlider.Value, 560, 900);
+            _settings.CornerStyle = CornerSquare.IsChecked == true ? "square" : "rounded";
+            _settings.RowDensity = DensityCompact.IsChecked == true ? "compact" : "comfortable";
+
             ApplySelfTheme();
             UpdatePreview();
             MarkSelectedSwatch(_settings.AccentColor);
@@ -395,6 +425,18 @@ public partial class SettingsWindow : Window
             _applyAppearance();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.SyncLive", ex); }
+    }
+
+    /// <summary>v2.0.1 — keeps the value chips next to the advanced sliders honest.</summary>
+    private void UpdateAdvLabels()
+    {
+        try
+        {
+            GlowOpacityValue.Text = $"{(int)Math.Clamp(GlowOpacitySlider.Value, 40, 100)}%";
+            RimThicknessValue.Text = $"{RimThicknessSlider.Value:0.#} px";
+            WidthValue.Text = $"{(int)Math.Clamp(WidthSlider.Value, 560, 900)} px";
+        }
+        catch { }
     }
 
     private void UpdatePreview()

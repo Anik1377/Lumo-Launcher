@@ -224,6 +224,10 @@
                                                         Background="{DynamicResource HoverBrush}" Opacity="0"/>
                                                 <Border x:Name="SelectedOverlay" CornerRadius="4"
                                                         Background="{DynamicResource SelectedBrush}" Opacity="0"/>
+                                                <!-- v2.0.1 — Win11 selection pill: 3 px accent bar on the left edge -->
+                                                <Border x:Name="SelPill" Width="3" CornerRadius="1.5"
+                                                        Background="{DynamicResource AccentBrush}"
+                                                        HorizontalAlignment="Left" Margin="2,9,0,9" Opacity="0"/>
                                                 <ContentPresenter/>
                                             </Grid>
                                         </Border>
@@ -255,6 +259,9 @@
                                                             <DoubleAnimation Storyboard.TargetName="SelectedOverlay"
                                                                              Storyboard.TargetProperty="Opacity"
                                                                              To="1" Duration="0:0:0.10"/>
+                                                            <DoubleAnimation Storyboard.TargetName="SelPill"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="1" Duration="0:0:0.10"/>
                                                         </Storyboard>
                                                     </BeginStoryboard>
                                                 </Trigger.EnterActions>
@@ -264,6 +271,9 @@
                                                             <DoubleAnimation Storyboard.TargetName="SelectedOverlay"
                                                                              Storyboard.TargetProperty="Opacity"
                                                                              To="0" Duration="0:0:0.22"/>
+                                                            <DoubleAnimation Storyboard.TargetName="SelPill"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.18"/>
                                                         </Storyboard>
                                                     </BeginStoryboard>
                                                 </Trigger.ExitActions>
@@ -276,7 +286,7 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <Grid Margin="10,6">
+                            <Grid Margin="{DynamicResource ResultRowPad}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>

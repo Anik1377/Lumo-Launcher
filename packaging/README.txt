@@ -1,7 +1,18 @@
 ======================================================
-  LUMO v2.0.0-alpha.2  —  universal launcher for Windows
+  LUMO v2.0.0-alpha.3  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.0.0-alpha.3 (accent fixes + advanced customization)
+--------------------------------------------------------------------
+1. SEARCH FIELD FIX - no more double accent: hairline stroke
+   always, accent only in the 2 px bottom focus bar.
+2. WIN11 SELECTION PILL - 3 px accent bar on the selected
+   row's left edge; row tint softened for readability.
+3. ADVANCED CUSTOMIZATION (Appearance, all live):
+   glow brightness 40-100%, rim thickness 2-6 px,
+   launcher width 560-900 px, corner radius rounded/square,
+   result density comfortable/compact.
 
 WHAT'S NEW IN v2.0.0-alpha.2 (the rim comet, rebuilt)
 -----------------------------------------------------
