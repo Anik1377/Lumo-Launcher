@@ -46,6 +46,22 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
 | 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
 
+## 🆕 What's new in v2.0.0-alpha.4 — the comet never stops again
+
+The alpha.2/3 comet was driven by a WPF **timeline storyboard** (path animations
+with a negative begin-time tail and in-place path mutation on resize) — a fragile
+combination that could stop after exactly one lap. The engine is rewritten:
+
+1. **♾️ Loop is now mathematical, not clocked.** The perimeter is sampled once into
+   720 points; every frame the head/tail positions are computed from
+   `elapsed time % lap`. Seamless by construction — there is no repeat behavior
+   left to fail.
+2. **📉 Zero idle CPU, same as before** — the render hook detaches whenever the
+   window hides or loses focus, and re-attaches on show/activate.
+3. **📐 Resize + live-settings proof** — dragging the width/thickness sliders or
+   typing (window height changes) re-samples the outline in place; the comet
+   keeps its time-based position with no restart, no snap, no stall.
+
 ## 🆕 What's new in v2.0.0-alpha.3 — accent fixes + advanced customization
 
 1. **🎯 Search-field accent overlap fixed.** While typing, the field used to paint

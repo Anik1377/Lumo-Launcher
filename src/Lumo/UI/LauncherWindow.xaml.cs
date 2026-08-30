@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -45,9 +46,12 @@ public partial class LauncherWindow : Window
     private bool _allowClose;
     private IntPtr _hwnd;
     private Brush _themeBorderBrush = Brushes.DimGray;
-    private Storyboard? _glowStoryboard;     // v2.0.1 — perimeter comet path storyboard
-    private PathGeometry? _glowPath;         // unfrozen — figures swap live as the window resizes
-    private bool _glowRunning;               // animation clock currently active
+    // v2.0.2 — the comet is driven by CompositionTarget.Rendering + a Stopwatch: the
+    // position is a pure function of elapsed time (elapsed % lap), so the loop is
+    // seamless BY CONSTRUCTION and can never stall like timeline clocks can.
+    private readonly Stopwatch _glowWatch = Stopwatch.StartNew();
+    private Point[] _glowSamples = Array.Empty<Point>();   // precomputed perimeter samples
+    private bool _glowClockAttached;
     private bool _glowDimmed;                // window inactive → comet dimmed
     private int _animGen;                    // invalidates stale hide-completion callbacks
     private bool _staggerNext = true;        // v1.4 — stagger only on show/empty→results, not every keystroke
@@ -813,12 +817,15 @@ public partial class LauncherWindow : Window
     }
 
     /// <summary>
-    /// The glow effect, v2.0.1 — the z.ai chat-box comet. Two soft light blobs orbit
-    /// the true window perimeter (DoubleAnimationUsingPath along a rounded-rect path);
-    /// the orbit host is clipped to the window, so the light only ever exists INSIDE
-    /// the rim — no outer bleed, no halo, no spinning gradient. The storyboard stays
-    /// controllable so it pauses whenever the window is hidden or inactive (zero idle
-    /// CPU). "Solid" style = static accent ring, no motion.
+    /// v2.0.2 glow engine — the z.ai chat-box comet, rebuilt to CANNOT stop looping.
+    /// The old alpha.2/3 engine used a controllable Storyboard of
+    /// DoubleAnimationUsingPath timelines (negative BeginTime for the tail, in-place
+    /// path mutation on resize) — a fragile combination that can stop after one lap.
+    /// Now: the perimeter is sampled ONCE into a point array, and every composition
+    /// frame the head/tail positions are set from elapsed-time-modulo-lap. The loop is
+    /// seamless by construction, resize-proof (re-sample in place), and costs zero
+    /// idle CPU (the clock detaches when the window hides or deactivates).
+    /// "Solid" style = static accent ring, no motion.
     /// </summary>
     public void ApplyBorderEffect()
     {
@@ -837,10 +844,9 @@ public partial class LauncherWindow : Window
                     GlowClip.Visibility = Visibility.Visible;
                     GlowClip.Opacity = CurrentGlowOpacity();
 
-                    _glowPath ??= new PathGeometry();
                     if (ActualWidth >= 40 && ActualHeight >= 40)
-                        UpdateGlowGeometry(new Size(ActualWidth, ActualHeight));
-                    StartGlowStoryboard();
+                        EnsureGlowSamples(new Size(ActualWidth, ActualHeight));
+                    AttachGlowClock();
                 }
                 else
                 {
@@ -860,50 +866,73 @@ public partial class LauncherWindow : Window
         }
     }
 
-    private void StartGlowStoryboard()
+    /// <summary>Number of perimeter samples — dense enough to look continuous, trivial to recompute.</summary>
+    private const int GlowSampleCount = 720;
+
+    /// <summary>
+    /// Samples the rounded-rect perimeter (blob centres travel the band's middle line)
+    /// into a frozen point array. Rebuilt in place on resize/style change — the comet
+    /// continues from its time-based position with no restart and no snap.
+    /// </summary>
+    private void EnsureGlowSamples(Size size)
     {
         try
         {
-            _glowStoryboard?.Remove(this);
-            _glowStoryboard = null;
-            if (_glowPath is null) return;
+            bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
+            double r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
+            double t = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
 
-            // 3.5 s (the v2.0.0 default) was tuned for brush rotation; a blob travelling
-            // the real perimeter reads best at a calm pace. Old saved values clamp in.
-            double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 9.0 : Math.Clamp(_settings.BorderSpeedSec, 4.0, 30.0);
-            var dur = TimeSpan.FromSeconds(sec);
+            var geo = new PathGeometry();
+            geo.Figures.Add(BuildPerimeterFigure(size.Width, size.Height, t / 2, Math.Max(2, r - t / 2)));
+            geo.Freeze();
 
-            var sb = new Storyboard();
-            AddPathAnimations(sb, "GlowHeadPos", dur, TimeSpan.Zero);
-            AddPathAnimations(sb, "GlowTailPos", dur, TimeSpan.FromSeconds(-sec * 0.07));   // tail trails the head
-
-            _glowStoryboard = sb;
-            sb.Begin(this, isControllable: true);
-            _glowRunning = true;
+            var pts = new Point[GlowSampleCount];
+            for (int i = 0; i < GlowSampleCount; i++)
+                geo.GetPointAtFractionLength((double)i / GlowSampleCount, out pts[i], out _);
+            _glowSamples = pts;
         }
         catch (Exception ex)
         {
-            DiagnosticLogger.LogException("Window.StartGlow", ex);
+            DiagnosticLogger.LogException("Window.GlowSamples", ex);
         }
     }
 
-    private void AddPathAnimations(Storyboard sb, string targetName, Duration dur, TimeSpan begin)
+    private void AttachGlowClock()
     {
-        foreach (var src in new[] { PathAnimationSource.X, PathAnimationSource.Y })
+        if (_glowClockAttached) return;
+        CompositionTarget.Rendering += OnGlowFrame;
+        _glowClockAttached = true;
+    }
+
+    private void DetachGlowClock()
+    {
+        if (!_glowClockAttached) return;
+        CompositionTarget.Rendering -= OnGlowFrame;
+        _glowClockAttached = false;
+    }
+
+    /// <summary>
+    /// Per-frame comet update. Setting the transform positions invalidates the visual,
+    /// which schedules the next frame — the loop self-drives while visible and costs
+    /// nothing when paused (handler early-outs, clock detached on hide/deactivate).
+    /// </summary>
+    private void OnGlowFrame(object? sender, EventArgs e)
+    {
+        try
         {
-            var anim = new DoubleAnimationUsingPath
-            {
-                PathGeometry = _glowPath!,
-                Source = src,
-                Duration = dur,
-                RepeatBehavior = RepeatBehavior.Forever,
-                BeginTime = begin,
-            };
-            Storyboard.SetTargetName(anim, targetName);
-            Storyboard.SetTargetProperty(anim, new PropertyPath(
-                src == PathAnimationSource.X ? TranslateTransform.XProperty : TranslateTransform.YProperty));
-            sb.Children.Add(anim);
+            var pts = _glowSamples;
+            if (pts.Length == 0 || !IsVisible) return;
+
+            double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 9.0 : Math.Clamp(_settings.BorderSpeedSec, 4.0, 30.0);
+            double frac = (_glowWatch.Elapsed.TotalSeconds % sec) / sec;                 // 0..1, seamless
+            int n = pts.Length;
+            int head = (int)(frac * n) % n;
+            int tail = ((int)(frac * n) - (int)(0.07 * n) + n) % n;                      // trails the head
+
+            GlowHeadPos.X = pts[head].X; GlowHeadPos.Y = pts[head].Y;
+            GlowTailPos.X = pts[tail].X; GlowTailPos.Y = pts[tail].Y;
         }
+        catch { }
     }
 
     private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
@@ -917,22 +946,16 @@ public partial class LauncherWindow : Window
     }
 
     /// <summary>
-    /// Rebuilds the rounded-rect clip and the perimeter path the comet travels. The
-    /// path geometry is mutated IN PLACE (never frozen) so the running storyboard
-    /// picks up the new outline without a restart — the comet never snaps back to its
-    /// start when the result list changes the window height.
+    /// Keeps the rounded-rect clip and the perimeter samples in sync with the window
+    /// size. The comet position derives from time, so a resize never restarts or snaps
+    /// the animation — the next frame simply uses the new samples.
     /// </summary>
     private void UpdateGlowGeometry(Size size)
     {
         bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
         double r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
-        double t = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
         GlowClip.Clip = new RectangleGeometry(new Rect(0, 0, size.Width, size.Height), r, r);
-
-        if (_glowPath is null) return;
-        _glowPath.Figures.Clear();
-        // the blob CENTRES travel exactly on the middle of the glowing band
-        _glowPath.Figures.Add(BuildPerimeterFigure(size.Width, size.Height, t / 2, Math.Max(2, r - t / 2)));
+        EnsureGlowSamples(size);
     }
 
     /// <summary>Closed rounded-rectangle outline (clockwise from the top-left corner).</summary>
@@ -955,27 +978,28 @@ public partial class LauncherWindow : Window
 
     private void StopGlow()
     {
-        try { _glowStoryboard?.Remove(this); } catch { }
-        _glowStoryboard = null;
-        _glowRunning = false;
+        DetachGlowClock();
     }
 
     private void PauseGlow()
     {
-        try
-        {
-            if (_glowStoryboard is { } sb && _glowRunning) { sb.Pause(this); _glowRunning = false; }
-        }
-        catch { }
+        try { DetachGlowClock(); } catch { }
     }
 
     private void ResumeGlow()
     {
         try
         {
-            if (_glowStoryboard is { } sb && !_glowRunning) { sb.Resume(this); _glowRunning = true; }
+            if (_settings.BorderEffect && Appearance.IsAnimatedStyle(_settings.BorderStyle))
+                AttachGlowClock();
         }
         catch { }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        DetachGlowClock();
+        base.OnClosed(e);
     }
 
     /// <summary>Re-apply theme + border effect + window size (used live by the settings window).</summary>

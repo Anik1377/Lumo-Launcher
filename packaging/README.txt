@@ -1,7 +1,17 @@
 ======================================================
-  LUMO v2.0.0-alpha.3  —  universal launcher for Windows
+  LUMO v2.0.0-alpha.4  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.0.0-alpha.4 (the comet never stops again)
+----------------------------------------------------------
+1. LOOP FIX - the comet engine no longer uses WPF timeline
+   storyboards (which could stall after exactly one lap).
+   Positions are now computed from elapsed time modulo the
+   lap duration every frame - the loop is seamless by
+   construction and cannot stop.
+2. Still zero idle CPU (render hook detaches when hidden
+   or inactive) and resize-proof (re-samples in place).
 
 WHAT'S NEW IN v2.0.0-alpha.3 (accent fixes + advanced customization)
 --------------------------------------------------------------------
