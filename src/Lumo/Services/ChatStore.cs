@@ -16,6 +16,7 @@ public sealed class ChatSession
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Title { get; set; } = "New chat";
     public string Persona { get; set; } = "assistant";
+    public bool Pinned { get; set; }               // v2.4.0-alpha.6 — favorite chats float to the top
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     public List<ChatMessage> Messages { get; set; } = new();
@@ -90,7 +91,9 @@ public sealed class ChatStore
                         .ToList();
                     loaded.Sort((a, b) =>
                     {
-                        int c = b.UpdatedAt.CompareTo(a.UpdatedAt);
+                        int c = b.Pinned.CompareTo(a.Pinned);          // v2.4.0-alpha.6 — pinned chats first
+                        if (c != 0) return c;
+                        c = b.UpdatedAt.CompareTo(a.UpdatedAt);
                         return c != 0 ? c : b.Seq.CompareTo(a.Seq);
                     });
                     lock (store._gate)
@@ -117,6 +120,11 @@ public sealed class ChatStore
                 s.Title = t.GetString() ?? s.Title;
             if (el.TryGetProperty(nameof(ChatSession.Persona), out var p) && p.ValueKind == JsonValueKind.String)
                 s.Persona = p.GetString() ?? s.Persona;
+            if (el.TryGetProperty(nameof(ChatSession.Pinned), out var pin))
+            {
+                if (pin.ValueKind is JsonValueKind.True or JsonValueKind.False) s.Pinned = pin.GetBoolean();
+                else if (pin.ValueKind == JsonValueKind.String && bool.TryParse(pin.GetString(), out var pb)) s.Pinned = pb;
+            }
             if (el.TryGetProperty(nameof(ChatSession.CreatedAt), out var c) && c.ValueKind == JsonValueKind.String &&
                 DateTime.TryParse(c.GetString(), null, System.Globalization.DateTimeStyles.RoundtripKind, out var cd))
                 s.CreatedAt = cd.ToUniversalTime();
@@ -213,7 +221,9 @@ public sealed class ChatStore
             _sessions.RemoveRange(MaxSessions, _sessions.Count - MaxSessions);
         _sessions.Sort((a, b) =>
         {
-            int c = b.UpdatedAt.CompareTo(a.UpdatedAt);
+            int c = b.Pinned.CompareTo(a.Pinned);              // v2.4.0-alpha.6 — pinned chats first
+            if (c != 0) return c;
+            c = b.UpdatedAt.CompareTo(a.UpdatedAt);
             return c != 0 ? c : b.Seq.CompareTo(a.Seq);
         });
     }

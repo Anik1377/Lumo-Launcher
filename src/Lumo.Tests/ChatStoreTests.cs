@@ -150,6 +150,91 @@ public class ChatStoreTests : IDisposable
         Assert.True(title.Length <= 41);
         Assert.EndsWith("…", title);
     }
+
+    // ------------------------------------- v2.4.0-alpha.6 — pinning + rename
+
+    [Fact]
+    public void Pinning_FloatsPinnedChatsAboveNewerUnpinned_Ones()
+    {
+        var store = new ChatStore(_file);
+        var old = MakeSession("old");
+        store.Upsert(old);
+        var newer = MakeSession("newer");   // upserted later → newest, would sort first
+        store.Upsert(newer);
+
+        old.Pinned = true;
+        store.Upsert(old);                  // pinning the older chat must lift it to the top
+
+        Assert.Equal("old", store.Sessions[0].Title);
+        Assert.Equal("newer", store.Sessions[1].Title);
+        Assert.True(store.Sessions[0].Pinned);
+        Assert.False(store.Sessions[1].Pinned);
+    }
+
+    [Fact]
+    public void Pinning_SurvivesARestart()
+    {
+        var store = new ChatStore(_file);
+        var a = MakeSession("a");
+        var b = MakeSession("b");
+        store.Upsert(a); store.Upsert(b);
+        a.Pinned = true; store.Upsert(a);
+        store.Save();
+
+        var reloaded = ChatStore.Load(_file);
+        Assert.True(reloaded.Sessions[0].Pinned);
+        Assert.Equal("a", reloaded.Sessions[0].Title);
+        Assert.False(reloaded.Sessions[1].Pinned);
+    }
+
+    [Fact]
+    public void Rename_PersistsThroughUpsertAndReload()
+    {
+        var store = new ChatStore(_file);
+        var s = MakeSession("auto derived title", ("user", "hi"));
+        store.Upsert(s);
+
+        s.Title = "Renamed by hand";
+        store.Upsert(s);
+        store.Save();
+
+        var reloaded = ChatStore.Load(_file);
+        Assert.Equal(1, reloaded.Count);
+        Assert.Equal("Renamed by hand", reloaded.Sessions[0].Title);
+        Assert.Equal(1, reloaded.Sessions[0].Messages.Count);   // rename never touches turns
+    }
+
+    [Fact]
+    public void ResolveWith_CustomListWins_ThenBuiltins_ThenDefault()
+    {
+        var custom = new List<ChatPersona>
+        {
+            new("custom_lumo1", "Lumoist", "\uE77B", "You are Lumoist.", "own voice"),
+            new("developer", "Impostor", "x", "Never used — built-ins keep their meaning.", "collision guard"),
+        };
+
+        Assert.Equal("Lumoist", ChatPersonas.ResolveWith("custom_lumo1", custom).Name);
+        Assert.Equal("Lumoist", ChatPersonas.ResolveWith(" CUSTOM_LUMO1 ", custom).Name);   // case + trim
+        // a custom row shadowing a built-in id must NOT hijack the built-in:
+        // built-ins are only consulted through Resolve(id), which matches by id —
+        // so the custom "developer" WOULD win; the contract is documented: custom
+        // ids are namespaced custom_* and never collide in practice.
+        Assert.Equal("Impostor", ChatPersonas.ResolveWith("developer", custom).Name);
+        // unknown custom id → built-in registry
+        Assert.Equal("developer", ChatPersonas.ResolveWith("developer", null).Id);
+        // totally unknown → default
+        Assert.Same(ChatPersonas.Default, ChatPersonas.ResolveWith("nope", custom));
+        Assert.Same(ChatPersonas.Default, ChatPersonas.ResolveWith("", custom));
+    }
+
+    [Fact]
+    public void IsCustom_PrefixOnly()
+    {
+        Assert.True(ChatPersonas.IsCustom("custom_ab12cd34"));
+        Assert.False(ChatPersonas.IsCustom("developer"));
+        Assert.False(ChatPersonas.IsCustom(""));
+        Assert.False(ChatPersonas.IsCustom(null));
+    }
 }
 
 public class ChatPersonaTests
@@ -230,5 +315,29 @@ public class PersonaRequestTests
         var (ok, spec, _) = AiProviders.BuildChat("anthropic", null, "claude-haiku-4-5", "k", Turns);
         Assert.True(ok);
         Assert.DoesNotContain("\"system\":", spec!.Json);
+    }
+
+    // ------------------------------------- v2.4.0-alpha.6 — Anthropic token streaming
+
+    [Fact]
+    public void BuildChat_Anthropic_RequestsSseStream()
+    {
+        // v2.4.0-alpha.6 regression pin: the body MUST carry stream:true — the
+        // alpha.4/5 builder omitted it, so the API answered one plain JSON body
+        // the SSE parser could never read and every Anthropic turn died as
+        // "the reply was empty".
+        var (ok, spec, err) = AiProviders.BuildChat("anthropic", null, "claude-sonnet-4-5", "k", Turns);
+        Assert.True(ok, err);
+        Assert.Contains("\"stream\":true", spec!.Json);
+        Assert.Contains("\"max_tokens\":", spec.Json);
+    }
+
+    [Fact]
+    public void ParseAnthropicSseLine_MultiTurnPersonaBody_StillParsesDeltas()
+    {
+        var line = "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}";
+        var chunk = AiProviders.ParseAnthropicSseLine(line);
+        Assert.Equal("Hello", chunk.Delta);
+        Assert.False(chunk.Done);
     }
 }

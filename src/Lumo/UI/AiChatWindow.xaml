@@ -282,10 +282,16 @@
 
         <!-- v2.4.0-alpha.4 — minimal suggestion pill: no accent seed dot, just a
              hairline quiet pill that lifts its stroke on hover (the launcher's
-             raised-card language). The pill no longer shouts. -->
+             raised-card language). The pill no longer shouts.
+             v2.4.0-alpha.6 — the pill text is THEME-AWARE (TitleBrush): WPF's
+             default ControlText black used to leak through the template and
+             turn invisible on the dark pill. Ink now flips white-on-black /
+             black-on-white with the theme, and the fill got a touch more
+             presence so the pills read at a glance. -->
         <Style x:Key="ChipButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
             <Setter Property="Margin" Value="4"/>
             <Setter Property="ui:PressFeedback.IsEnabled" Value="True"/>
             <Setter Property="Template">
@@ -293,7 +299,7 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bg" Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
                                 BorderThickness="1" CornerRadius="16" Padding="14,7">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextBlock.Foreground="{TemplateBinding Foreground}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -446,6 +452,9 @@
                                 Style="{StaticResource CaptionButton}" Click="OnHistoryClick" ToolTip="Chat history"/>
                         <Button x:Name="NewChatButton" Content="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
                                 Style="{StaticResource CaptionButton}" Click="OnNewChat" ToolTip="New chat (Ctrl+N)"/>
+                        <!-- v2.4.0-alpha.6 — fullscreen / window toggle (also F11) -->
+                        <Button x:Name="FullscreenButton" Content="&#xE740;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                Style="{StaticResource CaptionButton}" Click="OnFullscreenClick" ToolTip="Fullscreen (F11)"/>
                         <Button x:Name="MinButton" Content="&#xE70E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
                                 Style="{StaticResource CaptionButton}" Click="OnMinimize"/>
                         <Button x:Name="CloseButton" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="11"
@@ -541,7 +550,8 @@
                     <Button x:Name="SendButton" Grid.Column="1" Style="{StaticResource SendButton}"
                             VerticalAlignment="Bottom" Margin="10,0,0,2" Click="OnSendClick"/>
                     <Button x:Name="StopButton" Grid.Column="1" Style="{StaticResource SendButton}" Tag="&#xE71A;"
-                            VerticalAlignment="Bottom" Margin="10,0,0,2" Visibility="Collapsed" Click="OnStopClick"/>
+                            VerticalAlignment="Bottom" Margin="10,0,0,2" Visibility="Collapsed" Click="OnStopClick"
+                            ToolTip="Stop generating"/>
                 </Grid>
             </Border>
 
@@ -549,7 +559,7 @@
                  the boxed chip row (minimal) ============ -->
             <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,8,0,11"
                        FontSize="10.5" Foreground="{DynamicResource SubtitleBrush}" Opacity="0.7"
-                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;esc hide"/>
+                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;F11 fullscreen&#160;&#160;&#183;&#160;&#160;esc stop / hide"/>
 
             <!-- ============ v2.4.0-alpha.5 — chat history slide-over (Raycast pattern):
                  a scrim + left panel that overlays the whole card, so the window keeps

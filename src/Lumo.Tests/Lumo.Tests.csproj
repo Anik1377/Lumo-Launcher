@@ -43,6 +43,8 @@
     <!-- v2.4.0-alpha.5 — AI chat history: session store + persona registry -->
     <Compile Include="../Lumo/Core/ChatPersonas.cs" Link="Core/ChatPersonas.cs" />
     <Compile Include="../Lumo/Services/ChatStore.cs" Link="Services/ChatStore.cs" />
+    <!-- v2.4.0-alpha.6 — user-defined personas store -->
+    <Compile Include="../Lumo/Services/PersonaStore.cs" Link="Services/PersonaStore.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">

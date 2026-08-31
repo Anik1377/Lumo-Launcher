@@ -104,8 +104,11 @@ public static class AiProviders
     /// v2.3.0-alpha.3 — multi-turn variant for the AI chat tab. Same contract as
     /// <see cref="Build"/>, but the body carries the whole conversation:
     ///   · ollama    → /api/chat { model, stream:true, messages:[…] }  (token streaming)
-    ///   · anthropic → /v1/messages { model, max_tokens, messages:[…] } (buffered;
-    ///                 the window plays a typewriter reveal so it feels the same)
+    ///   · anthropic → /v1/messages { model, max_tokens, stream:true, messages:[…] }
+    ///     v2.4.0-alpha.6 — Anthropic now streams too: the body carries stream:true
+    ///     and the reply arrives as SSE (content_block_delta lines the window's
+    ///     stream loop already parses), replacing the old buffered request that
+    ///     the SSE parser could never read.
     /// v2.4.0-alpha.5 — <paramref name="systemPrompt"/> adds a persona: a leading
     /// role:"system" message for Ollama, the top-level "system" field for
     /// Anthropic (its API has no system role inside messages). Omitted when null.
@@ -146,9 +149,11 @@ public static class AiProviders
                 url = baseUri + "/v1/messages";
                 // Anthropic carries the persona as the top-level system field, never
                 // as a message role; omit the property entirely when there is none.
+                // v2.4.0-alpha.6 — stream:true turns the reply into an SSE token
+                // stream (parsed by ParseAnthropicSseLine in the chat window's loop).
                 object bodyObj = sys.Length > 0
-                    ? new { model = model!.Trim(), max_tokens = MaxAnswerTokens, system = sys, messages = turnsList }
-                    : new { model = model!.Trim(), max_tokens = MaxAnswerTokens, messages = turnsList };
+                    ? new { model = model!.Trim(), max_tokens = MaxAnswerTokens, stream = true, system = sys, messages = turnsList }
+                    : new { model = model!.Trim(), max_tokens = MaxAnswerTokens, stream = true, messages = turnsList };
                 body = JsonSerializer.Serialize(bodyObj);
                 headers["x-api-key"] = apiKey!.Trim();
                 headers["anthropic-version"] = AnthropicVersion;

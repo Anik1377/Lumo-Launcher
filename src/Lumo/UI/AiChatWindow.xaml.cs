@@ -183,7 +183,7 @@ public partial class AiChatWindow : Window
             Resources["CaptionBrush"] = new SolidColorBrush(dark
                 ? Color.FromRgb(0x0B, 0x0B, 0x0D) : Color.FromRgb(0xF1, 0xF1, 0xF4));
             Resources["ChipBrush"] = new SolidColorBrush(dark
-                ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
+                ? Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
             // v2.4.0-alpha.4 — MAXIMUM-CONTRAST user pill: near-white fill with
             // near-black ink in dark mode, inverted in light mode. No accent tint,
             // no border — the one loud element in an otherwise quiet window.
@@ -197,6 +197,10 @@ public partial class AiChatWindow : Window
             // v2.4.0-alpha.4 — raised-card strokes for the picker menu, suggestion
             // pills and the model chip hover (same token the launcher rows use).
             Resources["SelStrokeBrush"] = new SolidColorBrush(p.SelStroke);
+            // v2.4.0-alpha.6 — the suggestion pills got a touch more fill so they read
+            // at a glance on the dark card (the text ink is the real fix: TitleBrush).
+            Resources["ChipBrush"] = new SolidColorBrush(dark
+                ? Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
             // v2.4.0-alpha.4 — top-lit card stroke: the window edge now catches light
             // along the top and settles into the hairline, matching the launcher rim.
             Resources["CardStrokeBrush"] = TopLitStrokeBrush(p.Border, dark, 0x30);
@@ -237,11 +241,13 @@ public partial class AiChatWindow : Window
             // actually rounds (Win11 8 px, Win10 square), so the shadow hugs the card.
             bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
             float r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
-            RootCard.CornerRadius = new CornerRadius(r);
-            CaptionBar.CornerRadius = new CornerRadius(r, r, 0, 0);
-            // v2.4.0-alpha.5 — sidebar slide-over: right corners follow the window edge;
-            // the scrim darkens with the theme so the panel reads above the transcript.
-            SidebarPanel.CornerRadius = new CornerRadius(0, r, r, 0);
+            _chromeRadius = r;   // v2.4.0-alpha.6 — remembered by the fullscreen toggle
+            if (!_fullscreen)    // don't fight the squared fullscreen state on a live theme switch
+            {
+                RootCard.CornerRadius = new CornerRadius(r);
+                CaptionBar.CornerRadius = new CornerRadius(r, r, 0, 0);
+                SidebarPanel.CornerRadius = new CornerRadius(0, r, r, 0);
+            }
             SidebarScrim.Background = new SolidColorBrush(dark
                 ? Color.FromArgb(0x73, 0x00, 0x00, 0x00)
                 : Color.FromArgb(0x3D, 0x00, 0x00, 0x00));
@@ -302,6 +308,32 @@ public partial class AiChatWindow : Window
     private void OnClose(object sender, RoutedEventArgs e)
     {
         try { Close(); } catch { }
+    }
+
+    // ------------------------------------- v2.4.0-alpha.6 — fullscreen / window
+
+    private bool _fullscreen;
+    private float _chromeRadius = 8f;   // the DWM-synced corner radius ApplySelfTheme computes
+
+    /// <summary>Caption button + F11: borderless fullscreen (covers the taskbar) ↔ windowed.</summary>
+    private void OnFullscreenClick(object sender, RoutedEventArgs e)
+    {
+        try { SetFullscreen(!_fullscreen); }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Fullscreen", ex); }
+    }
+
+    private void SetFullscreen(bool on)
+    {
+        _fullscreen = on;
+        FullscreenButton.Content = on ? "\uE8A7" : "\uE740";   // back-to-window ↔ fullscreen glyph
+        FullscreenButton.ToolTip = on ? "Exit fullscreen (F11)" : "Fullscreen (F11)";
+        WindowState = on ? WindowState.Maximized : WindowState.Normal;   // WindowStyle=None → true fullscreen
+
+        // square the card against the screen edges while fullscreen, restore after
+        float r = on ? 0f : _chromeRadius;
+        RootCard.CornerRadius = new CornerRadius(r);
+        CaptionBar.CornerRadius = new CornerRadius(r, r, 0, 0);
+        SidebarPanel.CornerRadius = new CornerRadius(0, r, r, 0);
     }
 
     private void OnOpenAiSettings(object sender, RoutedEventArgs e)
@@ -398,7 +430,15 @@ public partial class AiChatWindow : Window
             {
                 e.Handled = true;
                 if (_sidebarOpen) { CloseSidebar(); return; }
+                // v2.4.0-alpha.6 — while a generation is running, Esc stops it first
+                // (the hint line says "esc stop / hide"); a second Esc then hides.
+                if (_generating) { _genCts?.Cancel(); return; }
                 Close();
+            }
+            else if (e.Key == Key.F11)
+            {
+                e.Handled = true;
+                SetFullscreen(!_fullscreen);   // v2.4.0-alpha.6 — fullscreen toggle
             }
             else if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control)
             {
@@ -495,20 +535,38 @@ public partial class AiChatWindow : Window
         UpdateEmptyState();
     }
 
-    // ------------------------------------------- v2.4.0-alpha.5 — personas
+    // ------------------------------------------- v2.4.0-alpha.5/6 — personas
+
+    /// <summary>v2.4.0-alpha.6 — custom personas resolve FIRST, then the built-in registry.</summary>
+    private ChatPersona ResolvePersona(string? id) =>
+        ChatPersonas.ResolveWith(id, PersonaStore.Current.All);
+
+    /// <summary>MDL2 glyphs live in the Private Use Area — anything else is emoji/text.</summary>
+    private static bool IsMdl2Glyph(string g) =>
+        g.Length > 0 && g[0] >= '\uE000' && g[0] <= '\uF8FF';
 
     private void UpdatePersonaChip()
     {
         try
         {
-            var persona = ChatPersonas.Resolve(_session?.Persona ?? _settings.AiPersona);
+            var persona = ResolvePersona(_session?.Persona ?? _settings.AiPersona);
             PersonaGlyph.Text = persona.Glyph;
+            // custom personas may carry an emoji — those need the default font
+            // (WPF falls back to Segoe UI Emoji), not the MDL2 symbol face.
+            if (IsMdl2Glyph(persona.Glyph))
+                PersonaGlyph.FontFamily = new FontFamily("Segoe MDL2 Assets");
+            else
+                PersonaGlyph.ClearValue(FontFamilyProperty);   // inherit the Inter family
             PersonaChipText.Text = persona.Name;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PersonaChip", ex); }
     }
 
-    /// <summary>Persona flyout: one system prompt per chat, check-marked when active.</summary>
+    /// <summary>
+    /// Persona flyout: one system prompt per chat, check-marked when active.
+    /// v2.4.0-alpha.6 — user-defined personas (Settings → AI) list under their own
+    /// caption, and a "Manage personas…" row jumps straight to the editor.
+    /// </summary>
     private void OnPersonaChipClick(object sender, RoutedEventArgs e)
     {
         try
@@ -528,6 +586,34 @@ public partial class AiChatWindow : Window
                 item.Click += OnPersonaMenuItemClick;
                 menu.Items.Add(item);
             }
+
+            var custom = PersonaStore.Current.All;
+            if (custom.Count > 0)
+            {
+                menu.Items.Add(CaptionItem("YOUR PERSONAS"));
+                foreach (var p in custom)
+                {
+                    bool active = string.Equals(p.Id, current, StringComparison.OrdinalIgnoreCase);
+                    var item = new MenuItem
+                    {
+                        Header = (active ? "\u2713  " : "") + $"{p.Name}  \u00b7  {p.Blurb}",
+                        FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
+                        Tag = p.Id,
+                    };
+                    item.Click += OnPersonaMenuItemClick;
+                    menu.Items.Add(item);
+                }
+            }
+
+            menu.Items.Add(new Separator());
+            var manage = new MenuItem { Header = "Manage personas\u2026" };
+            manage.Click += (_, _) =>
+            {
+                try { SettingsRequested?.Invoke(); }
+                catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ManagePersonas", ex); }
+            };
+            menu.Items.Add(manage);
+
             menu.PlacementTarget = PersonaChip;
             menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
             menu.IsOpen = true;
@@ -605,9 +691,24 @@ public partial class AiChatWindow : Window
         try
         {
             SidebarHost.Children.Clear();
-            var sessions = _store.Sessions;   // newest first
+            var sessions = _store.Sessions;   // pinned first, then newest first
+            bool anyPinned = sessions.Any(s => s.Pinned);
+            bool captionPinned = false, captionRecent = false;
             foreach (var s in sessions)
+            {
+                // v2.4.0-alpha.6 — PINNED / RECENT section captions (Raycast pattern)
+                if (anyPinned && s.Pinned && !captionPinned)
+                {
+                    SidebarHost.Children.Add(MakeSidebarCaption("PINNED"));
+                    captionPinned = true;
+                }
+                if (anyPinned && !s.Pinned && !captionRecent)
+                {
+                    SidebarHost.Children.Add(MakeSidebarCaption("RECENT"));
+                    captionRecent = true;
+                }
                 SidebarHost.Children.Add(BuildSessionRow(s));
+            }
             SidebarFooter.Text = sessions.Count == 0
                 ? "No chats yet — say something first"
                 : $"{sessions.Count} chat{(sessions.Count == 1 ? "" : "s")} · stored on this PC";
@@ -615,9 +716,21 @@ public partial class AiChatWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SidebarBuild", ex); }
     }
 
+    private static TextBlock MakeSidebarCaption(string text) => new()
+    {
+        Text = text,
+        FontSize = 9.5,
+        FontWeight = FontWeights.SemiBold,
+        Opacity = 0.6,
+        Margin = new Thickness(11, 8, 11, 3),
+    };
+
     /// <summary>
     /// One session row in the launcher's raised-card language: quiet fill, the
-    /// active chat wears the SelStroke ring, a delete affordance fades in on hover.
+    /// active chat wears the SelStroke ring, and hover fades in the curation
+    /// actions — rename (inline), pin/unpin, delete. Pinned chats wear a small
+    /// accent pin ahead of the title so they read pinned even at a glance.
+    /// v2.4.0-alpha.6 — pinning + inline rename.
     /// </summary>
     private FrameworkElement BuildSessionRow(ChatSession s)
     {
@@ -639,14 +752,36 @@ public partial class AiChatWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-        stack.Children.Add(new TextBlock
+
+        var titleRow = new StackPanel { Orientation = Orientation.Horizontal };
+        if (s.Pinned)
+        {
+            titleRow.Children.Add(new TextBlock
+            {
+                Text = "\uE840",                      // filled pin
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 9,
+                Foreground = (Brush)Resources["AccentBrush"],
+                Margin = new Thickness(0, 0, 5, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsHitTestVisible = false,
+            });
+        }
+        var title = new TextBlock
         {
             Text = string.IsNullOrWhiteSpace(s.Title) ? "New chat" : s.Title,
             FontSize = 12.5,
             FontWeight = active ? FontWeights.SemiBold : FontWeights.Medium,
             TextTrimming = TextTrimming.CharacterEllipsis,
             Foreground = (Brush)Resources["TitleBrush"],
-        });
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        titleRow.Children.Add(title);
+
+        // rename swaps this host's content for an inline edit box (and back)
+        var titleHost = new ContentControl { Content = titleRow, IsTabStop = false, Focusable = false };
+        stack.Children.Add(titleHost);
+
         int turns = s.Messages.Count(m => m.Role == "user");
         stack.Children.Add(new TextBlock
         {
@@ -658,36 +793,143 @@ public partial class AiChatWindow : Window
         });
         Grid.SetColumn(stack, 0);
 
-        var del = new Button
+        // curation actions, faded in on hover (pin stays visible while pinned)
+        var actions = new StackPanel
         {
-            Style = (Style)FindResource("CaptionButton"),
-            Content = "\uE74D",
-            FontFamily = new FontFamily("Segoe MDL2 Assets"),
-            FontSize = 10,
-            Opacity = 0,
-            Tag = s.Id,
-            ToolTip = "Delete chat",
+            Orientation = Orientation.Horizontal,
             VerticalAlignment = VerticalAlignment.Center,
         };
+        var ren = SidebarActionButton("\uE70F", "Rename");
+        ren.Click += (_, _) =>
+        {
+            try { StartInlineRename(s, titleHost); }
+            catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SessionRename", ex); }
+        };
+        actions.Children.Add(ren);
+
+        var pin = SidebarActionButton(s.Pinned ? "\uE77A" : "\uE718", s.Pinned ? "Unpin" : "Pin");
+        if (s.Pinned) pin.Opacity = 0.85;
+        pin.Tag = s.Id;
+        pin.Click += OnPinSessionClick;
+        actions.Children.Add(pin);
+
+        var del = SidebarActionButton("\uE74D", "Delete chat");
+        del.Tag = s.Id;
         del.Click += OnDeleteSessionClick;
-        Grid.SetColumn(del, 1);
+        actions.Children.Add(del);
+        Grid.SetColumn(actions, 1);
 
         grid.Children.Add(stack);
-        grid.Children.Add(del);
+        grid.Children.Add(actions);
         border.Child = grid;
 
         border.MouseLeftButtonDown += OnSessionRowClick;
         border.MouseEnter += (_, _) =>
         {
             if (!active) border.Background = (Brush)Resources["HoverBrush"];
-            del.Opacity = 0.9;
+            foreach (var b in actions.Children.OfType<Button>())
+                if (!(ReferenceEquals(b, pin) && s.Pinned)) b.Opacity = 0.9;
         };
         border.MouseLeave += (_, _) =>
         {
             if (!active) border.Background = System.Windows.Media.Brushes.Transparent;
-            del.Opacity = 0;
+            foreach (var b in actions.Children.OfType<Button>())
+                if (!(ReferenceEquals(b, pin) && s.Pinned)) b.Opacity = 0;
         };
         return border;
+    }
+
+    private static Button SidebarActionButton(string glyph, string tooltip) => new()
+    {
+        Style = null,   // templated below — the caption style's FontSize setter would fight the glyph
+        Content = glyph,
+        FontFamily = new FontFamily("Segoe MDL2 Assets"),
+        FontSize = 10,
+        Opacity = 0,
+        ToolTip = tooltip,
+        Cursor = Cursors.Hand,
+        Focusable = false,
+        Padding = new Thickness(5, 3, 5, 3),
+        VerticalAlignment = VerticalAlignment.Center,
+        Background = System.Windows.Media.Brushes.Transparent,
+        BorderThickness = new Thickness(0),
+    };
+
+    /// <summary>Pin/unpin — pinned chats float to the PINNED section (store sorts pinned-first).</summary>
+    private void OnPinSessionClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            e.Handled = true;
+            if (sender is not Button { Tag: string id }) return;
+            if (_store.Find(id) is not { } s) return;
+            s.Pinned = !s.Pinned;
+            _store.Upsert(s);
+            RebuildSidebar();   // sidebar stays open for further curation
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SessionPin", ex); }
+    }
+
+    /// <summary>
+    /// v2.4.0-alpha.6 — inline rename: the row's title swaps for a borderless edit
+    /// box. Enter or focus-loss commits (trimmed, ≤80 chars), Esc cancels; clicks
+    /// inside the box never bubble to the row's switch handler.
+    /// </summary>
+    private void StartInlineRename(ChatSession s, ContentControl titleHost)
+    {
+        var box = new TextBox
+        {
+            Text = s.Title,
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            BorderBrush = (Brush)Resources["SelStrokeBrush"],
+            Foreground = (Brush)Resources["TitleBrush"],
+            CaretBrush = (Brush)Resources["AccentBrush"],
+            Padding = new Thickness(0, 0, 0, 1),
+            MinWidth = 120,
+            MaxLength = 120,
+        };
+
+        bool done = false;
+        void Commit()
+        {
+            if (done) return;
+            done = true;
+            try
+            {
+                string t = box.Text.Trim();
+                if (t.Length > 0 && !string.Equals(t, s.Title, StringComparison.Ordinal))
+                {
+                    s.Title = t.Length > 80 ? t[..80].TrimEnd() + "…" : t;
+                    _store.Upsert(s);   // rename also refreshes UpdatedAt — recently curated floats up
+                }
+            }
+            catch (Exception ex) { DiagnosticLogger.LogException("AiChat.RenameCommit", ex); }
+            RebuildSidebar();
+        }
+        void Cancel()
+        {
+            if (done) return;
+            done = true;
+            RebuildSidebar();
+        }
+
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) { e.Handled = true; Commit(); }
+            else if (e.Key == Key.Escape) { e.Handled = true; Cancel(); }
+        };
+        box.LostFocus += (_, _) => Commit();
+        // clicks inside the editor must not bubble to the row's switch handler
+        // (the TextBox class-handles the click first — caret still lands — and
+        // marking the bubbled event handled keeps the Border from acting on it)
+        box.MouseLeftButtonDown += (_, e2) => e2.Handled = true;
+
+        titleHost.Content = box;
+        box.Focus();
+        box.SelectAll();
     }
 
     private void OnSessionRowClick(object sender, MouseButtonEventArgs e)
@@ -1022,7 +1264,8 @@ public partial class AiChatWindow : Window
             var ct = _genCts.Token;
 
             // v2.4.0-alpha.5 — the session's persona rides along as the system prompt
-            string systemPrompt = ChatPersonas.Resolve(_session?.Persona ?? _settings.AiPersona).Prompt;
+            // (v2.4.0-alpha.6 — custom personas resolve through PersonaStore first)
+            string systemPrompt = ResolvePersona(_session?.Persona ?? _settings.AiPersona).Prompt;
 
             _flushTimer ??= CreateFlushTimer();
             _throttle.Restart();

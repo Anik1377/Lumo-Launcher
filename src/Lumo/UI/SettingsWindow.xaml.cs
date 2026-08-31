@@ -358,6 +358,10 @@ public partial class SettingsWindow : Window
             AiModelBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiModel = AiModelBox.Text.Trim(); };
             AiKeyBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiApiKey = AiKeyBox.Text.Trim(); };
 
+            // v2.4.0-alpha.6 — custom personas: their own store (personas.json, saved
+            // immediately on edit — independent of this window's Save/Cancel cycle)
+            RebuildPersonaList();
+
             // v2.3.0-alpha.2 — Local models (Ollama): probe in the background, render
             // when it lands. Closed cancels any in-flight download/pull.
             Closed += (_, _) => { try { _ollamaCts?.Cancel(); } catch { } };
@@ -876,6 +880,153 @@ public partial class SettingsWindow : Window
             });
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaProbe", ex); }
+    }
+
+    // --------------------------- v2.4.0-alpha.6 — custom personas (personas.json)
+
+    private string? _editingPersonaId;   // null = creating a new persona
+
+    private void RebuildPersonaList()
+    {
+        try
+        {
+            PersonaList.Items.Clear();
+            var all = PersonaStore.Current.All;
+            PersonaEmpty.Visibility = all.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            foreach (var p in all)
+                PersonaList.Items.Add(BuildPersonaRow(p));
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.PersonaList", ex); }
+    }
+
+    private FrameworkElement BuildPersonaRow(ChatPersona p)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
+        var glyph = new TextBlock
+        {
+            Text = p.Glyph,
+            FontSize = 12.5,
+            Margin = new Thickness(0, 0, 7, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        if (p.Glyph.Length > 0 && p.Glyph[0] >= '\uE000' && p.Glyph[0] <= '\uF8FF')
+            glyph.FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets");
+        var name = new TextBlock
+        {
+            Text = p.Name,
+            FontSize = 12.5,
+            FontWeight = FontWeights.SemiBold,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "TitleBrush");
+        nameRow.Children.Add(glyph);
+        nameRow.Children.Add(name);
+        text.Children.Add(nameRow);
+
+        string preview = p.Prompt.Length > 96 ? p.Prompt[..96] + "…" : p.Prompt;
+        var blurb = new TextBlock { Text = preview, FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis };
+        blurb.SetResourceReference(TextBlock.ForegroundProperty, "SubtitleBrush");
+        text.Children.Add(blurb);
+        Grid.SetColumn(text, 0);
+        grid.Children.Add(text);
+
+        var edit = new Button { Content = "Edit", Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(0, 0, 8, 0), Tag = p.Id };
+        if (TryFindResource("GhostButton") is Style editStyle) edit.Style = editStyle;
+        edit.Click += OnPersonaEdit;
+        Grid.SetColumn(edit, 1);
+        grid.Children.Add(edit);
+
+        var del = new Button { Content = "Delete", Padding = new Thickness(12, 4, 12, 4), Tag = p.Id };
+        if (TryFindResource("GhostButton") is Style delStyle) del.Style = delStyle;
+        del.Click += OnPersonaDelete;
+        Grid.SetColumn(del, 2);
+        grid.Children.Add(del);
+        return grid;
+    }
+
+    private void OnPersonaNew(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _editingPersonaId = null;
+            PersonaNameBox.Text = "";
+            PersonaGlyphBox.Text = "";
+            PersonaPromptBox.Text = "";
+            PersonaEditor.Visibility = Visibility.Visible;
+            PersonaNameBox.Focus();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.PersonaNew", ex); }
+    }
+
+    private void OnPersonaEdit(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not Button { Tag: string id } || PersonaStore.Current.Find(id) is not { } p) return;
+            _editingPersonaId = p.Id;
+            PersonaNameBox.Text = p.Name;
+            PersonaGlyphBox.Text = p.Glyph;
+            PersonaPromptBox.Text = p.Prompt;
+            PersonaEditor.Visibility = Visibility.Visible;
+            PersonaNameBox.Focus();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.PersonaEdit", ex); }
+    }
+
+    private void OnPersonaDelete(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not Button { Tag: string id }) return;
+            if (PersonaStore.Current.Delete(id))
+            {
+                if (string.Equals(_editingPersonaId, id, StringComparison.OrdinalIgnoreCase))
+                    PersonaEditor.Visibility = Visibility.Collapsed;
+                RebuildPersonaList();
+                FooterHint.Text = "Chats that used this persona fall back to the Assistant";
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.PersonaDelete", ex); }
+    }
+
+    private void OnPersonaSave(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string name = PersonaNameBox.Text.Trim();
+            string prompt = PersonaPromptBox.Text.Trim();
+            if (name.Length == 0 || prompt.Length == 0)
+            {
+                FooterHint.Text = "A persona needs at least a name and a system prompt";
+                return;
+            }
+            string glyph = PersonaGlyphBox.Text.Trim();
+            bool ok = _editingPersonaId is { } id
+                ? PersonaStore.Current.Update(id, name, glyph, prompt, "")
+                : PersonaStore.Current.Add(name, glyph, prompt, "") is not null;
+            if (!ok && _editingPersonaId is null)
+            {
+                FooterHint.Text = $"Persona list is full ({PersonaStore.MaxPersonas}) — delete one first";
+                return;
+            }
+            PersonaEditor.Visibility = Visibility.Collapsed;
+            RebuildPersonaList();
+            FooterHint.Text = "Persona saved — pick it from the chat's persona chip";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.PersonaSave", ex); }
+    }
+
+    private void OnPersonaCancel(object sender, RoutedEventArgs e)
+    {
+        try { PersonaEditor.Visibility = Visibility.Collapsed; }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.PersonaCancel", ex); }
     }
 
     private void OnOllamaRefresh(object sender, RoutedEventArgs e)

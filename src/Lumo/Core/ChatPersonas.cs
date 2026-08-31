@@ -56,6 +56,13 @@ public static class ChatPersonas
 
     public static ChatPersona Default => All[0];
 
+    /// <summary>v2.4.0-alpha.6 — id prefix of user-defined personas (PersonaStore).</summary>
+    public const string CustomPrefix = "custom_";
+
+    /// <summary>True when the id belongs to a user-defined persona.</summary>
+    public static bool IsCustom(string? id) =>
+        !string.IsNullOrWhiteSpace(id) && id.Trim().StartsWith(CustomPrefix, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Resolves a stored persona id; unknown/empty ids fall back to the default.</summary>
     public static ChatPersona Resolve(string? id)
     {
@@ -64,5 +71,20 @@ public static class ChatPersonas
             if (string.Equals(p.Id, id, StringComparison.OrdinalIgnoreCase))
                 return p;
         return Default;
+    }
+
+    /// <summary>
+    /// v2.4.0-alpha.6 — resolves against the user-defined list FIRST, then the
+    /// built-in registry, and finally the default. Pure so the test harness can
+    /// pin the precedence without touching real personas.json.
+    /// </summary>
+    public static ChatPersona ResolveWith(string? id, IReadOnlyList<ChatPersona>? custom)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return Default;
+        if (custom is { })
+            foreach (var p in custom)
+                if (string.Equals(p.Id, id.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return p;
+        return Resolve(id);
     }
 }
