@@ -1466,6 +1466,14 @@ public partial class LauncherWindow : Window
             Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
             Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
 
+            // v2.4.0-alpha.3 — bordered raised-card selection: the 1 px outline around
+            // the active row (Palette.SelStroke), also used by the primary footer chip.
+            Resources["SelStrokeBrush"] = new SolidColorBrush(p.SelStroke);
+            // v2.4.0-alpha.3 — top-lit strokes: the rim ring and the preview pane share
+            // the reference material's light-catch border — a vertical gradient that
+            // starts as a bright white edge at the top and settles into the hairline.
+            Resources["PreviewStrokeBrush"] = TopLitStrokeBrush(p.Border, dark, 0x26);
+
             // v2.2.0-alpha.3 FIX — FieldBrush was never defined in this window, so every
             // DynamicResource referencing it resolved to NULL. The quick-action menu card
             // (a WPF popup has no backdrop of its own) rendered completely see-through,
@@ -1486,7 +1494,11 @@ public partial class LauncherWindow : Window
             byte panelAlpha = glass ? (byte)0xB4 : (byte)0xFF;
             Root.Background = new SolidColorBrush(Color.FromArgb(panelAlpha, p.Panel.R, p.Panel.G, p.Panel.B));
             Root.CornerRadius = new CornerRadius(r);
-            _themeBorderBrush = new SolidColorBrush(p.Border);
+            _themeBorderBrush = TopLitStrokeBrush(p.Border, dark, 0x30);
+
+            // v2.4.0-alpha.3 — the ambient sheen under the top edge is a dark-mode
+            // material cue (light pools from the top-lit rim); light stays clean.
+            AmbientLight.Opacity = dark ? 1.0 : 0.0;
 
             // v2.0.1 — rim comet geometry follows the theme radius: hairline ring for
             // definition, clipped orbit host, and the cover patch inset by the rim
@@ -1535,6 +1547,35 @@ public partial class LauncherWindow : Window
     private void OnInputFocusChanged(object sender, KeyboardFocusChangedEventArgs e)
     {
         // Intentionally empty — the Raycast header has no focus ring to draw.
+    }
+
+    /// <summary>
+    /// v2.4.0-alpha.3 — the top-lit stroke: a vertical gradient border that reads as
+    /// a bright 1 px light edge along the top of a surface and settles into the
+    /// quiet hairline below it (the reference material's glass-card outline).
+    /// Used for the resting rim ring and the Tab preview pane.
+    /// </summary>
+    private static Brush TopLitStrokeBrush(Color hairline, bool dark, byte topAlpha)
+    {
+        var b = new LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(0, 1),
+        };
+        if (dark)
+        {
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(topAlpha, 0xFF, 0xFF, 0xFF), 0.0));
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF), 0.10));
+            b.GradientStops.Add(new GradientStop(hairline, 0.42));
+        }
+        else
+        {
+            b.GradientStops.Add(new GradientStop(Colors.White, 0.0));
+            b.GradientStops.Add(new GradientStop(hairline, 0.40));
+        }
+        b.GradientStops.Add(new GradientStop(hairline, 1.0));
+        b.Freeze();
+        return b;
     }
 
     private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);

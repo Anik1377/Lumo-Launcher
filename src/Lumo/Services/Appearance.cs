@@ -12,12 +12,13 @@ namespace Lumo.Services;
 /// Shared appearance helpers.
 ///
 /// • v2.4 — "Raycast-grade" design system. The Win11 gray ladder (#202020 → #2D2D2D)
-///   is gone; every surface now sits on a near-black, faintly blue-tinted ladder
-///   modelled on Raycast's product chrome: panel ≈ #0E0F12, elevated fields ≈
-///   #17181C, hairline #26282D, ink #F4F4F6, mute #9B9CA1. Selection is a QUIET
-///   neutral fill (Raycast's active row) — the accent appears only as punctuation:
-///   caret, selection pill, glyphs, primary buttons. Light mode mirrors the same
-///   structure with a #FAFAFB canvas and white fields. Typography is embedded Inter.
+///   is gone; every surface sits on a near-black ladder modelled on Raycast's product
+///   chrome. v2.4.0-alpha.3 re-tunes the ladder to NEUTRAL zinc charcoal (canvas ≈
+///   #0F0F11, elevated fields ≈ #18181B, hairline #26262B, ink #F5F5F6, mute #9D9DA2)
+///   and adds a bordered raised-card selection: the active row gains a 1 px SelStroke
+///   outline over its quiet fill. The accent appears only as punctuation: caret,
+///   selection pill, glyphs, primary buttons. Light mode mirrors the same structure
+///   with a #FAFAFB canvas and white fields. Typography is embedded Inter.
 /// • Rim glow (v2.0.1) — the z.ai chat-box comet: two soft radial light blobs that
 ///   orbit the TRUE window perimeter via a path animation, clipped to the window so
 ///   the light only ever exists INSIDE the rim.
@@ -167,55 +168,64 @@ public static class Appearance
     /// <summary>
     /// The effective palette. Hover/Selected are translucent tints of the accent colour
     /// (the macOS way) so every accent choice produces a coherent highlight system.
+    /// v2.4.0-alpha.3 — SelStroke joins the ladder: the 1 px outline that lifts the
+    /// active row into a raised card (the reference material's bordered selection).
     /// </summary>
     public sealed record Palette(
         Color Panel, Color Field, Color Border, Color Title, Color Subtitle,
-        Color Hover, Color Selected, Color GlyphBox, Color Accent, Color Separator);
+        Color Hover, Color Selected, Color GlyphBox, Color Accent, Color Separator,
+        Color SelStroke);
 
     /// <summary>
-    /// v2.4 — Raycast-grade surface ladder.
+    /// v2.4.0-alpha.3 — the surface ladder, re-tuned to NEUTRAL zinc charcoal.
     ///
-    /// Dark: a near-black, faintly blue-tinted canvas (#0E0F12) with ONE elevation
-    /// step up (#17181C fields/tiles) and hairline strokes (#26282D) — the Raycast
-    /// "surface ladder" (#07080a → #0d0d0d → #101111 → #121212) adapted for a
-    /// launcher card that floats on the desktop. Text: ink #F4F4F6, mute #9B9CA1,
-    /// placeholder ash #63646B. Selection is deliberately QUIET — a neutral fill one
-    /// step above the panel (Raycast's active row); the accent stays punctuation.
+    /// The reference material (three dark-Dashboard shots) sits on a grey family with
+    /// no blue bias — the old #0E0F12 canvas read faintly navy next to them. The new
+    /// ladder is zinc: canvas #0F0F11, fields #18181B, hairlines #26262B, active row
+    /// #1F1F24. Everything else keeps the Raycast structure: one elevation step up
+    /// for fields/tiles, QUIET neutral selection with the accent as punctuation
+    /// (caret, selection pill, active title), ink #F5F5F6, mute #9D9DA2.
     ///
-    /// Light mirrors the structure: #FAFAFB canvas, #FFFFFF fields, #17181C ink,
-    /// #71727A mute, #E6E7EA hairlines, #ECEDEF active row.
+    /// SelStroke is the bordered-selection hairline — one step brighter than Border
+    /// in dark mode (ref: the raised, outlined active card), one step darker in
+    /// light mode so the outline reads on white fields.
+    ///
+    /// Light mirrors the structure: #FAFAFB canvas, #FFFFFF fields, #17181B ink,
+    /// #71727B mute, #E6E7EA hairlines, #EDEDEF active row.
     /// </summary>
     public static Palette PaletteFor(bool dark, string? accentHex)
     {
         var accent = ParseAccent(accentHex);
         return dark
             ? new Palette(
-                Panel:    FromRgb(0x0E, 0x0F, 0x12),   // canvas — Raycast surface tier 1
-                Field:    FromRgb(0x17, 0x18, 0x1C),   // elevated fill — tier 3 (inputs, tiles)
-                Border:   FromRgb(0x26, 0x28, 0x2D),   // hairline (Raycast #242728, nudged)
-                Title:    FromRgb(0xF4, 0xF4, 0xF6),   // ink
-                Subtitle: FromRgb(0x9B, 0x9C, 0xA1),   // mute
+                Panel:    FromRgb(0x0F, 0x0F, 0x11),   // canvas — neutral zinc charcoal
+                Field:    FromRgb(0x18, 0x18, 0x1B),   // elevated fill — tier 3 (inputs, tiles)
+                Border:   FromRgb(0x26, 0x26, 0x2B),   // hairline
+                Title:    FromRgb(0xF5, 0xF5, 0xF6),   // ink
+                Subtitle: FromRgb(0x9D, 0x9D, 0xA2),   // mute
                 Hover:    Color.FromArgb(0x0F, 0xFF, 0xFF, 0xFF),   // 6% white — quiet pointer wash
-                Selected: FromRgb(0x1F, 0x21, 0x27),   // active row — Raycast's neutral highlight
-                GlyphBox: FromRgb(0x1B, 0x1C, 0x22),   // icon tile fill — tier 2
+                Selected: FromRgb(0x1F, 0x1F, 0x24),   // active row — neutral highlight
+                GlyphBox: FromRgb(0x1A, 0x1A, 0x1F),   // icon tile fill — tier 2
                 Accent:   accent,
-                Separator: FromRgb(0x1D, 0x1F, 0x24))
+                Separator: FromRgb(0x1C, 0x1C, 0x21),
+                SelStroke: FromRgb(0x37, 0x37, 0x3E))  // bordered-selection outline
             : new Palette(
                 Panel:    FromRgb(0xFA, 0xFA, 0xFB),   // canvas
                 Field:    Colors.White,                // elevated fill
                 Border:   FromRgb(0xE6, 0xE7, 0xEA),   // hairline
-                Title:    FromRgb(0x17, 0x18, 0x1C),   // ink
-                Subtitle: FromRgb(0x71, 0x72, 0x7A),   // mute
+                Title:    FromRgb(0x17, 0x18, 0x1B),   // ink
+                Subtitle: FromRgb(0x71, 0x72, 0x7B),   // mute
                 Hover:    Color.FromArgb(0x0A, 0x00, 0x00, 0x00),   // 4% black
-                Selected: FromRgb(0xEC, 0xED, 0xEF),   // active row
+                Selected: FromRgb(0xED, 0xED, 0xEF),   // active row
                 GlyphBox: FromRgb(0xF1, 0xF1, 0xF4),   // icon tile fill
                 Accent:   accent,
-                Separator: FromRgb(0xE8, 0xE9, 0xEB));
+                Separator: FromRgb(0xE8, 0xE9, 0xEB),
+                SelStroke: FromRgb(0xD7, 0xD8, 0xDE)); // bordered-selection outline
     }
 
     /// <summary>The muted placeholder tone for the current mode (ash tier of the ladder).</summary>
     public static Color PlaceholderFor(bool dark) => dark
-        ? FromRgb(0x63, 0x64, 0x6B)
+        ? FromRgb(0x64, 0x64, 0x6A)
         : FromRgb(0xA2, 0xA3, 0xA8);
 
     /// <summary>
@@ -223,7 +233,7 @@ public static class Appearance
     /// popovers — tier 2.5 of the ladder, between the icon tile and the field.
     /// </summary>
     public static Color ElevatedFor(bool dark) => dark
-        ? FromRgb(0x14, 0x15, 0x1A)
+        ? FromRgb(0x15, 0x15, 0x18)
         : Colors.White;
 
     /// <summary>accent with the given alpha — the base for tinted highlights.</summary>

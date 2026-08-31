@@ -20,8 +20,14 @@
         v2.4 "Raycast" — the command-palette structure, natively in WPF.
 
         · The card paints the Raycast surface ladder (Appearance.PaletteFor):
-          dark canvas #0E0F12 / light #FAFAFB, one elevation step up for fields
-          and tiles, hairline #26282D strokes, quiet neutral selection.
+          dark canvas #0F0F11 / light #FAFAFB, one elevation step up for fields
+          and tiles, hairline #26262B strokes, quiet neutral selection.
+        · v2.4.0-alpha.3 — reference round: the ladder is NEUTRAL zinc charcoal
+          (no blue bias); the active row is a bordered raised card (1 px SelStroke
+          outline over the fill); footer keycaps are pills with the "open" chip
+          promoted to primary; a soft ambient light pools under the top edge;
+          the rim ring and preview pane wear a top-lit gradient stroke
+          (bright white at the top, hairline at the bottom).
         · Typography is embedded Inter (OFL) — Regular / Medium / SemiBold / Bold,
           name tables flattened so FontWeight picks the exact face.
         · The search row is flush with the card top (no boxed field — the input IS
@@ -43,16 +49,25 @@
         <ui:GlyphIconConverter x:Key="GlyphToIcon"/>
         <ui:UpperTextConverter x:Key="Upper"/>
 
-        <!-- kbd-style hint chip — Raycast keycap: quiet raised fill, hairline, no glow.
-             DESIGN.md §kbd: 4px radius, 2×6 padding, min-width 20, 11px/500 -->
+        <!-- kbd-style hint chip — v2.4.0-alpha.3 pill (reference round): the keycap
+             grew from a 4 px box to a full pill with hairline stroke, matching the
+             chip language of the reference material. DESIGN.md §kbd heritage:
+             11px/500 text, generous horizontal padding, min-width 24.
+             The PRIMARY variant (↵ open) is promoted: tile fill + SelStroke outline
+             + full-ink label — one bright anchor in the footer, the way the
+             reference material singles out its primary pill. -->
         <Style x:Key="KbdChipBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="4"/>
-            <Setter Property="Padding" Value="6,2"/>
-            <Setter Property="MinWidth" Value="20"/>
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="MinWidth" Value="24"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{DynamicResource GlyphBoxBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ChipBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style x:Key="KbdChipBorderPrimary" TargetType="Border" BasedOn="{StaticResource KbdChipBorder}">
+            <Setter Property="Background" Value="{DynamicResource GlyphBoxBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource SelStrokeBrush}"/>
         </Style>
         <Style x:Key="KbdChipText" TargetType="TextBlock">
             <Setter Property="FontSize" Value="11"/>
@@ -61,6 +76,9 @@
             <Setter Property="Opacity" Value="0.75"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="KbdChipTextPrimary" TargetType="TextBlock" BasedOn="{StaticResource KbdChipText}">
+            <Setter Property="Opacity" Value="1"/>
         </Style>
 
         <!-- Apple craft — slim overlay scrollbar (Spotlight/Raycast): an 8 px invisible
@@ -272,6 +290,20 @@
             </Border>
             <Border x:Name="GlowCover" CornerRadius="5" Margin="3" IsHitTestVisible="False"/>
 
+            <!-- v2.4.0-alpha.3 — ambient sheen: a soft, static pool of light just under
+                 the top edge (the reference material's glow). Clipped by the window clip
+                 like the comet; dark mode only (opacity set in ApplyTheme). -->
+            <Border x:Name="AmbientLight" Height="150" VerticalAlignment="Top" Margin="60,-75,60,0"
+                    IsHitTestVisible="False" Opacity="0">
+                <Border.Background>
+                    <RadialGradientBrush>
+                        <GradientStop Color="#12FFFFFF" Offset="0.0"/>
+                        <GradientStop Color="#08FFFFFF" Offset="0.45"/>
+                        <GradientStop Color="#00FFFFFF" Offset="1.0"/>
+                    </RadialGradientBrush>
+                </Border.Background>
+            </Border>
+
             <!-- Apple craft — the light-catch: a 1 px bright edge along the top of the
                  card, like light grazing the top of a material surface. Clipped to the
                  window's rounded rect in code so it can never paint the corner cutouts. -->
@@ -401,6 +433,12 @@
                                                         Background="{DynamicResource HoverBrush}" Opacity="0"/>
                                                 <Border x:Name="SelectedOverlay" CornerRadius="8"
                                                         Background="{DynamicResource SelectedBrush}" Opacity="0"/>
+                                                <!-- v2.4.0-alpha.3 — bordered raised card: a 1 px outline
+                                                     around the active row lifts it off the canvas
+                                                     (the reference material's selected-card cue).
+                                                     Shares the selection storyboard below. -->
+                                                <Border x:Name="SelStroke" CornerRadius="8" BorderThickness="1"
+                                                        BorderBrush="{DynamicResource SelStrokeBrush}" Opacity="0"/>
                                                 <!-- v2.0.1 — selection pill: 3 px accent punctuation on the left edge -->
                                                 <Border x:Name="SelPill" Width="3" CornerRadius="1.5"
                                                         Background="{DynamicResource AccentBrush}"
@@ -436,6 +474,9 @@
                                                             <DoubleAnimation Storyboard.TargetName="SelectedOverlay"
                                                                              Storyboard.TargetProperty="Opacity"
                                                                              To="1" Duration="0:0:0.10"/>
+                                                            <DoubleAnimation Storyboard.TargetName="SelStroke"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="1" Duration="0:0:0.10"/>
                                                             <DoubleAnimation Storyboard.TargetName="SelPill"
                                                                              Storyboard.TargetProperty="Opacity"
                                                                              To="1" Duration="0:0:0.10"/>
@@ -448,6 +489,9 @@
                                                             <DoubleAnimation Storyboard.TargetName="SelectedOverlay"
                                                                              Storyboard.TargetProperty="Opacity"
                                                                              To="0" Duration="0:0:0.22"/>
+                                                            <DoubleAnimation Storyboard.TargetName="SelStroke"
+                                                                             Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.18"/>
                                                             <DoubleAnimation Storyboard.TargetName="SelPill"
                                                                              Storyboard.TargetProperty="Opacity"
                                                                              To="0" Duration="0:0:0.18"/>
@@ -586,9 +630,11 @@
                     </ListBox.ItemTemplate>
                 </ListBox>
 
-                <!-- ================= preview pane (v2.2 — Tab toggles; Esc closes) ================= -->
+                <!-- ================= preview pane (v2.2 — Tab toggles; Esc closes)
+                     v2.4.0-alpha.3 — top-lit gradient stroke (bright white over the
+                     top edge, hairline below), matching the rim material -->
                 <Border x:Name="PreviewPane" Grid.Row="3" Margin="10,2,10,2" CornerRadius="8"
-                        Background="{DynamicResource GlyphBoxBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
+                        Background="{DynamicResource GlyphBoxBrush}" BorderBrush="{DynamicResource PreviewStrokeBrush}"
                         BorderThickness="1" Visibility="Collapsed" Focusable="False">
                     <Grid MaxHeight="200" Margin="12,8,12,10">
                         <Grid.RowDefinitions>
@@ -633,8 +679,11 @@
                                Text="Starting…" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Style="{StaticResource KbdChipBorder}" Margin="0,0,5,0">
-                            <TextBlock Style="{StaticResource KbdChipText}" Text="&#x21B5; open"/>
+                        <!-- v2.4.0-alpha.3 — the PRIMARY chip: ↵ open is the one bright
+                             anchor in the footer (tile fill, SelStroke outline, full-ink
+                             label); the rest stay quiet pills -->
+                        <Border Style="{StaticResource KbdChipBorderPrimary}" Margin="0,0,5,0">
+                            <TextBlock Style="{StaticResource KbdChipTextPrimary}" Text="&#x21B5; open"/>
                         </Border>
                         <Border Style="{StaticResource KbdChipBorder}" Margin="0,0,5,0">
                             <TextBlock Style="{StaticResource KbdChipText}" Text="&#x2193;&#x2191; select"/>
