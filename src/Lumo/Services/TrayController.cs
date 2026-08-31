@@ -29,7 +29,7 @@ public sealed class TrayController : IDisposable
         _icon = new NotifyIcon
         {
             Icon = IconFactory.CreateAppIcon(32),
-            Text = $"Lumo v1.4 — press {settings.Hotkey}",
+            Text = $"Lumo v{AppVersion.Label} — press {settings.Hotkey}",
             Visible = true,
         };
 

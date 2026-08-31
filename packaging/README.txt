@@ -1,7 +1,20 @@
 ======================================================
-  LUMO v2.4.0-alpha.2  —  universal launcher for Windows
+  LUMO v2.4.0-alpha.7  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.4.0-alpha.7 (the tray icon round)
+---------------------------------------------------------------
+1. THE TRAY FINALLY WEARS THE NEW ICON. The magic-wand art
+   shipped in alpha.6 only reached the exe/window icons -
+   the notification-area icon was still drawn at runtime as
+   the old purple "L" tile. It now loads the real multi-size
+   app.ico from the embedded resources (crisp at 16-64 px).
+2. HONEST VERSION LABELS. The tray tooltip said "Lumo v1.4",
+   the hotkey tooltip "v2.1.0", Settings truncated to "v2.4".
+   All three now derive from one source (the build's
+   informational version), e.g. "Lumo v2.4.0-alpha.7 - press
+   alt+space" and the full label on the Settings about page.
 
 WHAT'S NEW IN v2.4.0-alpha.2 (the frosted-glass material)
 ---------------------------------------------------------------

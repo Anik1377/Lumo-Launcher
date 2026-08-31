@@ -160,7 +160,7 @@ public partial class App : Application
                 applyHotkey: () =>
                 {
                     string active = _window?.ReapplyHotkey() ?? "(none)";
-                    try { _tray?.UpdateText($"Lumo v2.1.0 — press {active}"); } catch { }
+                    try { _tray?.UpdateText($"Lumo v{AppVersion.Label} — press {active}"); } catch { }
                     return active;
                 },
                 rebuildIndex: () => { try { _window?.RebuildIndex(); } catch { } },

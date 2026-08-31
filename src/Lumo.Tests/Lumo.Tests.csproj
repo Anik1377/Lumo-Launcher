@@ -45,6 +45,8 @@
     <Compile Include="../Lumo/Services/ChatStore.cs" Link="Services/ChatStore.cs" />
     <!-- v2.4.0-alpha.6 — user-defined personas store -->
     <Compile Include="../Lumo/Services/PersonaStore.cs" Link="Services/PersonaStore.cs" />
+    <!-- v2.4.0-alpha.7 — display-version parser -->
+    <Compile Include="../Lumo/Core/AppVersion.cs" Link="Core/AppVersion.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">

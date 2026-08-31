@@ -75,8 +75,7 @@ public partial class SettingsWindow : Window
         LoadShortcutList();
 
         LogPathText.Text = "Log: " + AppPaths.LogFile;
-        var ver = typeof(SettingsWindow).Assembly.GetName().Version;
-        string vs = ver is null ? "v1.4" : $"v{ver.Major}.{ver.Minor}";
+        string vs = "v" + AppVersion.Label;   // v2.4.0-alpha.7 — full label ("v2.4.0-alpha.7"), was truncated to v{major}.{minor}
         VersionText.Text = vs;
         AboutVersion.Text = vs;
 

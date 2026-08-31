@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>2.4.0-alpha.6</Version>
-    <InformationalVersion>Lumo 2.4.0-alpha.6 (ALPHA — unstable build)</InformationalVersion>
+    <Version>2.4.0-alpha.7</Version>
+    <InformationalVersion>Lumo 2.4.0-alpha.7 (ALPHA — unstable build)</InformationalVersion>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -33,6 +33,13 @@
     <Resource Include="Assets\Fonts\Inter-Medium.ttf" />
     <Resource Include="Assets\Fonts\Inter-SemiBold.ttf" />
     <Resource Include="Assets\Fonts\Inter-Bold.ttf" />
+  </ItemGroup>
+
+  <!-- v2.4.0-alpha.7 — the tray loads the real icon art at runtime: ApplicationIcon
+       only stamps the Win32 exe/window icon, the NotifyIcon needs the ico as a
+       pack resource (IconFactory → pack://application:,,,/Assets/app.ico). -->
+  <ItemGroup>
+    <Resource Include="Assets\app.ico" />
   </ItemGroup>
 
   <!-- UseWindowsForms injects global System.Drawing / System.Windows.Forms usings which

@@ -1,12 +1,45 @@
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Windows;
 
 namespace Lumo.Services;
 
-/// <summary>Draws the Lumo tray/window icon at runtime — no .ico file dependency.</summary>
+/// <summary>
+/// Produces the Lumo tray icon.
+///
+/// v2.4.0-alpha.7 — the app art moved to the magic-wand icon (Assets/app.ico) in
+/// alpha.6 via csproj ApplicationIcon, but that only stamps the exe/window icon;
+/// the tray kept calling the runtime drawing below, so the old purple "L" tile
+/// stayed in the notification area. The icon is now loaded from the embedded WPF
+/// resource (the ico carries exact 16/24/32/48/64 frames; the tray asks for 32).
+/// The legacy drawing survives only as a fallback if the pack resource is missing.
+/// </summary>
 public static class IconFactory
 {
     public static Icon CreateAppIcon(int size = 32)
+    {
+        try
+        {
+            var sri = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/app.ico"));
+            if (sri?.Stream is not null)
+            {
+                // Icon(Stream) reads the stream lazily and must keep it open for the
+                // icon's lifetime — copy into a MemoryStream we deliberately never
+                // dispose (a live MemoryStream holds only a managed buffer).
+                using var src = sri.Stream;
+                var copy = new MemoryStream();
+                src.CopyTo(copy);
+                copy.Position = 0;
+                return new Icon(copy, size, size);
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("IconFactory.PackIcon", ex); }
+
+        return CreateLegacyDrawnIcon(size);
+    }
+
+    /// <summary>The pre-alpha.6 drawn "L" tile — kept strictly as a fallback.</summary>
+    public static Icon CreateLegacyDrawnIcon(int size = 32)
     {
         try
         {
