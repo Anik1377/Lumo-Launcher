@@ -40,6 +40,9 @@
     <Compile Include="../Lumo/Services/ExchangeRateService.cs" Link="Services/ExchangeRateService.cs" />
     <!-- v2.3.0-alpha.2 — one-click Ollama setup: pull-line/tags parsers, catalog, endpoint guard -->
     <Compile Include="../Lumo/Services/OllamaManager.cs" Link="Services/OllamaManager.cs" />
+    <!-- v2.4.0-alpha.5 — AI chat history: session store + persona registry -->
+    <Compile Include="../Lumo/Core/ChatPersonas.cs" Link="Core/ChatPersonas.cs" />
+    <Compile Include="../Lumo/Services/ChatStore.cs" Link="Services/ChatStore.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">

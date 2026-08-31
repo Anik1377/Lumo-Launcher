@@ -106,10 +106,14 @@ public static class AiProviders
     ///   · ollama    → /api/chat { model, stream:true, messages:[…] }  (token streaming)
     ///   · anthropic → /v1/messages { model, max_tokens, messages:[…] } (buffered;
     ///                 the window plays a typewriter reveal so it feels the same)
+    /// v2.4.0-alpha.5 — <paramref name="systemPrompt"/> adds a persona: a leading
+    /// role:"system" message for Ollama, the top-level "system" field for
+    /// Anthropic (its API has no system role inside messages). Omitted when null.
     /// The key only ever travels in headers, as before.
     /// </summary>
     public static (bool Ok, AiRequestSpec? Spec, string Error) BuildChat(
-        string? style, string? endpoint, string? model, string? apiKey, IReadOnlyList<AiTurn> turns)
+        string? style, string? endpoint, string? model, string? apiKey, IReadOnlyList<AiTurn> turns,
+        string? systemPrompt = null)
     {
         try
         {
@@ -123,12 +127,15 @@ public static class AiProviders
             if (anthropic && string.IsNullOrWhiteSpace(apiKey))
                 return (false, null, "no API key set — add your Anthropic key in Settings");
 
-            var messages = turns
+            var turnsList = turns
                 .Where(t => !string.IsNullOrWhiteSpace(t.Content) &&
                             (t.Role == "user" || t.Role == "assistant"))
-                .Select(t => new { role = t.Role, content = t.Content })
-                .ToArray();
-            if (messages.Length == 0)
+                .Select(t => (object)new { role = t.Role, content = t.Content })
+                .ToList();
+            string sys = (systemPrompt ?? "").Trim();
+            if (sys.Length > 0 && !anthropic)
+                turnsList.Insert(0, new { role = "system", content = sys });   // Ollama: leading system message
+            if (turnsList.Count == 0)
                 return (false, null, "empty prompt");
 
             string url, body;
@@ -137,7 +144,12 @@ public static class AiProviders
             if (anthropic)
             {
                 url = baseUri + "/v1/messages";
-                body = JsonSerializer.Serialize(new { model = model!.Trim(), max_tokens = MaxAnswerTokens, messages });
+                // Anthropic carries the persona as the top-level system field, never
+                // as a message role; omit the property entirely when there is none.
+                object bodyObj = sys.Length > 0
+                    ? new { model = model!.Trim(), max_tokens = MaxAnswerTokens, system = sys, messages = turnsList }
+                    : new { model = model!.Trim(), max_tokens = MaxAnswerTokens, messages = turnsList };
+                body = JsonSerializer.Serialize(bodyObj);
                 headers["x-api-key"] = apiKey!.Trim();
                 headers["anthropic-version"] = AnthropicVersion;
                 headers["content-type"] = "application/json";
@@ -145,7 +157,7 @@ public static class AiProviders
             else
             {
                 url = baseUri + "/api/chat";
-                body = JsonSerializer.Serialize(new { model = model!.Trim(), stream = true, messages });
+                body = JsonSerializer.Serialize(new { model = model!.Trim(), stream = true, messages = turnsList });
                 headers["content-type"] = "application/json";
                 if (!string.IsNullOrWhiteSpace(apiKey))
                     headers["authorization"] = "Bearer " + apiKey.Trim();   // optional gateways only

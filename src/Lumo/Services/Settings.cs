@@ -54,6 +54,7 @@ public sealed class Settings
     public string AiEndpoint { get; set; } = "http://localhost:11434"; // ollama default
     public string AiModel { get; set; } = "llama3.2";                  // provider model id
     public string AiApiKey { get; set; } = "";                         // anthropic x-api-key / optional gateway bearer
+    public string AiPersona { get; set; } = "assistant";               // v2.4.0-alpha.5 — persona id for NEW chats
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
@@ -108,6 +109,7 @@ public sealed class Settings
         s.AiEndpoint        = GetStr(root, nameof(AiEndpoint), s.AiEndpoint);
         s.AiModel           = GetStr(root, nameof(AiModel), s.AiModel);
         s.AiApiKey          = GetStr(root, nameof(AiApiKey), s.AiApiKey);
+        s.AiPersona         = GetStr(root, nameof(AiPersona), s.AiPersona);
 
         // v2.4 design-system migration — pre-2.4 installs carry an accent that was only
         // ever the old default (violet #7C6CFF or Win11 blue #0078D4). The Raycast-grade
@@ -222,6 +224,7 @@ public sealed class Settings
         AiEndpoint = o.AiEndpoint;
         AiModel = o.AiModel;
         AiApiKey = o.AiApiKey;
+        AiPersona = o.AiPersona;
     }
 
     /// <summary>

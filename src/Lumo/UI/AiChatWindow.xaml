@@ -423,9 +423,29 @@
                                            Margin="6,1,0,0"/>
                             </StackPanel>
                         </Button>
+                        <!-- v2.4.0-alpha.5 — persona chip: the system prompt that shapes
+                             every reply in this chat; click = persona flyout -->
+                        <Button x:Name="PersonaChip" Style="{StaticResource GhostChip}" Margin="8,0,0,0"
+                                VerticalAlignment="Center" Click="OnPersonaChipClick"
+                                ToolTip="Persona — the system prompt shaping every reply">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="PersonaGlyph" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="PersonaChipText" FontSize="11" Margin="6,0,0,0"
+                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text=" &#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="8"
+                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"
+                                           Margin="5,1,0,0"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Button x:Name="NewChatButton" Content="New chat" Style="{StaticResource CaptionButton}" Click="OnNewChat"/>
+                        <!-- v2.4.0-alpha.5 — glyph caption buttons: history toggle, new chat (text
+                             moved into the sidebar header to declutter the caption band) -->
+                        <Button x:Name="HistoryButton" Content="&#xE700;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                Style="{StaticResource CaptionButton}" Click="OnHistoryClick" ToolTip="Chat history"/>
+                        <Button x:Name="NewChatButton" Content="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                Style="{StaticResource CaptionButton}" Click="OnNewChat" ToolTip="New chat (Ctrl+N)"/>
                         <Button x:Name="MinButton" Content="&#xE70E;" FontFamily="Segoe MDL2 Assets" FontSize="11"
                                 Style="{StaticResource CaptionButton}" Click="OnMinimize"/>
                         <Button x:Name="CloseButton" Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" FontSize="11"
@@ -529,7 +549,57 @@
                  the boxed chip row (minimal) ============ -->
             <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,8,0,11"
                        FontSize="10.5" Foreground="{DynamicResource SubtitleBrush}" Opacity="0.7"
-                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;esc hide"/>
+                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;esc hide"/>
+
+            <!-- ============ v2.4.0-alpha.5 — chat history slide-over (Raycast pattern):
+                 a scrim + left panel that overlays the whole card, so the window keeps
+                 its compact footprint and history never steals permanent space. -->
+            <Grid x:Name="SidebarOverlay" Grid.Row="0" Grid.RowSpan="5" Visibility="Collapsed">
+                <Border x:Name="SidebarScrim" Background="#66000000" MouseLeftButtonDown="OnSidebarScrimClick"/>
+                <Border x:Name="SidebarPanel" Width="252" HorizontalAlignment="Left"
+                        Background="{DynamicResource CardBrush}"
+                        BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="0,0,1,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- header: section caption + primary new-chat pill -->
+                        <Grid Grid.Row="0" Margin="12,12,12,9">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="&#xE81C;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="HISTORY" FontSize="10.5" FontWeight="SemiBold" Margin="7,0,0,0"
+                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Button x:Name="SidebarNewChatButton" Grid.Column="1" Click="OnNewChat"
+                                    Style="{StaticResource GhostChip}" ToolTip="New chat (Ctrl+N)">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                               Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="New chat" FontSize="11" Margin="6,0,0,0"
+                                               Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+
+                        <!-- session list (rows built in code) -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="8,0,8,4">
+                            <StackPanel x:Name="SidebarHost"/>
+                        </ScrollViewer>
+
+                        <!-- footer: quiet storage note -->
+                        <TextBlock x:Name="SidebarFooter" Grid.Row="2" Margin="14,8,14,12" FontSize="10.5"
+                                   Foreground="{DynamicResource SubtitleBrush}" Opacity="0.7" TextTrimming="CharacterEllipsis"/>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
     </Border>
 </Window>

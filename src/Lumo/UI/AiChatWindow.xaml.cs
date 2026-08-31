@@ -37,6 +37,12 @@ public partial class AiChatWindow : Window
     private readonly AiService _ai;
     private readonly List<AiProviders.AiTurn> _history = new();
 
+    // v2.4.0-alpha.5 — persisted multi-chat history + system-prompt personas
+    private readonly ChatStore _store;
+    private ChatSession? _session;              // active conversation (null = fresh unsaved chat)
+    private bool _sidebarOpen;
+    private bool _restoring;                    // suppress per-message motion during a bulk transcript restore
+
     private bool _generating;
     private CancellationTokenSource? _genCts;
     private bool _sourceReady;
@@ -68,9 +74,11 @@ public partial class AiChatWindow : Window
         InitializeComponent();
         _settings = settings;
         _ai = ai;
+        _store = ChatStore.Load();   // v2.4.0-alpha.5 — chats survive restarts
 
         ApplySelfTheme();
         UpdateModelChip();
+        UpdatePersonaChip();
         UpdateBanner();
         UpdateEmptyState();
         BuildChips();
@@ -119,7 +127,7 @@ public partial class AiChatWindow : Window
     {
         try
         {
-            if (!_settings.AnimationsEnabled) return;
+            if (_restoring || !_settings.AnimationsEnabled) return;
             var tt = new System.Windows.Media.TranslateTransform(0, rise);
             fe.RenderTransform = tt;
             var ease = new System.Windows.Media.Animation.CubicEase
@@ -231,6 +239,12 @@ public partial class AiChatWindow : Window
             float r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
             RootCard.CornerRadius = new CornerRadius(r);
             CaptionBar.CornerRadius = new CornerRadius(r, r, 0, 0);
+            // v2.4.0-alpha.5 — sidebar slide-over: right corners follow the window edge;
+            // the scrim darkens with the theme so the panel reads above the transcript.
+            SidebarPanel.CornerRadius = new CornerRadius(0, r, r, 0);
+            SidebarScrim.Background = new SolidColorBrush(dark
+                ? Color.FromArgb(0x73, 0x00, 0x00, 0x00)
+                : Color.FromArgb(0x3D, 0x00, 0x00, 0x00));
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ApplyTheme", ex); }
     }
@@ -371,8 +385,11 @@ public partial class AiChatWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PromptKey", ex); }
     }
 
-    /// <summary>v2.3.0-alpha.4 — Esc closes the chat from anywhere in the window
-    /// (the hint chips promise it, so it must be true — the old build only claimed it).</summary>
+    /// <summary>
+    /// v2.3.0-alpha.4 — Esc closes the chat from anywhere in the window (the hint
+    /// chips promise it, so it must be true). v2.4.0-alpha.5 — Esc closes the
+    /// history sidebar first when it is open, and Ctrl+N starts a new chat.
+    /// </summary>
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
         try
@@ -380,7 +397,13 @@ public partial class AiChatWindow : Window
             if (e.Key == Key.Escape)
             {
                 e.Handled = true;
+                if (_sidebarOpen) { CloseSidebar(); return; }
                 Close();
+            }
+            else if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                e.Handled = true;
+                OnNewChat(sender, e);
             }
         }
         catch { }
@@ -428,23 +451,349 @@ public partial class AiChatWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Stop", ex); }
     }
 
+    /// <summary>
+    /// v2.4.0-alpha.5 — starts a fresh chat. The previous conversation (if it had
+    /// any content) stays saved in the store and remains reachable in the sidebar;
+    /// an already-empty chat just refocuses the input instead of stacking ghosts.
+    /// </summary>
     private void OnNewChat(object sender, RoutedEventArgs e)
     {
         try
         {
             if (_generating) _genCts?.Cancel();
-            _history.Clear();
-            MessagesHost.Children.Clear();
-            _streamBuf.Clear();
-            _shownLen = 0;
-            _generating = false;
-            _lastAssistantGrid = null;
-            SendButton.Visibility = Visibility.Visible;
-            StopButton.Visibility = Visibility.Collapsed;
-            UpdateEmptyState();
+            if (_session is null)
+            {
+                // already a fresh, unsaved chat — just refocus
+                CloseSidebar();
+                PromptBox.Focus();
+                return;
+            }
+            _session = null;
+            ResetConversationUi();
+            UpdatePersonaChip();
+            CloseSidebar();
             PromptBox.Focus();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.NewChat", ex); }
+    }
+
+    /// <summary>Common teardown: clears transcript, stream state and the busy flags.</summary>
+    private void ResetConversationUi()
+    {
+        _history.Clear();
+        MessagesHost.Children.Clear();
+        _streamBuf.Clear();
+        _shownLen = 0;
+        _generating = false;
+        _lastAssistantGrid = null;
+        _liveHost = null;
+        _liveText = null;
+        _dotsPanel = null;
+        SendButton.Visibility = Visibility.Visible;
+        StopButton.Visibility = Visibility.Collapsed;
+        SendButton.IsEnabled = !string.IsNullOrWhiteSpace(PromptBox.Text);
+        UpdateEmptyState();
+    }
+
+    // ------------------------------------------- v2.4.0-alpha.5 — personas
+
+    private void UpdatePersonaChip()
+    {
+        try
+        {
+            var persona = ChatPersonas.Resolve(_session?.Persona ?? _settings.AiPersona);
+            PersonaGlyph.Text = persona.Glyph;
+            PersonaChipText.Text = persona.Name;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PersonaChip", ex); }
+    }
+
+    /// <summary>Persona flyout: one system prompt per chat, check-marked when active.</summary>
+    private void OnPersonaChipClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string current = _session?.Persona ?? _settings.AiPersona;
+            var menu = new ContextMenu();
+            menu.Items.Add(CaptionItem("PERSONA · SYSTEM PROMPT"));
+            foreach (var p in ChatPersonas.All)
+            {
+                bool active = string.Equals(p.Id, current, StringComparison.OrdinalIgnoreCase);
+                var item = new MenuItem
+                {
+                    Header = (active ? "\u2713  " : "") + $"{p.Name}  \u00b7  {p.Blurb}",
+                    FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
+                    Tag = p.Id,
+                };
+                item.Click += OnPersonaMenuItemClick;
+                menu.Items.Add(item);
+            }
+            menu.PlacementTarget = PersonaChip;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PersonaPick", ex); }
+    }
+
+    private void OnPersonaMenuItemClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not MenuItem { Tag: string id } || id.Length == 0) return;
+            _settings.AiPersona = id;      // new chats inherit the choice
+            _settings.Save();
+            if (_session is { } s) { s.Persona = id; _store.Upsert(s); }   // this chat switches live
+            UpdatePersonaChip();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PersonaSwitch", ex); }
+    }
+
+    // ------------------------------------------- v2.4.0-alpha.5 — history sidebar
+
+    private void OnHistoryClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_sidebarOpen) CloseSidebar();
+            else OpenSidebar();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.HistoryToggle", ex); }
+    }
+
+    private void OnSidebarScrimClick(object sender, MouseButtonEventArgs e)
+    {
+        try { CloseSidebar(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SidebarScrim", ex); }
+    }
+
+    private void OpenSidebar()
+    {
+        RebuildSidebar();
+        SidebarOverlay.Visibility = Visibility.Visible;
+        _sidebarOpen = true;
+
+        // Raycast slide-over motion: the panel eases in from the left while the
+        // scrim fades up. Skipped entirely when the user disabled animations.
+        if (_settings.AnimationsEnabled)
+        {
+            try
+            {
+                var tt = new System.Windows.Media.TranslateTransform(-36, 0);
+                SidebarPanel.RenderTransform = tt;
+                var ease = new System.Windows.Media.Animation.CubicEase
+                { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut };
+                var slide = new System.Windows.Media.Animation.DoubleAnimation(-36, 0, TimeSpan.FromMilliseconds(190))
+                { EasingFunction = ease };
+                var fade = new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140));
+                tt.BeginAnimation(System.Windows.Media.TranslateTransform.XProperty, slide);
+                SidebarScrim.BeginAnimation(OpacityProperty, fade);
+            }
+            catch { /* motion is cosmetic */ }
+        }
+    }
+
+    private void CloseSidebar()
+    {
+        if (!_sidebarOpen) return;
+        _sidebarOpen = false;
+        SidebarOverlay.Visibility = Visibility.Collapsed;
+        SidebarScrim.Opacity = 1;
+    }
+
+    private void RebuildSidebar()
+    {
+        try
+        {
+            SidebarHost.Children.Clear();
+            var sessions = _store.Sessions;   // newest first
+            foreach (var s in sessions)
+                SidebarHost.Children.Add(BuildSessionRow(s));
+            SidebarFooter.Text = sessions.Count == 0
+                ? "No chats yet — say something first"
+                : $"{sessions.Count} chat{(sessions.Count == 1 ? "" : "s")} · stored on this PC";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SidebarBuild", ex); }
+    }
+
+    /// <summary>
+    /// One session row in the launcher's raised-card language: quiet fill, the
+    /// active chat wears the SelStroke ring, a delete affordance fades in on hover.
+    /// </summary>
+    private FrameworkElement BuildSessionRow(ChatSession s)
+    {
+        bool active = string.Equals(s.Id, _session?.Id, StringComparison.Ordinal);
+        var border = new Border
+        {
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(11, 8, 5, 8),
+            Margin = new Thickness(0, 1, 0, 1),
+            Background = active ? (Brush)Resources["SelectedBrush"] : System.Windows.Media.Brushes.Transparent,
+            BorderBrush = active ? (Brush)Resources["SelStrokeBrush"] : System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(1),
+            Cursor = Cursors.Hand,
+            Tag = s.Id,
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        stack.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(s.Title) ? "New chat" : s.Title,
+            FontSize = 12.5,
+            FontWeight = active ? FontWeights.SemiBold : FontWeights.Medium,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            Foreground = (Brush)Resources["TitleBrush"],
+        });
+        int turns = s.Messages.Count(m => m.Role == "user");
+        stack.Children.Add(new TextBlock
+        {
+            Text = $"{RelTime(s.UpdatedAt)} · {turns} turn{(turns == 1 ? "" : "s")}",
+            FontSize = 10.5,
+            Opacity = 0.85,
+            Foreground = (Brush)Resources["SubtitleBrush"],
+            Margin = new Thickness(0, 2, 0, 0),
+        });
+        Grid.SetColumn(stack, 0);
+
+        var del = new Button
+        {
+            Style = (Style)FindResource("CaptionButton"),
+            Content = "\uE74D",
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 10,
+            Opacity = 0,
+            Tag = s.Id,
+            ToolTip = "Delete chat",
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        del.Click += OnDeleteSessionClick;
+        Grid.SetColumn(del, 1);
+
+        grid.Children.Add(stack);
+        grid.Children.Add(del);
+        border.Child = grid;
+
+        border.MouseLeftButtonDown += OnSessionRowClick;
+        border.MouseEnter += (_, _) =>
+        {
+            if (!active) border.Background = (Brush)Resources["HoverBrush"];
+            del.Opacity = 0.9;
+        };
+        border.MouseLeave += (_, _) =>
+        {
+            if (!active) border.Background = System.Windows.Media.Brushes.Transparent;
+            del.Opacity = 0;
+        };
+        return border;
+    }
+
+    private void OnSessionRowClick(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            if (sender is not Border { Tag: string id }) return;
+            SwitchSession(id);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SessionClick", ex); }
+    }
+
+    private void OnDeleteSessionClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            e.Handled = true;
+            if (sender is not Button { Tag: string id }) return;
+            _store.Delete(id);
+            if (string.Equals(_session?.Id, id, StringComparison.Ordinal))
+            {
+                _session = null;
+                ResetConversationUi();
+                UpdatePersonaChip();
+            }
+            RebuildSidebar();   // sidebar stays open for further curation
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SessionDelete", ex); }
+    }
+
+    /// <summary>Loads a stored conversation into the transcript (sidebar click / restore).</summary>
+    private void SwitchSession(string id)
+    {
+        try
+        {
+            var s = _store.Find(id);
+            if (s is null) return;
+            CloseSidebar();
+            if (_generating) _genCts?.Cancel();
+            _session = s;
+            ResetConversationUi();
+
+            _restoring = true;
+            try
+            {
+                // only the newest restored answer earns a Regenerate action —
+                // older rows would pop the wrong turn out of the context
+                int lastAssistantIdx = -1;
+                for (int i = s.Messages.Count - 1; i >= 0; i--)
+                {
+                    if (s.Messages[i].Role == "assistant") { lastAssistantIdx = i; break; }
+                }
+
+                for (int i = 0; i < s.Messages.Count; i++)
+                {
+                    var m = s.Messages[i];
+                    if (m.Role == "user")
+                        AppendUserBubble(m.Content);
+                    else if (m.Role == "assistant")
+                    {
+                        var (host, _) = AppendAssistantBubble();
+                        RenderMarkdownInto(host, m.Content, null, allowRegenerate: i == lastAssistantIdx);
+                    }
+                }
+            }
+            finally { _restoring = false; }
+
+            RebuildHistoryFromSession();
+            UpdatePersonaChip();
+            UpdateEmptyState();   // transcript may be non-empty — drop the welcome screen
+            _atBottom = true;
+            ChatScroll.ScrollToEnd();
+            PromptBox.Focus();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SessionSwitch", ex); }
+    }
+
+    /// <summary>
+    /// Rebuilds the in-memory API context from the stored transcript, merging
+    /// consecutive same-role messages (providers dislike back-to-back turns).
+    /// </summary>
+    private void RebuildHistoryFromSession()
+    {
+        _history.Clear();
+        if (_session is null) return;
+        foreach (var m in _session.Messages)
+        {
+            if (m.Role is not ("user" or "assistant")) continue;
+            if (_history.Count > 0 && _history[^1].Role == m.Role)
+                _history[^1] = new AiProviders.AiTurn(m.Role, _history[^1].Content + "\n\n" + m.Content);
+            else
+                _history.Add(new AiProviders.AiTurn(m.Role, m.Content));
+        }
+        if (_history.Count > HistoryCap)
+            _history.RemoveRange(0, _history.Count - HistoryCap);
+    }
+
+    /// <summary>Compact relative age for sidebar rows: now · 5m · 2h · 3d · date.</summary>
+    private static string RelTime(DateTime utc)
+    {
+        TimeSpan d = DateTime.UtcNow - utc.ToUniversalTime();
+        if (d.TotalMinutes < 1) return "now";
+        if (d.TotalMinutes < 60) return $"{(int)d.TotalMinutes}m";
+        if (d.TotalHours < 24) return $"{(int)d.TotalHours}h";
+        if (d.TotalDays < 7) return $"{(int)d.TotalDays}d";
+        return utc.ToLocalTime().ToString("d MMM", System.Globalization.CultureInfo.InvariantCulture);
     }
 
     // ------------------------------------------------- v2.4.0-alpha.4 — model picker
@@ -614,11 +963,35 @@ public partial class AiChatWindow : Window
             if (text.Length == 0 || _generating) return;
             if (!_settings.AiEnabled) { UpdateBanner(); }   // the request will fail with the same message — surface it visibly
 
+            EnsureSession(text);      // v2.4.0-alpha.5 — first message mints the session (title + persona)
             AppendUserBubble(text);
             UpdateEmptyState();
             BeginAssistantTurn(text);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Send", ex); }
+    }
+
+    /// <summary>
+    /// v2.4.0-alpha.5 — guarantees an active session exists before a turn runs: the
+    /// first user message mints one (title derived, persona inherited from settings)
+    /// and the user turn is persisted immediately, so a crash mid-answer keeps text.
+    /// </summary>
+    private void EnsureSession(string firstUserMessage)
+    {
+        try
+        {
+            if (_session is not null) return;
+            _session = new ChatSession
+            {
+                Title = ChatSession.DeriveTitle(firstUserMessage),
+                Persona = _settings.AiPersona,
+                CreatedAt = DateTime.UtcNow,
+            };
+            _session.Messages.Add(new ChatMessage("user", firstUserMessage, DateTime.UtcNow));
+            _store.Upsert(_session);
+            UpdatePersonaChip();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.EnsureSession", ex); }
     }
 
     /// <summary>
@@ -648,6 +1021,9 @@ public partial class AiChatWindow : Window
             _genCts = new CancellationTokenSource();
             var ct = _genCts.Token;
 
+            // v2.4.0-alpha.5 — the session's persona rides along as the system prompt
+            string systemPrompt = ChatPersonas.Resolve(_session?.Persona ?? _settings.AiPersona).Prompt;
+
             _flushTimer ??= CreateFlushTimer();
             _throttle.Restart();
             _flushTimer.Start();
@@ -658,7 +1034,7 @@ public partial class AiChatWindow : Window
                 {
                     var result = await _ai.StreamChatAsync(_settings, _history, prompt,
                         delta => { lock (_streamBuf) { _streamBuf.Append(delta); _streamDirty = true; } },
-                        ct).ConfigureAwait(true);
+                        ct, systemPrompt).ConfigureAwait(true);
                     await Dispatcher.InvokeAsync(() => FinishTurn(result));
                 }
                 catch (Exception ex)
@@ -731,6 +1107,7 @@ public partial class AiChatWindow : Window
                 string full = typed.Length > 0 ? typed : result.Text;
                 _history.Add(new AiProviders.AiTurn("user", _pendingUserPrompt));
                 _history.Add(new AiProviders.AiTurn("assistant", full));
+                PersistAssistant(full, "");
                 if (_liveHost is { } host)
                 {
                     if (_liveText is { } lt) lt.Visibility = Visibility.Collapsed;
@@ -748,6 +1125,7 @@ public partial class AiChatWindow : Window
                     if (_liveText is { } lt) lt.Visibility = Visibility.Collapsed;
                     RenderMarkdownInto(h, partial);
                     AddFootnote(h, "stopped");
+                    PersistAssistant(partial, " (stopped)");
                 }
                 else
                 {
@@ -786,6 +1164,22 @@ public partial class AiChatWindow : Window
 
     /// <summary>The prompt whose answer is streaming (for history pairing). UI-thread only.</summary>
     private string _pendingUserPrompt = "";
+
+    /// <summary>
+    /// v2.4.0-alpha.5 — appends the finished answer to the session transcript and
+    /// persists it. <paramref name="suffix"/> marks a stop mid-stream so the restored
+    /// transcript stays honest. Errors leave the user turn saved but no answer.
+    /// </summary>
+    private void PersistAssistant(string text, string suffix)
+    {
+        try
+        {
+            if (_session is not { } s || text.Length == 0) return;
+            s.Messages.Add(new ChatMessage("assistant", text + suffix, DateTime.UtcNow));
+            _store.Upsert(s);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Persist", ex); }
+    }
 
     // ---------------------------------------------------------------- bubbles
 
@@ -1006,8 +1400,10 @@ public partial class AiChatWindow : Window
     // ---------------------------------------------------------------- markdown rendering
 
     /// <summary>Turns markdown-lite blocks into visual children of the bubble host.
-    /// <paramref name="stats"/> (v2.4.0-alpha.4) rides along to the actions row.</summary>
-    private void RenderMarkdownInto(StackPanel host, string markdown, string? stats = null)
+    /// <paramref name="stats"/> (v2.4.0-alpha.4) rides along to the actions row;
+    /// <paramref name="allowRegenerate"/> (v2.4.0-alpha.5) is false for restored
+    /// history rows — regenerating only makes sense on the newest answer.</summary>
+    private void RenderMarkdownInto(StackPanel host, string markdown, string? stats = null, bool allowRegenerate = true)
     {
         try
         {
@@ -1074,7 +1470,7 @@ public partial class AiChatWindow : Window
 
             // per-answer footer: copy the whole answer + regenerate (prompt-kit's
             // message actions), plus the quiet timing/length stats
-            host.Children.Add(BuildAnswerActionsRow(host, markdown, stats));
+            host.Children.Add(BuildAnswerActionsRow(host, markdown, stats, allowRegenerate));
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Render", ex); }
     }
@@ -1139,16 +1535,19 @@ public partial class AiChatWindow : Window
     /// quiet stats caption ("2.4s · 812 chars"). Regenerate drops the trailing
     /// assistant turn (history + UI) and re-runs the last prompt.
     /// </summary>
-    private FrameworkElement BuildAnswerActionsRow(StackPanel host, string fullText, string? stats)
+    private FrameworkElement BuildAnswerActionsRow(StackPanel host, string fullText, string? stats, bool allowRegenerate = true)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 2, 0, 2) };
         var copy = new Button { Style = (Style)FindResource("CaptionButton"), Content = "Copy answer", Tag = fullText };
         copy.Click += OnCopyTagClick;
         row.Children.Add(copy);
 
-        var regen = new Button { Style = (Style)FindResource("CaptionButton"), Content = "Regenerate" };
-        regen.Click += (_, _) => OnRegenerateClick();
-        row.Children.Add(regen);
+        if (allowRegenerate)
+        {
+            var regen = new Button { Style = (Style)FindResource("CaptionButton"), Content = "Regenerate" };
+            regen.Click += (_, _) => OnRegenerateClick();
+            row.Children.Add(regen);
+        }
 
         if (!string.IsNullOrEmpty(stats))
             row.Children.Add(new TextBlock
@@ -1181,6 +1580,13 @@ public partial class AiChatWindow : Window
                 break;
             }
             if (string.IsNullOrWhiteSpace(lastUser)) return;
+
+            // v2.4.0-alpha.5 — the stored transcript pops its trailing answer too
+            if (_session is { } s && s.Messages.Count > 0 && s.Messages[^1].Role == "assistant")
+            {
+                s.Messages.RemoveAt(s.Messages.Count - 1);
+                _store.Upsert(s);
+            }
 
             if (_lastAssistantGrid is { } g && MessagesHost.Children.Contains(g))
                 MessagesHost.Children.Remove(g);

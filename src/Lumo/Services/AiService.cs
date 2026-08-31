@@ -160,6 +160,8 @@ public sealed class AiService
     ///  · anthropic — buffered /v1/messages request; the whole text arrives in a
     ///                single delta and the WINDOW plays the typewriter reveal, so
     ///                both providers feel identical from the user's seat.
+    /// v2.4.0-alpha.5 — <paramref name="systemPrompt"/> carries the chat persona
+    /// (BuildChat routes it to the right provider field; null = no persona).
     ///
     /// Constraints (DEV_PLAN agent rules): runs entirely on the caller's worker
     /// thread, the UI thread is only touched by the window's own dispatcher
@@ -170,7 +172,7 @@ public sealed class AiService
     /// </summary>
     public async Task<AiStreamResult> StreamChatAsync(
         Settings settings, IReadOnlyList<AiProviders.AiTurn> history, string prompt,
-        Action<string> onDelta, CancellationToken ct)
+        Action<string> onDelta, CancellationToken ct, string? systemPrompt = null)
     {
         string style = settings.AiStyle;
         try
@@ -184,7 +186,7 @@ public sealed class AiService
                 .ToList();
             turns.Add(new AiProviders.AiTurn("user", prompt ?? ""));
 
-            var (ok, spec, err) = AiProviders.BuildChat(style, settings.AiEndpoint, settings.AiModel, settings.AiApiKey, turns);
+            var (ok, spec, err) = AiProviders.BuildChat(style, settings.AiEndpoint, settings.AiModel, settings.AiApiKey, turns, systemPrompt);
             if (!ok || spec is null)
                 return AiStreamResult.Fail(err);
 

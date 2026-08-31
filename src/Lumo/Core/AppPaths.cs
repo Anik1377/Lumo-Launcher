@@ -16,6 +16,7 @@ public static class AppPaths
     public static readonly string ShortcutsFile = Path.Combine(SettingsDir, "shortcuts.json");
     public static string UsageFile => Path.Combine(SettingsDir, "usage.json");          // v2.1 MRU
     public static string FavouritesFile => Path.Combine(SettingsDir, "favourites.json"); // v2.2 (Phase 2)
+    public static string ChatsFile => Path.Combine(SettingsDir, "chats.json");           // v2.4.0-alpha.5 AI chat history
 
     static AppPaths()
     {
