@@ -56,7 +56,13 @@ public sealed class UsageStore
     /// Persist off the UI thread. A single-flight guard collapses bursts (rapid
     /// macro launches) into one write; the write itself is a temp-file swap so a
     /// crash can never truncate the JSON.
+    /// v2.4.0-alpha.4 FIX — saves are serialized under _saveGate and each write
+    /// uses a UNIQUE tmp path: two overlapping saves (scheduled + explicit) used
+    /// to share one .tmp and could swap a partially-written file, which Load
+    /// then tolerated as corrupt (a rare CI-only flake on contended runners).
     /// </summary>
+    private readonly object _saveGate = new();
+
     private void ScheduleSave()
     {
         if (Interlocked.CompareExchange(ref _saving, 1, 0) != 0) return;
@@ -79,9 +85,19 @@ public sealed class UsageStore
             }
             var dir = Path.GetDirectoryName(_file);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            var tmp = _file + ".tmp";
-            File.WriteAllText(tmp, json);
-            File.Move(tmp, _file, overwrite: true);
+            lock (_saveGate)
+            {
+                var tmp = $"{_file}.{Guid.NewGuid():N}.tmp";
+                try
+                {
+                    File.WriteAllText(tmp, json);
+                    File.Move(tmp, _file, overwrite: true);
+                }
+                finally
+                {
+                    try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+                }
+            }
         }
         catch (Exception ex) { DiagnosticLogger.LogException("UsageStore.Save", ex); }
     }
