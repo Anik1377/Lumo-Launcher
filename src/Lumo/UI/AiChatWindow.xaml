@@ -280,8 +280,9 @@
             </Setter>
         </Style>
 
-        <!-- suggestion chip (prompt-kit's empty-state prompts): pill with an accent
-             seed dot, hover lifts the border to accent -->
+        <!-- v2.4.0-alpha.4 — minimal suggestion pill: no accent seed dot, just a
+             hairline quiet pill that lifts its stroke on hover (the launcher's
+             raised-card language). The pill no longer shouts. -->
         <Style x:Key="ChipButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
@@ -290,18 +291,14 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bg" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
-                                BorderThickness="1" CornerRadius="18" Padding="15,8">
-                            <StackPanel Orientation="Horizontal">
-                                <Ellipse Width="5" Height="5" Fill="{DynamicResource AccentBrush}"
-                                         VerticalAlignment="Center" Margin="0,1,8,1"/>
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </StackPanel>
+                        <Border x:Name="Bg" Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
+                                BorderThickness="1" CornerRadius="16" Padding="14,7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}"/>
-                                <Setter TargetName="Bg" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="{DynamicResource SelStrokeBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -309,29 +306,84 @@
             </Setter>
         </Style>
 
-        <!-- kbd hint chips (same language as the launcher footer) -->
-        <Style x:Key="KbdChipBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="5"/>
-            <Setter Property="Padding" Value="7,2.5"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
+        <!-- v2.4.0-alpha.4 — the model chip is a ghost BUTTON now (click = model picker
+             dropdown): quiet chip fill + hairline, hover lifts to the raised stroke. -->
+        <Style x:Key="GhostChip" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="{DynamicResource ChipBrush}" BorderBrush="{DynamicResource BorderLineBrush}"
+                                BorderThickness="1" CornerRadius="12" Padding="10,4">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter TargetName="Bg" Property="BorderBrush" Value="{DynamicResource SelStrokeBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource SelectedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-        <Style x:Key="KbdChipText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="10.5"/>
-            <Setter Property="FontWeight" Value="Medium"/>
-            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
+
+        <!-- v2.4.0-alpha.4 — model picker dropdown: the launcher's rounded flyout
+             (opaque FieldBrush card — a chromeless popup must paint its own backdrop),
+             hairline stroke, soft shadow, hover rows. -->
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Margin="10" Background="{DynamicResource FieldBrush}"
+                                BorderBrush="{DynamicResource SelStrokeBrush}" BorderThickness="1"
+                                CornerRadius="10" Padding="5">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.35"/>
+                            </Border.Effect>
+                            <StackPanel IsItemsHost="True"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Bd" CornerRadius="6" Padding="11,6.5" Background="Transparent">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
     <!-- the card fills the whole window: DWM draws rounding + shadow on the true edge
-         (CornerRadius is synced to the DWM value in code — Win11 8 px, Win10 0) -->
+         (CornerRadius is synced to the DWM value in code — Win11 8 px, Win10 0).
+         v2.4.0-alpha.4 — the border is the top-lit CardStrokeBrush (bright white over
+         the top edge settling into the hairline), same material as the launcher rim. -->
     <Border x:Name="RootCard" CornerRadius="8"
             Background="{DynamicResource PanelBrush}"
             TextElement.FontFamily="/Assets/Fonts/#Inter"
-            BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+            BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>   <!-- caption -->
@@ -341,8 +393,9 @@
                 <RowDefinition Height="Auto"/>   <!-- hints -->
             </Grid.RowDefinitions>
 
-            <!-- ============ caption ============ -->
-            <Border Grid.Row="0" x:Name="CaptionBar" Background="{DynamicResource SidebarBrush}"
+            <!-- ============ caption — v2.4.0-alpha.4: quiet dark band, hairline only;
+                 the model chip is now a clickable picker ============ -->
+            <Border Grid.Row="0" x:Name="CaptionBar" Background="{DynamicResource CaptionBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="0,0,0,1"
                     CornerRadius="8,8,0,0" MouseLeftButtonDown="OnDragWindow">
                 <Grid Height="46" Margin="14,0">
@@ -356,17 +409,20 @@
                         </Grid>
                         <TextBlock Text="Lumo AI" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,0,0"
                                    Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
-                        <!-- model chip with live status dot -->
-                        <Border x:Name="ModelChip" Background="{DynamicResource ChipBrush}" CornerRadius="11"
-                                Padding="10,3.5" Margin="12,0,0,0" VerticalAlignment="Center"
-                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+                        <!-- model chip → picker button (dot shows provider liveness) -->
+                        <Button x:Name="ModelChip" Style="{StaticResource GhostChip}" Margin="12,0,0,0"
+                                VerticalAlignment="Center" Click="OnModelChipClick"
+                                ToolTip="Switch model">
                             <StackPanel Orientation="Horizontal">
                                 <Ellipse x:Name="ModelDot" Width="7" Height="7" VerticalAlignment="Center"
                                          Margin="0,0,7,0" Fill="#FF10B981"/>
                                 <TextBlock x:Name="ModelChipText" FontSize="11"
                                            Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text=" &#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="8"
+                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"
+                                           Margin="6,1,0,0"/>
                             </StackPanel>
-                        </Border>
+                        </Button>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button x:Name="NewChatButton" Content="New chat" Style="{StaticResource CaptionButton}" Click="OnNewChat"/>
@@ -469,18 +525,11 @@
                 </Grid>
             </Border>
 
-            <!-- ============ hints (kbd chips) ============ -->
-            <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,9,0,12">
-                <Border Style="{StaticResource KbdChipBorder}" Margin="0,0,5,0">
-                    <TextBlock Style="{StaticResource KbdChipText}" Text="&#x21B5; send"/>
-                </Border>
-                <Border Style="{StaticResource KbdChipBorder}" Margin="0,0,5,0">
-                    <TextBlock Style="{StaticResource KbdChipText}" Text="&#x21E7;&#x21B5; new line"/>
-                </Border>
-                <Border Style="{StaticResource KbdChipBorder}">
-                    <TextBlock Style="{StaticResource KbdChipText}" Text="esc hide"/>
-                </Border>
-            </StackPanel>
+            <!-- ============ hints — v2.4.0-alpha.4: one quiet caption line replaces
+                 the boxed chip row (minimal) ============ -->
+            <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,8,0,11"
+                       FontSize="10.5" Foreground="{DynamicResource SubtitleBrush}" Opacity="0.7"
+                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;esc hide"/>
         </Grid>
     </Border>
 </Window>

@@ -162,22 +162,36 @@ public partial class AiChatWindow : Window
             Resources["TitleBrush"] = new SolidColorBrush(p.Title);
             Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
             Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
+            Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
             Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
             Resources["SeparatorBrush"] = new SolidColorBrush(p.Separator);
             Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
             Resources["PanelBrush"] = new SolidColorBrush(p.Panel);
             Resources["FieldBrush"] = new SolidColorBrush(p.Field);
-            // v2.4 — Raycast ladder surfaces (were Win11 grays): elevated cards, deeper
-            // sidebar, and a code-block tier that sits between the two.
+            // v2.4 — Raycast ladder surfaces: elevated cards, caption band, and a
+            // code-block tier that sits between the two.
             Resources["CardBrush"] = new SolidColorBrush(Appearance.ElevatedFor(dark));
-            Resources["SidebarBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x0B, 0x0C, 0x0F) : Color.FromRgb(0xF1, 0xF1, 0xF4));
+            // v2.4.0-alpha.4 — neutral zinc caption band (was the bluer sidebar tier).
+            Resources["CaptionBrush"] = new SolidColorBrush(dark
+                ? Color.FromRgb(0x0B, 0x0B, 0x0D) : Color.FromRgb(0xF1, 0xF1, 0xF4));
             Resources["ChipBrush"] = new SolidColorBrush(dark
                 ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
-            Resources["UserBubbleBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2E));   // accent @ 18%
-            Resources["UserBubbleBorderBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x38));
+            // v2.4.0-alpha.4 — MAXIMUM-CONTRAST user pill: near-white fill with
+            // near-black ink in dark mode, inverted in light mode. No accent tint,
+            // no border — the one loud element in an otherwise quiet window.
+            Resources["UserBubbleBrush"] = new SolidColorBrush(dark
+                ? Color.FromRgb(0xF2, 0xF2, 0xF4) : Color.FromRgb(0x1B, 0x1B, 0x1E));
+            Resources["UserBubbleTextBrush"] = new SolidColorBrush(dark
+                ? Color.FromRgb(0x14, 0x14, 0x17) : Color.FromRgb(0xFA, 0xFA, 0xFB));
             Resources["AvatarBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2A));
-            Resources["CodeBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x12, 0x13, 0x17) : Color.FromRgb(0xF6, 0xF6, 0xF8));
+            Resources["CodeBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x12, 0x12, 0x15) : Color.FromRgb(0xF6, 0xF6, 0xF8));
             Resources["WarnBrush"] = new SolidColorBrush(Color.FromArgb(0x2A, 0xCA, 0x50, 0x10));
+            // v2.4.0-alpha.4 — raised-card strokes for the picker menu, suggestion
+            // pills and the model chip hover (same token the launcher rows use).
+            Resources["SelStrokeBrush"] = new SolidColorBrush(p.SelStroke);
+            // v2.4.0-alpha.4 — top-lit card stroke: the window edge now catches light
+            // along the top and settles into the hairline, matching the launcher rim.
+            Resources["CardStrokeBrush"] = TopLitStrokeBrush(p.Border, dark, 0x30);
 
             // v2.3.0-alpha.4 polish — gradient tokens (send cap, logo orb, orb halo).
             // Built from the accent so every accent choice keeps a coherent system.
@@ -228,6 +242,34 @@ public partial class AiChatWindow : Window
         (byte)(c.R + (255 - c.R) * f),
         (byte)(c.G + (255 - c.G) * f),
         (byte)(c.B + (255 - c.B) * f));
+
+    /// <summary>
+    /// v2.4.0-alpha.4 — the top-lit stroke (launcher family material): a vertical
+    /// gradient border that reads as a bright 1 px light edge along the top and
+    /// settles into the quiet hairline below.
+    /// </summary>
+    private static Brush TopLitStrokeBrush(Color hairline, bool dark, byte topAlpha)
+    {
+        var b = new LinearGradientBrush
+        {
+            StartPoint = new System.Windows.Point(0, 0),
+            EndPoint = new System.Windows.Point(0, 1),
+        };
+        if (dark)
+        {
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(topAlpha, 0xFF, 0xFF, 0xFF), 0.0));
+            b.GradientStops.Add(new GradientStop(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF), 0.10));
+            b.GradientStops.Add(new GradientStop(hairline, 0.42));
+        }
+        else
+        {
+            b.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.White, 0.0));
+            b.GradientStops.Add(new GradientStop(hairline, 0.40));
+        }
+        b.GradientStops.Add(new GradientStop(hairline, 1.0));
+        b.Freeze();
+        return b;
+    }
 
     // ---------------------------------------------------------------- chrome
 
@@ -396,6 +438,7 @@ public partial class AiChatWindow : Window
             _streamBuf.Clear();
             _shownLen = 0;
             _generating = false;
+            _lastAssistantGrid = null;
             SendButton.Visibility = Visibility.Visible;
             StopButton.Visibility = Visibility.Collapsed;
             UpdateEmptyState();
@@ -403,6 +446,162 @@ public partial class AiChatWindow : Window
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.NewChat", ex); }
     }
+
+    // ------------------------------------------------- v2.4.0-alpha.4 — model picker
+
+    private bool _pickerBusy;   // one probe at a time — a double-click can't stack requests
+
+    /// <summary>
+    /// The caption chip is a live model switcher: Ollama installs get a fresh
+    /// /api/tags probe (served from the cached snapshot when it is still warm);
+    /// Anthropic setups get the standard model ids plus a Settings shortcut.
+    /// Picking a row rewrites settings.AiModel, PERSISTS it, and refreshes the chip.
+    /// </summary>
+    private void OnModelChipClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_pickerBusy) return;
+            bool anthropic = AiProviders.IsAnthropic(_settings.AiStyle, _settings.AiEndpoint);
+            if (anthropic)
+            {
+                OpenModelMenu(BuildAnthropicMenu());
+                return;
+            }
+
+            var status = OllamaManager.Current;
+            if (status is { Probed: true, ServerUp: true } && status.Models.Count > 0 && !status.Stale)
+            {
+                OpenModelMenu(BuildOllamaMenu(status.Models));
+                return;
+            }
+
+            // cold or stale snapshot — probe on a worker, then open on the UI thread
+            _pickerBusy = true;
+            string endpoint = _settings.AiEndpoint;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var fresh = await OllamaManager.RefreshStatusAsync(endpoint).ConfigureAwait(true);
+                    await Dispatcher.InvokeAsync(() =>
+                    {
+                        _pickerBusy = false;
+                        if (IsLoaded)
+                            OpenModelMenu(fresh.ServerUp && fresh.Models.Count > 0
+                                ? BuildOllamaMenu(fresh.Models)
+                                : BuildOfflineMenu());
+                    });
+                }
+                catch (Exception ex)
+                {
+                    DiagnosticLogger.LogException("AiChat.ModelProbe", ex);
+                    await Dispatcher.InvokeAsync(() => { _pickerBusy = false; if (IsLoaded) OpenModelMenu(BuildOfflineMenu()); });
+                }
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ModelPick", ex); }
+    }
+
+    private ContextMenu BuildOllamaMenu(IReadOnlyList<OllamaManager.ModelInfo> models)
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(CaptionItem($"LOCAL MODELS · {models.Count}"));
+        foreach (var m in models.OrderByDescending(x => x.Bytes))
+        {
+            bool active = string.Equals(m.Name, _settings.AiModel, StringComparison.OrdinalIgnoreCase);
+            var item = new MenuItem
+            {
+                Header = (active ? "\u2713  " : "") + $"{m.Name}  \u00b7  {FormatGb(m.Bytes)}",
+                FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
+                Tag = m.Name,
+            };
+            item.Click += OnModelMenuItemClick;
+            menu.Items.Add(item);
+        }
+        menu.Items.Add(new Separator());
+        menu.Items.Add(SettingsItem());
+        return menu;
+    }
+
+    private ContextMenu BuildAnthropicMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(CaptionItem("ANTHROPIC API"));
+        foreach (string id in new[] { "claude-sonnet-4-5", "claude-haiku-4-5" })
+        {
+            bool active = string.Equals(id, _settings.AiModel, StringComparison.OrdinalIgnoreCase);
+            var item = new MenuItem
+            {
+                Header = (active ? "\u2713  " : "") + id,
+                FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
+                Tag = id,
+            };
+            item.Click += OnModelMenuItemClick;
+            menu.Items.Add(item);
+        }
+        if (_settings.AiModel.Length > 0 &&
+            _settings.AiModel != "claude-sonnet-4-5" && _settings.AiModel != "claude-haiku-4-5")
+            menu.Items.Add(CaptionItem($"custom · {_settings.AiModel}"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(SettingsItem());
+        return menu;
+    }
+
+    private ContextMenu BuildOfflineMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(CaptionItem("OLLAMA IS OFFLINE"));
+        menu.Items.Add(CaptionItem("start it (or pull a model) from Settings → AI"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(SettingsItem());
+        return menu;
+    }
+
+    private MenuItem CaptionItem(string text) => new()
+    {
+        Header = text,
+        IsEnabled = false,
+        FontSize = 10.5,
+        FontWeight = FontWeights.SemiBold,
+        Foreground = (Brush)Resources["SubtitleBrush"],
+    };
+
+    private MenuItem SettingsItem()
+    {
+        var item = new MenuItem { Header = "Manage models in Settings\u2026" };
+        item.Click += (_, _) =>
+        {
+            try { SettingsRequested?.Invoke(); }
+            catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ModelSettings", ex); }
+        };
+        return item;
+    }
+
+    private void OnModelMenuItemClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not MenuItem { Tag: string model } || model.Length == 0) return;
+            _settings.AiModel = model;
+            _settings.Save();          // v2.4.0-alpha.4 — the switch persists across restarts
+            UpdateModelChip();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ModelSwitch", ex); }
+    }
+
+    private void OpenModelMenu(ContextMenu menu)
+    {
+        try
+        {
+            menu.PlacementTarget = ModelChip;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            menu.IsOpen = true;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.MenuOpen", ex); }
+    }
+
+    private static string FormatGb(long bytes) => bytes <= 0 ? "?" : $"{bytes / 1_000_000_000.0:0.#} GB";
 
     // ---------------------------------------------------------------- sending / streaming
 
@@ -417,7 +616,20 @@ public partial class AiChatWindow : Window
 
             AppendUserBubble(text);
             UpdateEmptyState();
+            BeginAssistantTurn(text);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Send", ex); }
+    }
 
+    /// <summary>
+    /// v2.4.0-alpha.4 — the second half of a turn, split out so REGENERATE can
+    /// re-run it for the previous prompt without re-appending the user bubble:
+    /// builds the assistant placeholder, then starts the streamed request.
+    /// </summary>
+    private void BeginAssistantTurn(string prompt)
+    {
+        try
+        {
             // assistant placeholder: avatar + plain-text live line + typing dots
             var (host, live) = AppendAssistantBubble();
             _liveHost = host;
@@ -429,12 +641,12 @@ public partial class AiChatWindow : Window
             _shownLen = 0;
             _firstDeltaArrived = false;
             _generating = true;
+            _turnStart.Restart();
             SendButton.Visibility = Visibility.Collapsed;
             StopButton.Visibility = Visibility.Visible;
 
             _genCts = new CancellationTokenSource();
             var ct = _genCts.Token;
-            string prompt = text;
 
             _flushTimer ??= CreateFlushTimer();
             _throttle.Restart();
@@ -459,10 +671,11 @@ public partial class AiChatWindow : Window
 
             PromptBox.Focus();
         }
-        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Send", ex); }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.BeginTurn", ex); }
     }
 
     private readonly Stopwatch _throttle = Stopwatch.StartNew();
+    private readonly Stopwatch _turnStart = Stopwatch.StartNew();   // v2.4.0-alpha.4 — per-answer wall time
 
     /// <summary>50 ms UI flush: typewriter reveal of the accumulated stream text. One tick, one repaint.</summary>
     private DispatcherTimer CreateFlushTimer()
@@ -521,7 +734,9 @@ public partial class AiChatWindow : Window
                 if (_liveHost is { } host)
                 {
                     if (_liveText is { } lt) lt.Visibility = Visibility.Collapsed;
-                    RenderMarkdownInto(host, full);
+                    // v2.4.0-alpha.4 — quiet per-answer stats: wall time + answer length
+                    string stats = $"{_turnStart.Elapsed.TotalSeconds:0.0}s \u00b7 {full.Length:N0} chars";
+                    RenderMarkdownInto(host, full, stats);
                 }
             }
             else if (result.Cancelled)
@@ -583,11 +798,13 @@ public partial class AiChatWindow : Window
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+            // v2.4.0-alpha.4 — MAXIMUM CONTRAST, no chrome: a flat inverted pill
+            // (near-white on dark / near-black on light) with no border and no tint.
+            // The user's words should be the loudest thing in the window.
             var bubble = new Border
             {
                 Background = (Brush)Resources["UserBubbleBrush"],
-                BorderBrush = (Brush)Resources["UserBubbleBorderBrush"],   // v2.3.0-alpha.4 — hairline accent rim lifts the fill off the panel
-                BorderThickness = new Thickness(1),
+                BorderThickness = new Thickness(0),
                 CornerRadius = new CornerRadius(16, 16, 4, 16),   // prompt-kit: sharp tail corner toward the sender
                 Padding = new Thickness(13, 9, 13, 9),
                 MaxWidth = 560,
@@ -599,7 +816,7 @@ public partial class AiChatWindow : Window
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 13.5,
                 LineHeight = 19.5,
-                Foreground = (Brush)Resources["TitleBrush"],
+                Foreground = (Brush)Resources["UserBubbleTextBrush"],
             };
             bubble.Child = tb;
             Grid.SetColumn(bubble, 1);
@@ -662,8 +879,12 @@ public partial class AiChatWindow : Window
         MessagesHost.Children.Add(grid);
         AnimateIn(grid);
         ScrollIfAtBottom();
+        _lastAssistantGrid = grid;   // v2.4.0-alpha.4 — regenerate swaps exactly this row
         return (host, live);
     }
+
+    /// <summary>The wrapper grid of the most recent assistant bubble (regenerate target).</summary>
+    private FrameworkElement? _lastAssistantGrid;
 
     /// <summary>Removes the last assistant placeholder grid (used when a turn dies before any text).</summary>
     private void RemoveLastAssistantPlaceholder()
@@ -784,8 +1005,9 @@ public partial class AiChatWindow : Window
 
     // ---------------------------------------------------------------- markdown rendering
 
-    /// <summary>Turns markdown-lite blocks into visual children of the bubble host.</summary>
-    private void RenderMarkdownInto(StackPanel host, string markdown)
+    /// <summary>Turns markdown-lite blocks into visual children of the bubble host.
+    /// <paramref name="stats"/> (v2.4.0-alpha.4) rides along to the actions row.</summary>
+    private void RenderMarkdownInto(StackPanel host, string markdown, string? stats = null)
     {
         try
         {
@@ -850,8 +1072,9 @@ public partial class AiChatWindow : Window
                 }
             }
 
-            // per-answer footer: copy the whole answer (prompt-kit's message action)
-            host.Children.Add(BuildCopyFooterRow(markdown));
+            // per-answer footer: copy the whole answer + regenerate (prompt-kit's
+            // message actions), plus the quiet timing/length stats
+            host.Children.Add(BuildAnswerActionsRow(host, markdown, stats));
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Render", ex); }
     }
@@ -911,13 +1134,63 @@ public partial class AiChatWindow : Window
         return outer;
     }
 
-    private FrameworkElement BuildCopyFooterRow(string fullText)
+    /// <summary>
+    /// v2.4.0-alpha.4 — the answer actions row: Copy answer · Regenerate, then the
+    /// quiet stats caption ("2.4s · 812 chars"). Regenerate drops the trailing
+    /// assistant turn (history + UI) and re-runs the last prompt.
+    /// </summary>
+    private FrameworkElement BuildAnswerActionsRow(StackPanel host, string fullText, string? stats)
     {
         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, 2, 0, 2) };
         var copy = new Button { Style = (Style)FindResource("CaptionButton"), Content = "Copy answer", Tag = fullText };
         copy.Click += OnCopyTagClick;
         row.Children.Add(copy);
+
+        var regen = new Button { Style = (Style)FindResource("CaptionButton"), Content = "Regenerate" };
+        regen.Click += (_, _) => OnRegenerateClick();
+        row.Children.Add(regen);
+
+        if (!string.IsNullOrEmpty(stats))
+            row.Children.Add(new TextBlock
+            {
+                Text = stats,
+                FontSize = 10.5,
+                Opacity = 0.75,
+                Foreground = (Brush)Resources["SubtitleBrush"],
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 1, 0, 0),
+            });
         return row;
+    }
+
+    /// <summary>
+    /// v2.4.0-alpha.4 — regenerate: pop the trailing assistant turn (history + UI)
+    /// and re-run the last user prompt through the same streaming pipeline. The user
+    /// bubble stays exactly where it is; only the answer is replaced.
+    /// </summary>
+    private void OnRegenerateClick()
+    {
+        try
+        {
+            if (_generating) return;
+            string? lastUser = null;
+            for (int i = _history.Count - 1; i >= 0; i--)
+            {
+                if (_history[i].Role == "assistant") { _history.RemoveAt(i); continue; }
+                if (_history[i].Role == "user") { lastUser = _history[i].Content; _history.RemoveAt(i); }
+                break;
+            }
+            if (string.IsNullOrWhiteSpace(lastUser)) return;
+
+            if (_lastAssistantGrid is { } g && MessagesHost.Children.Contains(g))
+                MessagesHost.Children.Remove(g);
+            _lastAssistantGrid = null;
+
+            _pendingUserPrompt = lastUser;
+            UpdateEmptyState();
+            BeginAssistantTurn(lastUser);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Regenerate", ex); }
     }
 
     /// <summary>Fills a TextBlock with bold / inline-code runs via MarkdownLite.Inline.</summary>
