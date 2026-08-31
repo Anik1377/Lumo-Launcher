@@ -38,6 +38,11 @@ public partial class SettingsWindow : Window
     private readonly Func<bool>? _recordingActive; // v1.5.1 — is a recording live right now?
     private readonly PluginStore? _plugins;      // v2.5 — Task 4.2 JSON plugins
     private readonly Func<ShortcutDef, string>? _shortcutHotkeyFeedback;   // v2.5 — Task 4.3
+    private readonly UpdateService? _updates;    // v2.6 — Task 5.1 update check + staged download
+    private readonly Action? _replayOnboarding;  // v2.6 — Task 5.3 replay the intro tour
+    private UpdateInfo? _updateInfo;             // newest release found this session (for the card)
+    private string? _updateStagedPath;           // completed download, ready to open
+    private CancellationTokenSource? _updateCts;  // cancels an in-flight download
     private int _initialPage = 0;
 
     private readonly List<(Border Box, string Hex)> _swatches = new();
@@ -55,7 +60,8 @@ public partial class SettingsWindow : Window
                           ShortcutStore? shortcuts = null, Action? recordMacro = null,
                           Func<bool>? recordingActive = null, int initialPage = 0,
                           PluginStore? plugins = null,
-                          Func<ShortcutDef, string>? shortcutHotkeyFeedback = null)
+                          Func<ShortcutDef, string>? shortcutHotkeyFeedback = null,
+                          UpdateService? updates = null, Action? replayOnboarding = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -68,6 +74,8 @@ public partial class SettingsWindow : Window
         _recordingActive = recordingActive;
         _plugins = plugins;
         _shortcutHotkeyFeedback = shortcutHotkeyFeedback;
+        _updates = updates;
+        _replayOnboarding = replayOnboarding;
         _initialPage = initialPage;
 
         BuildAccentSwatches();
@@ -89,6 +97,13 @@ public partial class SettingsWindow : Window
         string vs = "v" + AppVersion.Label;   // v2.4.0-alpha.7 — full label ("v2.4.0-alpha.7"), was truncated to v{major}.{minor}
         VersionText.Text = vs;
         AboutVersion.Text = vs;
+
+        // v2.6 — data location (portable badge when the data folder follows the exe)
+        DataPathText.Text = AppPaths.DataDir + (AppPaths.IsPortable ? "   (portable — travels with the exe)" : "");
+
+        // v2.6 — Task 5.1 surface the update card state
+        _updateInfo = _updates?.Latest;
+        RefreshUpdateCard();
 
         // open directly on the requested page (e.g. Shortcuts from the launcher)
         if (_initialPage > 0) SelectPage(_initialPage);
@@ -296,6 +311,153 @@ public partial class SettingsWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.CopyStarter", ex); }
     }
 
+    // ---------------------------------------------------------------- data location (v2.6 — Task 5.2) + tour (Task 5.3)
+
+    private void OnOpenDataFolder(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = AppPaths.DataDir,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OpenDataFolder", ex); }
+    }
+
+    private void OnReplayTour(object sender, RoutedEventArgs e)
+    {
+        try { _replayOnboarding?.Invoke(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.ReplayTour", ex); }
+    }
+
+    // ---------------------------------------------------------------- updates (v2.6 — Task 5.1)
+
+    /// <summary>Repaints the update card from _updateInfo / _updateStagedPath.
+    /// Safe to call any time; every element exists after InitializeComponent.</summary>
+    private void RefreshUpdateCard()
+    {
+        try
+        {
+            UpdatesToggle.IsChecked = _settings.UpdatesEnabled;
+
+            if (_updateStagedPath is not null)
+            {
+                UpdateStatusText.Text = "Downloaded — extract the zip and replace your Lumo.exe with the one inside to finish installing.";
+                DownloadUpdateButton.Visibility = Visibility.Collapsed;
+                OpenStagedButton.Visibility = Visibility.Visible;
+                UpdateProgress.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            if (_updateInfo is { } info)
+            {
+                var size = info.ZipBytes > 0 ? $" · {info.ZipBytes / 1024.0 / 1024.0:0.0} MB" : "";
+                UpdateStatusText.Text = $"Lumo {info.Version} is available (you are running {AppVersion.Label}{size}). " +
+                                        "The zip is staged into your data folder; extract it over your current Lumo.exe.";
+                DownloadUpdateButton.Visibility = Visibility.Visible;
+                OpenStagedButton.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                UpdateStatusText.Text = _settings.UpdatesEnabled
+                    ? "Automatic checks are on — Lumo checks GitHub about once a day."
+                    : "Automatic checks are off — press “Check now” whenever you are curious.";
+                DownloadUpdateButton.Visibility = Visibility.Collapsed;
+                OpenStagedButton.Visibility = Visibility.Collapsed;
+            }
+            UpdateProgress.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.RefreshUpdateCard", ex); }
+    }
+
+    private async void OnCheckUpdates(object sender, RoutedEventArgs e)
+    {
+        if (_updates is null) { UpdateStatusText.Text = "Updates are not wired up in this build."; return; }
+        try
+        {
+            CheckUpdatesButton.IsEnabled = false;
+            UpdateStatusText.Text = "Checking GitHub Releases…";
+            var found = await _updates.CheckNowAsync();
+            _updateInfo = found;
+            if (found is null) UpdateStatusText.Text = $"You are up to date (v{AppVersion.Label}) — or GitHub was unreachable; the log knows which.";
+            RefreshUpdateCard();
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.CheckUpdates", ex);
+            UpdateStatusText.Text = "The check failed — details are in the log.";
+        }
+        finally { CheckUpdatesButton.IsEnabled = true; }
+    }
+
+    private async void OnDownloadUpdate(object sender, RoutedEventArgs e)
+    {
+        if (_updates is null || _updateInfo is not { } info) return;
+        try
+        {
+            DownloadUpdateButton.IsEnabled = false;
+            UpdateProgress.Visibility = Visibility.Visible;
+            UpdateProgress.Value = 0;
+            UpdateStatusText.Text = $"Downloading Lumo {info.Version}…";
+            _updateCts = new CancellationTokenSource();
+            var path = await _updates.DownloadAsync(info, p => Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    if (p >= 0) UpdateProgress.Value = p;
+                    if (p is > 0 and < 100) UpdateStatusText.Text = $"Downloading Lumo {info.Version}… {p:0}%";
+                }
+                catch { }
+            }), _updateCts.Token);
+
+            if (path is not null)
+            {
+                _updateStagedPath = path;
+                UpdateStatusText.Text = "Downloaded — extract the zip and replace your Lumo.exe with the one inside to finish installing.";
+                DownloadUpdateButton.Visibility = Visibility.Collapsed;
+                OpenStagedButton.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                UpdateStatusText.Text = "The download failed — details are in the log. You can always grab the zip from the GitHub release page.";
+            }
+            UpdateProgress.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.DownloadUpdate", ex);
+            UpdateStatusText.Text = "The download failed — details are in the log.";
+            UpdateProgress.Visibility = Visibility.Collapsed;
+        }
+        finally
+        {
+            DownloadUpdateButton.IsEnabled = _updateStagedPath is null;
+            _updateCts?.Dispose();
+            _updateCts = null;
+        }
+    }
+
+    private void OnOpenStagedUpdate(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_updateStagedPath is not { } path || !File.Exists(path))
+            {
+                UpdateStatusText.Text = "The staged zip is gone (data folder cleaned?) — press “Check now” and download again.";
+                OpenStagedButton.Visibility = Visibility.Collapsed;
+                return;
+            }
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OpenStaged", ex); }
+    }
+
     /// <summary>Window springs in — fade + gentle scale, a quiet Fluent touch.</summary>
     private void PlayEntrance()
     {
@@ -371,6 +533,7 @@ public partial class SettingsWindow : Window
             StartWithWindowsToggle.IsChecked = _pendingStartWithWindows;
             HideOnFocusLossToggle.IsChecked = _settings.HideOnFocusLoss;
             AnimationsToggle.IsChecked = _settings.AnimationsEnabled;
+            UpdatesToggle.IsChecked = _settings.UpdatesEnabled;   // v2.6 — Task 5.1
 
             switch (_settings.WebEngine?.ToLowerInvariant())
             {
@@ -468,6 +631,13 @@ public partial class SettingsWindow : Window
                 FooterHint.Text = _settings.AnimationsEnabled
                     ? "Animations on — press Save to keep them"
                     : "Reduced motion — press Save to keep it";
+            };
+            // v2.6 — Task 5.1: live-edited like the AI settings; Cancel restores via RestoreFrom(_snapshot).
+            UpdatesToggle.Click += (_, _) =>
+            {
+                if (_suppress) return;
+                _settings.UpdatesEnabled = UpdatesToggle.IsChecked == true;
+                RefreshUpdateCard();
             };
             EngineGoogle.Checked += (_, _) => { if (!_suppress) _settings.WebEngine = "google"; };
             EngineBing.Checked += (_, _) => { if (!_suppress) _settings.WebEngine = "bing"; };

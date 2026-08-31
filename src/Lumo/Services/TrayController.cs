@@ -61,6 +61,32 @@ public sealed class TrayController : IDisposable
     /// <summary>Raised when the user toggles the theme from the tray menu.</summary>
     public event Action? ThemeChanged;
 
+    private Action? _balloonClick;   // v2.6 — Task 5.1 update balloon
+
+    /// <summary>
+    /// v2.6 (Task 5.1) — show a notification balloon (the update-available nudge).
+    /// onClick fires when the balloon itself is clicked. Never throws.
+    /// </summary>
+    public void ShowBalloon(string title, string text, Action? onClick = null)
+    {
+        try
+        {
+            _balloonClick = onClick;
+            _icon.BalloonTipClicked -= OnBalloonClicked;
+            _icon.BalloonTipClicked += OnBalloonClicked;
+            _icon.BalloonTipTitle = title;
+            _icon.BalloonTipText = text;
+            _icon.ShowBalloonTip(10_000);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Tray.Balloon", ex); }
+    }
+
+    private void OnBalloonClicked(object? sender, EventArgs e)
+    {
+        var click = _balloonClick;
+        if (click is not null) Safe(click);
+    }
+
     /// <summary>Update the tray tooltip (e.g. after the hotkey changed in Settings).</summary>
     public void UpdateText(string text)
     {

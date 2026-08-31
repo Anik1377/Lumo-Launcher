@@ -51,6 +51,9 @@
     <Compile Include="../Lumo/Core/PrefixRouter.cs" Link="Core/PrefixRouter.cs" />
     <Compile Include="../Lumo/Core/Plugins.cs" Link="Core/Plugins.cs" />
     <Compile Include="../Lumo/Services/PluginStore.cs" Link="Services/PluginStore.cs" />
+    <!-- v2.6 (Phase 5) — release-version comparison, GitHub payload picker, update policy, portable roots -->
+    <Compile Include="../Lumo/Core/UpdateCheck.cs" Link="Core/UpdateCheck.cs" />
+    <Compile Include="../Lumo/Services/UpdateService.cs" Link="Services/UpdateService.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
     <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
     <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />

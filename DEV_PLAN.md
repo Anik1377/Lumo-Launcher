@@ -125,11 +125,31 @@ CI runs tests before publish.
   set as the main hotkey); the launcher re-registers all of them on save and
   runs the shortcut from anywhere — launcher hidden included.
 
-## Phase 5 — v2.6 "Product" (#13, #14, #15) — the last unimplemented phase
+## Phase 5 — v2.6 "Product" (#13, #14, #15) ✅ (shipped in v2.6.0-alpha.1) — ALL PHASES COMPLETE
 
-- **Task 5.1 — Auto-update service** (GitHub Releases check + staged download).
-- **Task 5.2 — Portable data mode** (data/ folder next to the exe).
-- **Task 5.3 — Onboarding / first-run tour.**
+- **Task 5.1 — Auto-update service ✅** GitHub Releases check + staged download.
+  Core/UpdateCheck.cs (pure: ReleaseVersion — SemVer-ish parse where the final
+  release outranks any prerelease and alpha.9 < alpha.10 numerically — plus the
+  tolerant /releases payload picker: drafts skipped, no-zip releases skipped,
+  the "Lumo…zip" CI asset found among alien assets). Services/UpdateService.cs:
+  /releases list (never /latest — every Lumo release is a prerelease), once per
+  24 h automatic check 15 s after startup, manual "Check now", staged download
+  to DataDir\updates via a Guid temp file (80 MB sanity cap) — staged on purpose:
+  the portable exe is never self-replaced while running; the user extracts the
+  zip over Lumo.exe. Settings: UpdatesEnabled + LastUpdateCheckUtc. UI: tray
+  balloon (click → Settings → About) + the Settings → About updates card
+  (toggle, check now, download progress, open staged zip).
+- **Task 5.2 — Portable data mode ✅** AppPaths.ResolveRoots: a "data" folder
+  next to Lumo.exe redirects every store (settings, shortcuts, chats, personas,
+  plugins, usage, favourites, log, staged updates) into it — Lumo.exe + data/
+  travels together. Without the folder the classic %LOCALAPPDATA%/%APPDATA%
+  roots are used, byte-for-byte unchanged. Static-init order note: the roots
+  resolve as the FIRST field initializer, so LogFile/SettingsFile see real
+  values. Settings → About shows the live location + portable badge.
+- **Task 5.3 — Onboarding / first-run tour ✅** UI/OnboardingWindow — three
+  quiet steps (hotkey → prefixes → data & updates), launcher-card styling,
+  Esc/Skip/✕ all count as seen (never traps the user). Shown once via
+  Settings.FirstRunDone on the first launch, replayable from Settings → About.
 
 ## Cross-cutting: settings-window checklist
 

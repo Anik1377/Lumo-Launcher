@@ -46,6 +46,11 @@ public sealed class Settings
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    // ---- v2.6 (DEV_PLAN Phase 5) — product round
+    public bool FirstRunDone { get; set; } = false;      // onboarding tour shown once (Task 5.3)
+    public bool UpdatesEnabled { get; set; } = true;     // auto-check GitHub Releases every 24 h (Task 5.1)
+    public string LastUpdateCheckUtc { get; set; } = ""; // ISO-8601 stamp of the last completed check
+
     // ---- v2.5 (DEV_PLAN Task 4.2) — JSON plugins: ids the user switched off in Settings → Plugins
     public List<string> DisabledPlugins { get; set; } = new();
 
@@ -114,6 +119,9 @@ public sealed class Settings
         s.AiModel           = GetStr(root, nameof(AiModel), s.AiModel);
         s.AiApiKey          = GetStr(root, nameof(AiApiKey), s.AiApiKey);
         s.AiPersona         = GetStr(root, nameof(AiPersona), s.AiPersona);
+        s.FirstRunDone      = GetBool(root, nameof(FirstRunDone), s.FirstRunDone);          // v2.6 — Task 5.3
+        s.UpdatesEnabled    = GetBool(root, nameof(UpdatesEnabled), s.UpdatesEnabled);      // v2.6 — Task 5.1
+        s.LastUpdateCheckUtc = GetStr(root, nameof(LastUpdateCheckUtc), s.LastUpdateCheckUtc);
 
         // v2.4 design-system migration — pre-2.4 installs carry an accent that was only
         // ever the old default (violet #7C6CFF or Win11 blue #0078D4). The Raycast-grade
@@ -248,6 +256,9 @@ public sealed class Settings
         AiModel = o.AiModel;
         AiApiKey = o.AiApiKey;
         AiPersona = o.AiPersona;
+        FirstRunDone = o.FirstRunDone;          // v2.6 — Task 5.3
+        UpdatesEnabled = o.UpdatesEnabled;      // v2.6 — Task 5.1
+        LastUpdateCheckUtc = o.LastUpdateCheckUtc;
     }
 
     /// <summary>

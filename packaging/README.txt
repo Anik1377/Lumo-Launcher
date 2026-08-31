@@ -1,7 +1,27 @@
 ======================================================
-  LUMO v2.5.0-alpha.1  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.1  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.1 (DEV_PLAN Phase 5 — "Product")
+---------------------------------------------------------------
+1. AUTO-UPDATE. Lumo now checks GitHub Releases about once a
+   day (quietly, 15 s after startup, nothing without your
+   click). When a newer build is out you get a tray nudge;
+   Settings -> About has the full card: check now, download
+   with progress, open the staged zip. Installing stays a
+   two-step by design: extract the zip over your Lumo.exe.
+   Turn it off any time (Settings -> About -> toggle).
+2. PORTABLE DATA MODE. Make a folder named "data" next to
+   Lumo.exe and everything - settings, shortcuts, chats,
+   plugins, favourites, even the log - lives inside it.
+   Lumo.exe + data/ on a USB stick = your whole setup travels.
+   Without the folder, nothing changes (data stays in
+   %APPDATA%\Lumo as before). The live location is shown on
+   Settings -> About.
+3. FIRST-RUN TOUR. A three-step intro (hotkey, prefixes,
+   data & updates) greets the first launch - skip or close it
+   any time, replay it from Settings -> About.
 
 WHAT'S NEW IN v2.5.0-alpha.1 (DEV_PLAN Phase 4 — "Platform")
 ---------------------------------------------------------------

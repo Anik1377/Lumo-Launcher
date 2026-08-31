@@ -18,7 +18,7 @@ public static class AppVersion
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
 
     /// <summary>Shown when the attribute is missing (e.g. the pure net8.0 test harness).</summary>
-    public const string Fallback = "2.5.0";
+    public const string Fallback = "2.6.0";
 
     /// <summary>
     /// Pure: pulls the first whitespace-separated token that starts with an ASCII digit

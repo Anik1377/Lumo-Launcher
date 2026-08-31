@@ -21,6 +21,8 @@ public partial class App : Application
     private ClipboardHistory? _clips;
     private UsageStore? _usage;                      // v2.1 — MRU ranking
     private Favourites? _favs;                       // v2.2 — pinned favourites
+    private UpdateService? _updates;                 // v2.6 — Task 5.1 GitHub Releases check
+    private OnboardingWindow? _onboarding;           // v2.6 — Task 5.3 first-run tour
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -43,7 +45,7 @@ public partial class App : Application
             args.SetObserved();
         };
 
-        DiagnosticLogger.Log("Startup", $"Lumo v2.1.0 starting (PID {Environment.ProcessId})");
+        DiagnosticLogger.Log("Startup", $"Lumo v{AppVersion.Label} starting (PID {Environment.ProcessId})");
 
         try
         {
@@ -66,6 +68,8 @@ public partial class App : Application
             _favs = new Favourites();                 // v2.2 — pinned favourites
             _favs.Load();
             _plugins = new PluginStore(_settings);    // v2.5 — JSON plugins (%APPDATA%\Lumo\plugins)
+            _updates = new UpdateService(_settings);  // v2.6 — Task 5.1 auto-update
+            _updates.UpdateAvailable += info => Dispatcher.InvokeAsync(() => NotifyUpdateAvailable(info));
             _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips, _usage, _favs, _plugins);
             MainWindow = _window;
 
@@ -131,6 +135,17 @@ public partial class App : Application
             _window.Show();
             _window.ActivateLauncher();
 
+            // v2.6 (Task 5.3) — first run: the tour, exactly once (replayable in Settings → About).
+            if (!_settings.FirstRunDone)
+            {
+                _settings.FirstRunDone = true;
+                _settings.Save();
+                ShowOnboarding();
+            }
+
+            // v2.6 (Task 5.1) — quiet 24-hour background check; never on the UI thread.
+            _ = RunAutoUpdateCheckAsync();
+
             DiagnosticLogger.Log("Startup", $"Startup complete. Hotkey: {_window.ActiveHotkeyDescription ?? "none"}");
         }
         catch (Exception ex)
@@ -179,7 +194,9 @@ public partial class App : Application
                         return _window?.DescribeShortcutHotkeyState(def.Id) ?? "";
                     }
                     catch { return ""; }
-                });
+                },
+                updates: _updates,                       // v2.6 — Task 5.1 updates card
+                replayOnboarding: () => Dispatcher.InvokeAsync(ShowOnboarding));
 
             _settingsWindow.Topmost = true; // stay above other apps while customizing
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
@@ -279,6 +296,53 @@ public partial class App : Application
             });
         }
         catch (Exception ex) { DiagnosticLogger.LogException("App.StartRecording", ex); }
+    }
+
+    /// <summary>v2.6 (Task 5.3) — show the intro tour (singleton per app lifetime).
+    /// Never blocks: the launcher already ran; this is a companion window.</summary>
+    private void ShowOnboarding()
+    {
+        try
+        {
+            if (_onboarding is { IsLoaded: true }) { _onboarding.Activate(); return; }
+            _onboarding = new OnboardingWindow(_settings);
+            _onboarding.Closed += (_, _) => _onboarding = null;
+            _onboarding.Show();
+            _onboarding.Activate();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("App.Onboarding", ex); }
+    }
+
+    /// <summary>v2.6 (Task 5.1) — the automatic check: only when enabled and due,
+    /// 15 s after startup so launch stays snappy. CheckNowAsync never throws.</summary>
+    private async Task RunAutoUpdateCheckAsync()
+    {
+        try
+        {
+            await Task.Delay(15_000).ConfigureAwait(false);
+            var settings = _settings; var svc = _updates;
+            if (settings is null || svc is null) return;
+            if (!UpdateService.AutoCheckDue(settings, DateTimeOffset.UtcNow)) return;
+            await svc.CheckNowAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("App.AutoUpdateCheck", ex);
+        }
+    }
+
+    /// <summary>v2.6 (Task 5.1) — a check found something newer: balloon it; the
+    /// balloon click lands on Settings → About where the download button lives.</summary>
+    private void NotifyUpdateAvailable(UpdateInfo info)
+    {
+        try
+        {
+            _tray?.ShowBalloon(
+                $"Lumo {info.Version} is out",
+                "Click to open the update card in Settings → About.",
+                onClick: () => Dispatcher.InvokeAsync(() => OpenSettings(initialPage: 5)));
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("App.NotifyUpdate", ex); }
     }
 
     protected override void OnExit(ExitEventArgs e)
