@@ -1006,6 +1006,25 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- ============ Voice input — v2.6.0-alpha.3 ============ -->
+                                <Border Style="{StaticResource Card}" Margin="0,14,0,0">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Voice input in the AI chat" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}" Margin="0,2,0,0" TextWrapping="Wrap"
+                                                           Text="Dictate into the prompt with the mic button (or Ctrl+M) — offline Windows speech, nothing leaves the PC."/>
+                                            </StackPanel>
+                                            <ToggleButton x:Name="VoiceEnabledToggle" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <TextBlock x:Name="VoiceStatusText" Style="{StaticResource SettingDesc}" Margin="0,10,0,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- ============ Custom personas — v2.4.0-alpha.6 ============ -->
                                 <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                                     <StackPanel>

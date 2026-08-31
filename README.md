@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.6.0--alpha.2-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.6.0--alpha.3-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -71,6 +71,7 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 💬 | **AI chat** | `AI/` (or the bare word `AI`) opens a dedicated chat tab — streaming replies, markdown rendering, multi-line input |
 | 🗂️ | **Chat sessions** | Full history (`chats.json`, 40 sessions / 200 messages) with a Raycast-style slide-over sidebar, pin/rename/delete curation, `Ctrl+N` new chat, last-answer-only regenerate |
 | 🎭 | **Personas** | 6 built-in system-prompt personas + your own (`personas.json`, edited in Settings → AI) — pick per chat from the persona chip flyout |
+| 🎤 | **Voice typing** | The chat's mic button (or `Ctrl+M`) dictates into the prompt — offline Windows speech (SAPI), words land live as you speak, `Enter` sends what you heard, `Esc` stops. No cloud, no key, no setup; recognizer follows the Windows display language (`"VoiceLanguage"` in settings.json pins one) |
 | 🔌 | **Providers** | **Ollama** (local, no key — one-click setup incl. model pull) or **Anthropic** Messages API (key stored only in `settings.json`, redacted from every log line) |
 
 ### Plugins (extensible keywords)
@@ -181,6 +182,7 @@ expansion is never recursive.
 | `Tab` | open the preview pane for the selection |
 | `Ctrl+→` | open the quick-action menu (again closes) |
 | `Ctrl+N` (in AI chat) | new chat session |
+| `Ctrl+M` (in AI chat) | start / stop voice typing — words appear in the prompt live; `Enter` sends, `Esc` stops without sending |
 | `F11` | fullscreen / window toggle (AI chat) |
 
 ### Plugins in one minute
@@ -209,6 +211,26 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v2.6.0-alpha.3 — voice typing in the AI chat
+
+1. **🎤 Dictate into the AI chat.** The prompt box grew a mic button — click it
+   (or press `Ctrl+M`) and speak: offline Windows speech turns your voice into
+   text **live**, right in the input, segments committing as you pause. `Enter`
+   stops listening and sends exactly what you saw; `Esc` stops without sending;
+   dictating appends to whatever you already typed. It runs on the desktop
+   speech stack that ships with Windows itself — **no cloud, no API key, no
+   extra install**, matching Lumo's local-first doctrine (the default Ollama
+   brain + a local mic = an AI conversation that never leaves the PC).
+2. **🎛️ One toggle.** **Settings → AI → Voice input** switches the feature; the
+   card reports whether a recognizer is installed (English ships with English
+   Windows; more languages come from Windows Settings → Time & Language →
+   Speech, or pin one via `"VoiceLanguage"` in settings.json).
+3. **🧪 +20 tests → 310.** Recognizer picking (exact culture, exact id,
+   language-part fallback, OS UI-language default, last-resort first, empty
+   machines), dictation text composition (spacing rules, whitespace-only
+   bases, empty segments), and the new settings keys (tolerant read,
+   `RestoreFrom`, `Clone` round-trip).
 
 ## 🆕 What's new in v2.6.0-alpha.2 — the plugin ecosystem
 
@@ -744,6 +766,8 @@ The Settings window writes this file for you; every key can still be edited by h
   "AiStyle": "ollama",
   "AiEndpoint": "http://localhost:11434",
   "AiModel": "llama3.2",
+  "VoiceEnabled": true,
+  "VoiceLanguage": "",
   "UpdatesEnabled": true,
   "FirstRunDone": true
 }
@@ -752,6 +776,8 @@ The Settings window writes this file for you; every key can still be edited by h
 `Theme` accepts `dark`, `light` or `auto` (follows the Windows colour mode).
 `Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24`, `Space` or `` ` ``.
 `WebEngine` accepts `google`, `bing` or `duckduckgo`.
+`VoiceLanguage` (AI chat dictation) is empty by default — it follows the Windows
+display language; set a culture like `"en-GB"` to pin one specific recognizer.
 
 ## ⚡ Shortcuts & macros — `%APPDATA%\Lumo\shortcuts.json`
 

@@ -57,6 +57,8 @@
     <!-- v2.6.0-alpha.2 — first-party plugin catalog (parse/state) + the install disk path -->
     <Compile Include="../Lumo/Core/FirstParty.cs" Link="Core/FirstParty.cs" />
     <Compile Include="../Lumo/Services/FirstPartyStore.cs" Link="Services/FirstPartyStore.cs" />
+    <!-- v2.6.0-alpha.3 — voice typing pure policy (recognizer pick + text compose) -->
+    <Compile Include="../Lumo/Core/VoiceDictation.cs" Link="Core/VoiceDictation.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
     <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
     <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />

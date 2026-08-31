@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>2.6.0-alpha.2</Version>
-    <InformationalVersion>Lumo 2.6.0-alpha.2 (ALPHA — unstable build)</InformationalVersion>
+    <Version>2.6.0-alpha.3</Version>
+    <InformationalVersion>Lumo 2.6.0-alpha.3 (ALPHA — unstable build)</InformationalVersion>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -40,6 +40,13 @@
        pack resource (IconFactory → pack://application:,,,/Assets/app.ico). -->
   <ItemGroup>
     <Resource Include="Assets\app.ico" />
+  </ItemGroup>
+
+  <!-- v2.6.0-alpha.3 — voice typing in the AI chat: the managed wrapper over the
+       Windows desktop speech stack (SAPI). Offline dictation, ships with the OS,
+       zero cloud, zero setup — the no-heavy-dependency way to add a mic. -->
+  <ItemGroup>
+    <PackageReference Include="System.Speech" Version="8.0.0" />
   </ItemGroup>
 
   <!-- UseWindowsForms injects global System.Drawing / System.Windows.Forms usings which

@@ -1,7 +1,25 @@
 ======================================================
-  LUMO v2.6.0-alpha.2  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.3  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.3 (voice typing in the AI chat)
+---------------------------------------------------------------
+1. DICTATE INTO THE AI CHAT. The prompt box grew a mic button
+   - click it (or press Ctrl+M) and speak: offline Windows
+   speech turns your voice into text live, right in the input,
+   committing as you pause. Enter stops listening and sends
+   exactly what you saw; Esc stops without sending; dictating
+   appends to whatever you already typed. It runs on the
+   desktop speech stack that ships with Windows itself - no
+   cloud, no API key, no extra install. English ships with
+   English Windows; more languages come from Windows Settings
+   -> Time & Language -> Speech, or pin one with
+   "VoiceLanguage" in settings.json.
+2. ONE TOGGLE. Settings -> AI -> Voice input switches the
+   feature and reports whether a recognizer is installed.
+3. +20 TESTS -> 310. Recognizer picking, dictation text
+   composition, and the new settings keys are under test.
 
 WHAT'S NEW IN v2.6.0-alpha.2 (the plugin ecosystem)
 ---------------------------------------------------------------

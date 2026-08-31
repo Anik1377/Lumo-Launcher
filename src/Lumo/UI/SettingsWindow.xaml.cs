@@ -740,6 +740,19 @@ public partial class SettingsWindow : Window
             AiModelBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiModel = AiModelBox.Text.Trim(); };
             AiKeyBox.TextChanged += (_, _) => { if (!_suppress) _settings.AiApiKey = AiKeyBox.Text.Trim(); };
 
+            // v2.6.0-alpha.3 — voice typing: toggle lives with the AI settings; the status
+            // line surfaces what dictation will actually use on this PC (live-edited like
+            // every AI setting, Cancel restores via RestoreFrom(_snapshot)).
+            VoiceEnabledToggle.IsChecked = _settings.VoiceEnabled;
+            VoiceEnabledToggle.Click += (_, _) => { if (!_suppress) _settings.VoiceEnabled = VoiceEnabledToggle.IsChecked == true; };
+            int recognizers = 0;
+            try { recognizers = VoiceInputService.Installed().Count; } catch { }
+            VoiceStatusText.Text = !VoiceInputService.IsSupported
+                ? "No speech recognizer found on this PC — install one under Windows Settings → Time & Language → Speech."
+                : recognizers <= 1
+                    ? "Dictation follows the Windows display language and runs entirely offline."
+                    : $"{recognizers} speech recognizers installed — dictation follows the Windows display language; set \"VoiceLanguage\" in settings.json (e.g. \"en-GB\") to pin one.";
+
             // v2.4.0-alpha.6 — custom personas: their own store (personas.json, saved
             // immediately on edit — independent of this window's Save/Cancel cycle)
             RebuildPersonaList();

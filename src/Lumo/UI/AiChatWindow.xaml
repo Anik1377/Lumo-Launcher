@@ -237,6 +237,45 @@
             </Setter>
         </Style>
 
+        <!-- v2.6.0-alpha.3 — voice typing toggle: a quiet 30 px ghost cap that sits
+             left of the send button and lights up with the accent while the mic is
+             live (Tag == "listening", set from code; Content carries the glyph). -->
+        <Style x:Key="MicButton" TargetType="Button">
+            <Setter Property="Width" Value="30"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="Cap" Fill="Transparent"
+                                     Stroke="{DynamicResource BorderLineBrush}" StrokeThickness="1"/>
+                            <TextBlock x:Name="Glyph" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="12.5"
+                                       Foreground="{DynamicResource SubtitleBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Cap" Property="Fill" Value="{DynamicResource ChipBrush}"/>
+                                <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="listening">
+                                <Setter TargetName="Cap" Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Cap" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Glyph" Property="Foreground" Value="White"/>
+                            </DataTrigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Cap" Property="Opacity" Value="0.35"/>
+                                <Setter TargetName="Glyph" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- ghost caption buttons (New chat / minimize / close) -->
         <Style x:Key="CaptionButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
@@ -524,6 +563,7 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <Grid Grid.Column="0" VerticalAlignment="Center">
                         <TextBox x:Name="PromptBox" FontSize="14" AcceptsReturn="True"
@@ -532,7 +572,7 @@
                                  CaretBrush="{DynamicResource AccentBrush}" VerticalContentAlignment="Center"
                                  MaxLength="4000" KeyDown="OnPromptKeyDown" TextChanged="OnPromptTextChanged"
                                  GotKeyboardFocus="OnPromptFocusChanged" LostKeyboardFocus="OnPromptFocusChanged"/>
-                        <TextBlock Text="Ask anything…" FontSize="14" Margin="1,0,0,0" IsHitTestVisible="False"
+                        <TextBlock x:Name="PromptPlaceholder" Text="Ask anything…" FontSize="14" Margin="1,0,0,0" IsHitTestVisible="False"
                                    Foreground="{DynamicResource SubtitleBrush}" Opacity="0.6"
                                    VerticalAlignment="Center">
                             <TextBlock.Style>
@@ -547,9 +587,14 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </Grid>
-                    <Button x:Name="SendButton" Grid.Column="1" Style="{StaticResource SendButton}"
+                    <!-- v2.6.0-alpha.3 — voice typing: mic between the prompt and send; hidden
+                         entirely when disabled in Settings or the PC has no speech recognizer. -->
+                    <Button x:Name="MicButton" Grid.Column="1" Style="{StaticResource MicButton}"
+                            Content="&#xE720;" VerticalAlignment="Bottom" Margin="8,0,0,3" Click="OnMicClick"
+                            ToolTip="Voice input (Ctrl+M)" Visibility="Collapsed"/>
+                    <Button x:Name="SendButton" Grid.Column="2" Style="{StaticResource SendButton}"
                             VerticalAlignment="Bottom" Margin="10,0,0,2" Click="OnSendClick"/>
-                    <Button x:Name="StopButton" Grid.Column="1" Style="{StaticResource SendButton}" Tag="&#xE71A;"
+                    <Button x:Name="StopButton" Grid.Column="2" Style="{StaticResource SendButton}" Tag="&#xE71A;"
                             VerticalAlignment="Bottom" Margin="10,0,0,2" Visibility="Collapsed" Click="OnStopClick"
                             ToolTip="Stop generating"/>
                 </Grid>
@@ -559,7 +604,7 @@
                  the boxed chip row (minimal) ============ -->
             <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,8,0,11"
                        FontSize="10.5" Foreground="{DynamicResource SubtitleBrush}" Opacity="0.7"
-                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;F11 fullscreen&#160;&#160;&#183;&#160;&#160;esc stop / hide"/>
+                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+M voice&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;F11 fullscreen&#160;&#160;&#183;&#160;&#160;esc stop / hide"/>
 
             <!-- ============ v2.4.0-alpha.5 — chat history slide-over (Raycast pattern):
                  a scrim + left panel that overlays the whole card, so the window keeps

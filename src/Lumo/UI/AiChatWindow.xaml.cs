@@ -48,6 +48,13 @@ public partial class AiChatWindow : Window
     private bool _sourceReady;
     private bool _atBottom = true;
 
+    // ---- v2.6.0-alpha.3 — offline voice typing (System.Speech SAPI dictation);
+    //      _voiceBase is everything committed so far, partials render on top of it.
+    private readonly VoiceInputService _voice = new();
+    private string _voiceBase = "";
+    private System.Windows.Threading.DispatcherTimer? _voiceErrTimer;
+    private System.Windows.Media.Animation.Storyboard? _micPulse;
+
     /// <summary>v2.3.0-alpha.4 — the banner's "Open AI settings" link asks App to open Settings → AI (page 6).</summary>
     public event Action? SettingsRequested;
 
@@ -83,12 +90,26 @@ public partial class AiChatWindow : Window
         UpdateEmptyState();
         BuildChips();
 
-        Closed += (_, _) => { try { _genCts?.Cancel(); } catch { } };
+        Closed += (_, _) =>
+        {
+            try { _genCts?.Cancel(); } catch { }
+            try { _voice.Dispose(); } catch { }   // v2.6.0-alpha.3 — never leave SAPI listening after the window dies
+        };
         Loaded += (_, _) =>
         {
             PromptBox.Focus();
             StartOrbBreathing();
+            UpdateMicState();
         };
+
+        // v2.6.0-alpha.3 — SAPI raises events on its own audio thread; the service
+        // marshals onto the session dispatcher and InvokeAsync re-queues to the UI
+        // thread, so dictation can never touch a control from a worker.
+        _voice.ListeningStarted += () => Dispatcher.InvokeAsync(OnVoiceStarted);
+        _voice.Partial += t => Dispatcher.InvokeAsync(() => OnVoicePartial(t));
+        _voice.Final += t => Dispatcher.InvokeAsync(() => OnVoiceFinal(t));
+        _voice.ListeningStopped += () => Dispatcher.InvokeAsync(OnVoiceStopped);
+        _voice.Failed += m => Dispatcher.InvokeAsync(() => OnVoiceFailed(m));
     }
 
     // ---------------------------------------------------------------- polish motion
@@ -410,7 +431,7 @@ public partial class AiChatWindow : Window
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
             {
                 e.Handled = true;
-                SendFromInput();
+                SendFromInput();   // v2.6.0-alpha.3 — SendFromInput stops dictation first; Enter sends what the user sees
             }
             // Shift+Enter falls through — the TextBox inserts the newline
         }
@@ -429,6 +450,7 @@ public partial class AiChatWindow : Window
             if (e.Key == Key.Escape)
             {
                 e.Handled = true;
+                if (_voice.IsListening) { StopVoice(); return; }   // v2.6.0-alpha.3 — first Esc ends dictation, not the window
                 if (_sidebarOpen) { CloseSidebar(); return; }
                 // v2.4.0-alpha.6 — while a generation is running, Esc stops it first
                 // (the hint line says "esc stop / hide"); a second Esc then hides.
@@ -444,6 +466,11 @@ public partial class AiChatWindow : Window
             {
                 e.Handled = true;
                 OnNewChat(sender, e);
+            }
+            else if (e.Key == Key.M && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                e.Handled = true;                                  // v2.6.0-alpha.3 — voice typing toggle
+                ToggleVoice();
             }
         }
         catch { }
@@ -464,11 +491,158 @@ public partial class AiChatWindow : Window
     {
         try
         {
-            PromptShell.BorderBrush = PromptBox.IsKeyboardFocusWithin
+            PromptShell.BorderBrush = PromptBox.IsKeyboardFocusWithin || _voice.IsListening
                 ? _focusRingBrush ?? (Brush)FindResource("AccentBrush")
                 : (Brush)FindResource("BorderLineBrush");
         }
         catch { }
+    }
+
+    // ---------------------------------------------------------------- voice typing (v2.6.0-alpha.3)
+
+    /// <summary>Show the mic only when voice is enabled AND the machine ships a recognizer.</summary>
+    private void UpdateMicState()
+    {
+        try
+        {
+            bool usable = _settings.VoiceEnabled && VoiceInputService.IsSupported;
+            MicButton.Visibility = usable ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.MicState", ex); }
+    }
+
+    private void OnMicClick(object sender, RoutedEventArgs e) => ToggleVoice();
+
+    private void ToggleVoice()
+    {
+        if (_voice.IsListening) StopVoice();
+        else StartVoice();
+    }
+
+    private void StartVoice()
+    {
+        try
+        {
+            if (_voice.IsListening || _generating || !VoiceInputService.IsSupported || !_settings.VoiceEnabled) return;
+            _voiceBase = PromptBox.Text;   // dictation appends to whatever is already typed
+            _voice.Start(_settings.VoiceLanguage);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceStart", ex); }
+    }
+
+    private void StopVoice()
+    {
+        try { _voice.Stop(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceStop", ex); }
+    }
+
+    private void OnVoiceStarted()
+    {
+        if (!_voice.IsListening) return;   // stale queued event after an instant stop — drop
+        try
+        {
+            MicButton.Tag = "listening";
+            MicButton.ToolTip = "Stop voice input (Ctrl+M or Esc)";
+            PromptPlaceholder.Text = "Listening… speak, then pause";
+            PromptShell.BorderBrush = _focusRingBrush ?? (Brush)FindResource("AccentBrush");
+            StartMicPulse();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceStarted", ex); }
+    }
+
+    /// <summary>Live hypothesis — renders base + partial WYSIWYG, caret pinned to the end.</summary>
+    private void OnVoicePartial(string text)
+    {
+        if (!_voice.IsListening) return;   // in-flight SAPI event after a stop/send — never repopulate a cleared box
+        try
+        {
+            string merged = VoiceText.Compose(_voiceBase, text);
+            if (merged == PromptBox.Text) return;
+            PromptBox.Text = merged;
+            PromptBox.CaretIndex = PromptBox.Text.Length;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoicePartial", ex); }
+    }
+
+    /// <summary>Settled segment — commits into the base so the next hypothesis builds on top.</summary>
+    private void OnVoiceFinal(string text)
+    {
+        if (!_voice.IsListening) return;   // same staleness rule as partials
+        try
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            _voiceBase = VoiceText.Compose(_voiceBase, text);
+            PromptBox.Text = _voiceBase;
+            PromptBox.CaretIndex = _voiceBase.Length;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceFinal", ex); }
+    }
+
+    private void OnVoiceStopped()
+    {
+        try
+        {
+            MicButton.Tag = "";
+            MicButton.ToolTip = "Voice input (Ctrl+M)";
+            PromptPlaceholder.Text = "Ask anything…";
+            StopMicPulse();
+            if (PromptBox.IsKeyboardFocusWithin)
+                PromptShell.BorderBrush = (Brush)FindResource("BorderLineBrush");
+        }
+        catch { }
+    }
+
+    /// <summary>Mic on a machine that can't dictate: one quiet placeholder-sized message, auto-clears; tooltip keeps the full reason.</summary>
+    private void OnVoiceFailed(string message)
+    {
+        try
+        {
+            OnVoiceStopped();
+            MicButton.ToolTip = message;
+            if (PromptBox.Text.Length == 0)
+                PromptPlaceholder.Text = message.Length <= 90 ? message : message[..87] + "…";
+            _voiceErrTimer?.Stop();
+            var t = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            t.Tick += (_, _) =>
+            {
+                try { if (!_voice.IsListening) PromptPlaceholder.Text = "Ask anything…"; t.Stop(); }
+                catch { }
+            };
+            t.Start();
+            _voiceErrTimer = t;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceFailed", ex); }
+    }
+
+    /// <summary>Breathing opacity on the mic while listening — same doctrine as the orb: skip when animations are off.</summary>
+    private void StartMicPulse()
+    {
+        try
+        {
+            if (!_settings.AnimationsEnabled) return;
+            var wave = new System.Windows.Media.Animation.DoubleAnimation(1, 0.5, TimeSpan.FromMilliseconds(1100))
+            {
+                AutoReverse = true,
+                RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
+                EasingFunction = new System.Windows.Media.Animation.SineEase
+                {
+                    EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut
+                }
+            };
+            System.Windows.Media.Animation.Storyboard.SetTarget(wave, MicButton);
+            System.Windows.Media.Animation.Storyboard.SetTargetProperty(wave, new PropertyPath("Opacity"));
+            var sb = new System.Windows.Media.Animation.Storyboard();
+            sb.Children.Add(wave);
+            sb.Begin(MicButton, true);
+            _micPulse = sb;
+        }
+        catch { }
+    }
+
+    private void StopMicPulse()
+    {
+        try { _micPulse?.Stop(MicButton); MicButton.Opacity = 1; } catch { }
+        _micPulse = null;
     }
 
     private void OnSendClick(object sender, RoutedEventArgs e) => SendFromInput();
@@ -477,6 +651,7 @@ public partial class AiChatWindow : Window
     {
         try
         {
+            if (_voice.IsListening) StopVoice();   // v2.6.0-alpha.3 — sending ends dictation; the box's visible text is what sends
             string t = PromptBox.Text.Trim();
             if (t.Length == 0 || _generating) return;
             PromptBox.Clear();

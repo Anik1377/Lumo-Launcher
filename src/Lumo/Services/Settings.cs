@@ -64,6 +64,13 @@ public sealed class Settings
     public string AiApiKey { get; set; } = "";                         // anthropic x-api-key / optional gateway bearer
     public string AiPersona { get; set; } = "assistant";               // v2.4.0-alpha.5 — persona id for NEW chats
 
+    // ---- v2.6.0-alpha.3 — voice typing in the AI chat (offline SAPI dictation).
+    // The recognizer is chosen at session start: VoiceLanguage non-empty pins a
+    // culture ("en-GB"); empty follows the OS UI language. No UI dropdown yet —
+    // a hand edit of settings.json is the override path (see README).
+    public bool VoiceEnabled { get; set; } = true;                     // mic button in the chat window
+    public string VoiceLanguage { get; set; } = "";                    // "" = follow the OS UI language
+
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = true };
 
     public static Settings Load()
@@ -119,6 +126,8 @@ public sealed class Settings
         s.AiModel           = GetStr(root, nameof(AiModel), s.AiModel);
         s.AiApiKey          = GetStr(root, nameof(AiApiKey), s.AiApiKey);
         s.AiPersona         = GetStr(root, nameof(AiPersona), s.AiPersona);
+        s.VoiceEnabled      = GetBool(root, nameof(VoiceEnabled), s.VoiceEnabled);          // v2.6.0-alpha.3
+        s.VoiceLanguage     = GetStr(root, nameof(VoiceLanguage), s.VoiceLanguage);
         s.FirstRunDone      = GetBool(root, nameof(FirstRunDone), s.FirstRunDone);          // v2.6 — Task 5.3
         s.UpdatesEnabled    = GetBool(root, nameof(UpdatesEnabled), s.UpdatesEnabled);      // v2.6 — Task 5.1
         s.LastUpdateCheckUtc = GetStr(root, nameof(LastUpdateCheckUtc), s.LastUpdateCheckUtc);
@@ -256,6 +265,8 @@ public sealed class Settings
         AiModel = o.AiModel;
         AiApiKey = o.AiApiKey;
         AiPersona = o.AiPersona;
+        VoiceEnabled = o.VoiceEnabled;          // v2.6.0-alpha.3
+        VoiceLanguage = o.VoiceLanguage;
         FirstRunDone = o.FirstRunDone;          // v2.6 — Task 5.3
         UpdatesEnabled = o.UpdatesEnabled;      // v2.6 — Task 5.1
         LastUpdateCheckUtc = o.LastUpdateCheckUtc;
