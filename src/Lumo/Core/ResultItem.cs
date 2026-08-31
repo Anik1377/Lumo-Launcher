@@ -32,6 +32,7 @@ public sealed class ResultItem
         ResultKind.Shortcut => "Shortcut",
         ResultKind.Clipboard => "Copy",   // v1.6
         ResultKind.Answer => "AI",        // v2.3 — ? answer row
+        ResultKind.Plugin => "Plugin",    // v2.5 — Task 4.2 JSON plugin command
         ResultKind.Header => "",          // v1.6 — section title, no chip
         _ => "",
     };
@@ -71,5 +72,6 @@ public enum ResultKind
     Shortcut,   // v1.4 — user-defined /sc launch
     Clipboard,  // v1.6 — one clipboard-history entry (Enter copies it back)
     Answer,     // v2.3 — an AI answer for a ? query (Enter copies it)
+    Plugin,     // v2.5 — a JSON plugin command (RunArgument "plugin:<id>:<keyword>[ <arg>]")
     Header,     // v1.6 — section title row (Raycast "Favourites" style)
 }

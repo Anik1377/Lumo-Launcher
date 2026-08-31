@@ -345,6 +345,18 @@
                 <TextBlock Style="{StaticResource FieldHint}"
                            Text="Extra words that should find this shortcut, comma separated."/>
 
+                <!-- v2.5 (Task 4.3) — global hotkey -->
+                <TextBlock Text="GLOBAL HOTKEY (OPTIONAL)" Style="{StaticResource FieldLabel}" Margin="2,14,0,6"/>
+                <Border x:Name="HotkeyCapture" Background="{DynamicResource FieldBrush}" CornerRadius="8"
+                        BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1" Padding="10,8"
+                        Cursor="Hand" Focusable="True" MouseLeftButtonUp="OnHotkeyCaptureClick"
+                        PreviewKeyDown="OnHotkeyCaptureKeyDown">
+                    <TextBlock x:Name="HotkeyDisplay" Text="(click here, then press a combination)"
+                               FontSize="13" Foreground="{DynamicResource TitleBrush}"/>
+                </Border>
+                <TextBlock x:Name="HotkeyHint" Style="{StaticResource FieldHint}"
+                           Text="Runs the shortcut from anywhere — even when Lumo is hidden. Use Ctrl/Alt/Win + a letter, number or F-key. Esc clears."/>
+
                 <!-- validation + buttons -->
                 <TextBlock x:Name="ErrorText" FontSize="11.5" Foreground="#FF6A6A" Margin="2,10,0,0"
                            Visibility="Collapsed" TextWrapping="Wrap"/>

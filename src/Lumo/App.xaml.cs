@@ -16,6 +16,7 @@ public partial class App : Application
     private AiChatWindow? _aiChatWindow;      // v2.3.0-alpha.3 — dedicated AI chat tab
     private Settings _settings = new();
     private ShortcutStore? _shortcuts;
+    private PluginStore? _plugins;                   // v2.5 — Task 4.2 JSON plugin commands
     private MacroRecorder? _recorder;
     private ClipboardHistory? _clips;
     private UsageStore? _usage;                      // v2.1 — MRU ranking
@@ -64,7 +65,8 @@ public partial class App : Application
             _usage.Load();
             _favs = new Favourites();                 // v2.2 — pinned favourites
             _favs.Load();
-            _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips, _usage, _favs);
+            _plugins = new PluginStore(_settings);    // v2.5 — JSON plugins (%APPDATA%\Lumo\plugins)
+            _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips, _usage, _favs, _plugins);
             MainWindow = _window;
 
             _window.SettingsRequested += () =>
@@ -167,7 +169,17 @@ public partial class App : Application
                 shortcuts: _shortcuts,
                 recordMacro: StartRecording,
                 recordingActive: () => _recorder is { Active: true },
-                initialPage: initialPage);
+                initialPage: initialPage,
+                plugins: _plugins,
+                shortcutHotkeyFeedback: def =>
+                {
+                    try
+                    {
+                        _window?.ReapplyShortcutHotkeys();
+                        return _window?.DescribeShortcutHotkeyState(def.Id) ?? "";
+                    }
+                    catch { return ""; }
+                });
 
             _settingsWindow.Topmost = true; // stay above other apps while customizing
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
@@ -188,7 +200,8 @@ public partial class App : Application
         {
             if (_shortcuts is null) return;
             var dlg = new ShortcutEditorWindow(_shortcuts, _settings, existing: null,
-                                               presetName: nameOverride ?? presetName, presetSteps: presetSteps);
+                                               presetName: nameOverride ?? presetName, presetSteps: presetSteps,
+                                               savedFeedback: HotkeyFeedbackForEditor);
             dlg.Owner = _window is { IsLoaded: true } ? _window : null;
             dlg.ShowDialog();
         }
@@ -196,6 +209,18 @@ public partial class App : Application
         {
             DiagnosticLogger.LogException("App.OpenShortcutEditor", ex);
         }
+    }
+
+    /// <summary>v2.5 (Task 4.3) — after the editor saves, re-register every shortcut
+    /// hotkey and hand back the live/not-live status for the saved shortcut.</summary>
+    private string HotkeyFeedbackForEditor(ShortcutDef def)
+    {
+        try
+        {
+            _window?.ReapplyShortcutHotkeys();
+            return _window?.DescribeShortcutHotkeyState(def.Id) ?? "";
+        }
+        catch { return ""; }
     }
 
     /// <summary>

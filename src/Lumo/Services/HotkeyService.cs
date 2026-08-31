@@ -16,6 +16,12 @@ public sealed class HotkeyService : IDisposable
 {
     public const int HotkeyId = 0x4C4D4F31; // "LMO1"
 
+    /// <summary>v2.5 (DEV_PLAN Task 4.3) — base id for per-shortcut hotkeys (base + n, n ≥ 1).</summary>
+    public const int ShortcutHotkeyBase = HotkeyId + 0x1000;
+
+    /// <summary>v2.5 — sane cap on per-shortcut hotkeys (Win32 would allow more; UX would not).</summary>
+    public const int MaxShortcutHotkeys = 16;
+
     /// <summary>The combo that actually registered successfully (human readable).</summary>
     public string ActiveDescription { get; private set; } = "(none)";
 
@@ -25,6 +31,7 @@ public sealed class HotkeyService : IDisposable
     private readonly IntPtr _hwnd;
     private readonly Settings _settings;
     private bool _registered;
+    private readonly HashSet<int> _extraIds = new();   // v2.5 — shortcut hotkey ids currently registered
 
     public HotkeyService(IntPtr hwnd, Settings settings)
     {
@@ -82,7 +89,69 @@ public sealed class HotkeyService : IDisposable
         _registered = false;
     }
 
-    public void Dispose() => Unregister();
+    // ---------------------------------------------------------------- v2.5 — per-shortcut hotkeys (Task 4.3)
+
+    /// <summary>
+    /// Registers one extra hotkey under an explicit id (ShortcutHotkeyBase + n).
+    /// Unlike the main hotkey there is NO fallback chain — a taken combo simply
+    /// fails and the caller (shortcut editor) surfaces that to the user.
+    /// </summary>
+    public bool TryRegisterId(int id, string combo)
+    {
+        if (id == HotkeyId) return false;                       // never collide with the main id
+        if (!IsRegistrableCombo(combo))                          // also refuses bare / Shift-only combos
+        {
+            DiagnosticLogger.Log("Hotkey", $"Shortcut hotkey '{combo}' cannot be parsed or lacks Ctrl/Alt/Win — skipped");
+            return false;
+        }
+        if (!TryParseCombo(combo, out uint mods, out uint vk)) return false;
+        UnregisterId(id);   // idempotent re-register
+        if (!NativeMethods.RegisterHotKey(_hwnd, id, mods, vk))
+        {
+            DiagnosticLogger.Log("Hotkey", $"Shortcut hotkey '{combo}' (id {id}) FAILED — win32 error {Marshal.GetLastWin32Error()}");
+            return false;
+        }
+        _extraIds.Add(id);
+        DiagnosticLogger.Log("Hotkey", $"Shortcut hotkey '{combo}' registered (id {id})");
+        return true;
+    }
+
+    /// <summary>Unregisters one extra hotkey id. True when it was registered.</summary>
+    public bool UnregisterId(int id)
+    {
+        if (!_extraIds.Remove(id)) return false;
+        try { NativeMethods.UnregisterHotKey(_hwnd, id); } catch { }
+        return true;
+    }
+
+    /// <summary>True when this extra id currently holds a registration.</summary>
+    public bool IsIdRegistered(int id) => _extraIds.Contains(id);
+
+    /// <summary>Re-checks a combo WITHOUT registering it — true when the combo is parseable.</summary>
+    public static bool IsValidCombo(string combo) => TryParseCombo(combo, out _, out _);
+
+    /// <summary>
+    /// v2.5 — registration-grade check: parseable AND carries Ctrl/Alt/Win. The parser
+    /// itself is permissive (Shift+G parses — the MAIN hotkey capture UI rejects bare
+    /// / shift-only combos before it ever reaches a registration), but a per-shortcut
+    /// hotkey can come from a hand-edited shortcuts.json — a shift-only GLOBAL hotkey
+    /// would hijack normal typing system-wide, so registration refuses it.
+    /// </summary>
+    public static bool IsRegistrableCombo(string combo)
+    {
+        if (!TryParseCombo(combo, out uint mods, out _)) return false;
+        return (mods & (NativeMethods.MOD_CONTROL | NativeMethods.MOD_ALT | NativeMethods.MOD_WIN)) != 0;
+    }
+
+    public void Dispose()
+    {
+        foreach (int id in _extraIds.ToList())   // v2.5 — drop every shortcut hotkey too
+        {
+            try { NativeMethods.UnregisterHotKey(_hwnd, id); } catch { }
+        }
+        _extraIds.Clear();
+        Unregister();
+    }
 
     // ---------------------------------------------------------------- parsing
 

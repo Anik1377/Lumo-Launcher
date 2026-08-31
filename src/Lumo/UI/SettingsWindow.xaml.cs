@@ -36,6 +36,8 @@ public partial class SettingsWindow : Window
     private readonly ShortcutStore _shortcuts;   // v1.4
     private readonly Action? _recordMacro;       // v1.5
     private readonly Func<bool>? _recordingActive; // v1.5.1 — is a recording live right now?
+    private readonly PluginStore? _plugins;      // v2.5 — Task 4.2 JSON plugins
+    private readonly Func<ShortcutDef, string>? _shortcutHotkeyFeedback;   // v2.5 — Task 4.3
     private int _initialPage = 0;
 
     private readonly List<(Border Box, string Hex)> _swatches = new();
@@ -51,7 +53,9 @@ public partial class SettingsWindow : Window
 
     public SettingsWindow(Settings settings, Action applyAppearance, Func<string> applyHotkey, Action rebuildIndex,
                           ShortcutStore? shortcuts = null, Action? recordMacro = null,
-                          Func<bool>? recordingActive = null, int initialPage = 0)
+                          Func<bool>? recordingActive = null, int initialPage = 0,
+                          PluginStore? plugins = null,
+                          Func<ShortcutDef, string>? shortcutHotkeyFeedback = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -62,6 +66,8 @@ public partial class SettingsWindow : Window
         _shortcuts = shortcuts ?? new ShortcutStore();
         _recordMacro = recordMacro;
         _recordingActive = recordingActive;
+        _plugins = plugins;
+        _shortcutHotkeyFeedback = shortcutHotkeyFeedback;
         _initialPage = initialPage;
 
         BuildAccentSwatches();
@@ -73,6 +79,11 @@ public partial class SettingsWindow : Window
 
         _shortcuts.Changed += () => Dispatcher.InvokeAsync(() => { try { LoadShortcutList(); } catch { } });
         LoadShortcutList();
+
+        // v2.5 (Task 4.2) — live plugin list; the store raises Changed on every rescan
+        if (_plugins is not null)
+            _plugins.Changed += () => Dispatcher.InvokeAsync(() => { try { LoadPluginList(); } catch { } });
+        LoadPluginList();
 
         LogPathText.Text = "Log: " + AppPaths.LogFile;
         string vs = "v" + AppVersion.Label;   // v2.4.0-alpha.7 — full label ("v2.4.0-alpha.7"), was truncated to v{major}.{minor}
@@ -145,7 +156,7 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, null) { Owner = this };
+            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, null, savedFeedback: _shortcutHotkeyFeedback) { Owner = this };
             dlg.ShowDialog();
             LoadShortcutList();
         }
@@ -190,7 +201,7 @@ public partial class SettingsWindow : Window
             if ((sender as FrameworkElement)?.DataContext is not ShortcutDef def) return;
             var live = _shortcuts.Find(def.Id);
             if (live is null) { LoadShortcutList(); return; }
-            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, live) { Owner = this };
+            var dlg = new ShortcutEditorWindow(_shortcuts, _settings, live, savedFeedback: _shortcutHotkeyFeedback) { Owner = this };
             dlg.ShowDialog();
             LoadShortcutList();
         }
@@ -209,6 +220,80 @@ public partial class SettingsWindow : Window
             _shortcuts.Remove(def.Id);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.DeleteShortcut", ex); }
+    }
+
+    // ---------------------------------------------------------------- plugins (v2.5 — DEV_PLAN Task 4.2)
+
+    /// <summary>Bindable row for one installed plugin.</summary>
+    public sealed class PluginRowVM
+    {
+        public string Id { get; init; } = "";
+        public string Name { get; init; } = "";
+        public string Meta { get; init; } = "";
+        public string Commands { get; init; } = "";
+        public bool Enabled { get; set; }
+    }
+
+    private void LoadPluginList()
+    {
+        try
+        {
+            if (PluginsList is null) return;   // XAML not ready yet (ctor ordering)
+            var defs = _plugins?.All() ?? new List<PluginDefinition>();
+            PluginsList.ItemsSource = defs.Select(d => new PluginRowVM
+            {
+                Id = d.Id,
+                Name = string.IsNullOrWhiteSpace(d.Name) ? d.Id : d.Name,
+                Meta = string.IsNullOrWhiteSpace(d.Author)
+                    ? (string.IsNullOrWhiteSpace(d.Version) ? "" : "v" + d.Version)
+                    : $"{d.Author}{(string.IsNullOrWhiteSpace(d.Version) ? "" : " · v" + d.Version)}",
+                Commands = string.Join(",  ", d.Commands.Select(c => $"{c.Keyword} ({c.TypeName.ToLowerInvariant()})")),
+                Enabled = _plugins!.IsEnabled(d.Id),
+            }).ToList();
+            PluginsEmpty.Visibility = defs.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            PluginsFolderText.Text = AppPaths.PluginsDir;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.LoadPluginList", ex); }
+    }
+
+    private void OnPluginToggle(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.DataContext is not PluginRowVM row) return;
+            _plugins?.SetEnabled(row.Id, row.Enabled);   // row.Enabled is already the NEW checkbox state
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.PluginToggle", ex); }
+    }
+
+    private void OnOpenPluginsFolder(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = AppPaths.PluginsDir,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OpenPluginsFolder", ex); }
+    }
+
+    private void OnRescanPlugins(object sender, RoutedEventArgs e)
+    {
+        try { _plugins?.Rescan(); LoadPluginList(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.RescanPlugins", ex); }
+    }
+
+    private void OnCopyStarterPlugin(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(Plugins.StarterJson);
+            PluginActionStatus.Text = "Starter plugin.json copied — make a folder in the plugins dir, paste, save as plugin.json, then Rescan.";
+            PluginActionStatus.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.CopyStarter", ex); }
     }
 
     /// <summary>Window springs in — fade + gentle scale, a quiet Fluent touch.</summary>
@@ -770,6 +855,7 @@ public partial class SettingsWindow : Window
         PanelSearch.Visibility = idx == 3 ? Visibility.Visible : Visibility.Collapsed;
         PanelShortcuts.Visibility = idx == 4 ? Visibility.Visible : Visibility.Collapsed;
         PanelAI.Visibility = idx == 6 ? Visibility.Visible : Visibility.Collapsed;   // v2.3 — AI page
+        PanelPlugins.Visibility = idx == 7 ? Visibility.Visible : Visibility.Collapsed;   // v2.5 — Plugins page
         PanelAbout.Visibility = idx == 5 ? Visibility.Visible : Visibility.Collapsed;
 
         // v1.3 — gentle page transition: the incoming panel fades + slides up a touch
@@ -784,6 +870,7 @@ public partial class SettingsWindow : Window
                 3 => PanelSearch,
                 4 => PanelShortcuts,
                 6 => PanelAI,
+                7 => PanelPlugins,
                 _ => (ScrollViewer?)PanelAbout,
             } is not { } panel) return;
 

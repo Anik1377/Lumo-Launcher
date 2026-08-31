@@ -46,18 +46,22 @@ public partial class ShortcutEditorWindow : Window
     private readonly ShortcutStore _store;
     private readonly Settings _settings;
     private readonly ShortcutDef _def;
+    private readonly Func<ShortcutDef, string>? _savedFeedback;   // v2.5 — hotkey status after save
     private bool _suppress;
     private int _editIndex = -1;              // -1 → the editor panel adds a new step
+    private string _pendingHotkey = "";       // v2.5 — Task 4.3 capture state
 
     private readonly ObservableCollection<StepVM> _steps = new();
 
     public ShortcutEditorWindow(ShortcutStore store, Settings settings, ShortcutDef? existing,
-                                string? presetName = null, List<MacroStep>? presetSteps = null)
+                                string? presetName = null, List<MacroStep>? presetSteps = null,
+                                Func<ShortcutDef, string>? savedFeedback = null)
     {
         InitializeComponent();
         _store = store;
         _settings = settings;
         _def = existing is null ? new ShortcutDef { Name = presetName ?? "" } : Clone(existing);
+        _savedFeedback = savedFeedback;
 
         ApplySelfTheme();
         LoadDef(presetSteps);
@@ -70,7 +74,7 @@ public partial class ShortcutEditorWindow : Window
     private static ShortcutDef Clone(ShortcutDef s) => new()
     {
         Id = s.Id, Name = s.Name, Type = s.Type, Target = s.Target,
-        Steps = new List<string>(s.Steps), Keywords = s.Keywords,
+        Steps = new List<string>(s.Steps), Keywords = s.Keywords, Hotkey = s.Hotkey,
     };
 
     // ---------------------------------------------------------------- theming
@@ -128,6 +132,10 @@ public partial class ShortcutEditorWindow : Window
         {
             NameBox.Text = _def.Name;
             KeywordsBox.Text = _def.Keywords;
+            _pendingHotkey = _def.Hotkey ?? "";   // v2.5 — Task 4.3
+            HotkeyDisplay.Text = _pendingHotkey.Length == 0
+                ? "(click here, then press a combination)"
+                : _pendingHotkey;
             bool fresh = string.IsNullOrEmpty(_def.Target) && _def.Steps.Count == 0 && string.IsNullOrEmpty(_def.Name);
             HeaderText.Text = fresh ? "New shortcut" : "Edit shortcut";
 
@@ -460,6 +468,85 @@ public partial class ShortcutEditorWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("ShortcutEditor.TestRun", ex); }
     }
 
+    // ---------------------------------------------------------------- hotkey capture (v2.5 — Task 4.3)
+
+    private void OnHotkeyCaptureClick(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            HotkeyCapture.Focus();
+            HotkeyDisplay.Text = "Press a combination…  (Esc clears)";
+            HotkeyHint.Text = "Use Ctrl/Alt/Win + a letter, number or F-key.";
+        }
+        catch { }
+    }
+
+    private void OnHotkeyCaptureKeyDown(object sender, KeyEventArgs e)
+    {
+        try
+        {
+            e.Handled = true;
+            var key = e.Key == Key.System ? e.SystemKey : e.Key;
+
+            // pure modifier presses → just show progress
+            if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt
+                     or Key.LeftShift or Key.RightShift or Key.LWin or Key.RWin)
+            {
+                string mods = ModsToString(Keyboard.Modifiers);
+                HotkeyDisplay.Text = mods.Length == 0 ? "Press a combination…" : mods + "…";
+                return;
+            }
+
+            if (key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None)
+            {
+                _pendingHotkey = "";
+                HotkeyDisplay.Text = "(click here, then press a combination)";
+                return;
+            }
+
+            string? main = DescribeMainKey(key);
+            if (main is null)
+            {
+                HotkeyHint.Text = "That key isn't supported — use letters, numbers, F1–F24, Space or `";
+                return;
+            }
+
+            var mods2 = Keyboard.Modifiers;
+            if ((mods2 & (ModifierKeys.Control | ModifierKeys.Alt | ModifierKeys.Windows)) == 0)
+            {
+                HotkeyHint.Text = "Add Ctrl, Alt or Win — a bare key would hijack normal typing.";
+                return;
+            }
+
+            _pendingHotkey = ModsToString(mods2) + main;
+            HotkeyDisplay.Text = _pendingHotkey;
+            HotkeyHint.Text = "Saved with the shortcut — it registers the moment you save.";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("ShortcutEditor.HotkeyCapture", ex); }
+    }
+
+    private static string ModsToString(ModifierKeys mods)
+    {
+        string s = "";
+        if (mods.HasFlag(ModifierKeys.Control)) s += "Ctrl+";
+        if (mods.HasFlag(ModifierKeys.Alt)) s += "Alt+";
+        if (mods.HasFlag(ModifierKeys.Shift)) s += "Shift+";
+        if (mods.HasFlag(ModifierKeys.Windows)) s += "Win+";
+        return s;
+    }
+
+    /// <summary>Same key set HotkeyService.TryParseCombo accepts (letters, digits, F1–F24, Space, `) —
+    /// the capture must never produce a combo the registrar would reject.</summary>
+    private static string? DescribeMainKey(Key key) => key switch
+    {
+        >= Key.A and <= Key.Z => key.ToString(),
+        >= Key.D0 and <= Key.D9 => ((int)key - (int)Key.D0).ToString(),
+        >= Key.F1 and <= Key.F24 => key.ToString(),
+        Key.Space => "Space",
+        Key.OemTilde => "`",
+        _ => null,
+    };
+
     // ---------------------------------------------------------------- save / close
 
     private void OnSaveClick(object sender, RoutedEventArgs e) => SaveAndClose();
@@ -519,9 +606,21 @@ public partial class ShortcutEditorWindow : Window
             _def.Name = name;
             _def.Type = type;
             _def.Keywords = KeywordsBox.Text.Trim();
+            _def.Hotkey = _pendingHotkey;   // v2.5 — Task 4.3
 
             _store.AddOrUpdate(_def);
-            DiagnosticLogger.Log("Shortcuts", $"Saved '{_def.Name}' ({_def.Type}, {_def.Steps.Count} steps)");
+            DiagnosticLogger.Log("Shortcuts", $"Saved '{_def.Name}' ({_def.Type}, {_def.Steps.Count} steps, hotkey '{_def.Hotkey}')");
+
+            // v2.5 — surface the live/not-live hotkey state right in the editor
+            string feedback = _savedFeedback?.Invoke(_def) ?? "";
+            if (feedback.Length > 0)
+            {
+                RunInfoText.Text = feedback;
+                RunInfoText.Visibility = Visibility.Visible;
+                DialogResult = true;
+                return;   // keep the window open so the status is actually readable
+            }
+
             DialogResult = true;
             Close();
         }

@@ -47,6 +47,13 @@
     <Compile Include="../Lumo/Services/PersonaStore.cs" Link="Services/PersonaStore.cs" />
     <!-- v2.4.0-alpha.7 — display-version parser -->
     <Compile Include="../Lumo/Core/AppVersion.cs" Link="Core/AppVersion.cs" />
+    <!-- v2.5 (Phase 4) — PrefixRouter, JSON plugins, hotkey parsing -->
+    <Compile Include="../Lumo/Core/PrefixRouter.cs" Link="Core/PrefixRouter.cs" />
+    <Compile Include="../Lumo/Core/Plugins.cs" Link="Core/Plugins.cs" />
+    <Compile Include="../Lumo/Services/PluginStore.cs" Link="Services/PluginStore.cs" />
+    <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
+    <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
+    <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0-windows'">

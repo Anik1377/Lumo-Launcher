@@ -46,6 +46,9 @@ public sealed class Settings
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    // ---- v2.5 (DEV_PLAN Task 4.2) — JSON plugins: ids the user switched off in Settings → Plugins
+    public List<string> DisabledPlugins { get; set; } = new();
+
     // ---- v2.3 (DEV_PLAN Task 3.1) — ? AI answers. Ollama (local) or Anthropic.
     // AiApiKey NEVER appears in a log line (AiProviders.Redact is mandatory there);
     // it is stored plaintext in settings.json on this PC only, like every launcher.
@@ -104,6 +107,7 @@ public sealed class Settings
         s.RowDensity        = GetStr(root, nameof(RowDensity), s.RowDensity);
         s.Acrylic           = GetBool(root, nameof(Acrylic), s.Acrylic);
         s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
+        s.DisabledPlugins  = GetStrList(root, nameof(DisabledPlugins), s.DisabledPlugins);   // v2.5 — Task 4.2
         s.AiEnabled         = GetBool(root, nameof(AiEnabled), s.AiEnabled);
         s.AiStyle           = GetStr(root, nameof(AiStyle), s.AiStyle);
         s.AiEndpoint        = GetStr(root, nameof(AiEndpoint), s.AiEndpoint);
@@ -163,6 +167,24 @@ public sealed class Settings
         return fallback;
     }
 
+    /// <summary>Tolerant string list read (v2.5 disabled plugin ids).</summary>
+    private static List<string> GetStrList(JsonElement root, string name, List<string> fallback)
+    {
+        try
+        {
+            if (root.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Array)
+            {
+                var list = new List<string>();
+                foreach (var e in v.EnumerateArray())
+                    if (e.ValueKind == JsonValueKind.String && e.GetString() is { } id && id.Length > 0)
+                        list.Add(id);
+                return list;
+            }
+        }
+        catch { /* defensive */ }
+        return fallback;
+    }
+
     /// <summary>Tolerant string→string map read (v2.1 custom web providers).</summary>
     private static Dictionary<string, string> GetStrMap(JsonElement root, string name, Dictionary<string, string> fallback)
     {
@@ -219,6 +241,7 @@ public sealed class Settings
         RowDensity = o.RowDensity;
         Acrylic = o.Acrylic;
         CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
+        DisabledPlugins = new List<string>(o.DisabledPlugins);   // v2.5 — Task 4.2
         AiEnabled = o.AiEnabled;
         AiStyle = o.AiStyle;
         AiEndpoint = o.AiEndpoint;

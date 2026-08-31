@@ -18,6 +18,11 @@ public sealed class ShortcutDef
     public List<string> Steps { get; set; } = new();  // macro: one target per step
     public string Keywords { get; set; } = "";        // extra match terms, comma separated
 
+    /// <summary>v2.5 (DEV_PLAN Task 4.3) — optional GLOBAL hotkey, e.g. "Ctrl+Alt+G".
+    /// "" = none. Registered through HotkeyService (same parser as the main hotkey);
+    /// pressing it runs the shortcut even when the launcher is hidden.</summary>
+    public string Hotkey { get; set; } = "";
+
     public bool IsMacro => Type.Equals("macro", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>v1.6 — a snippet holds text that Enter copies to the clipboard.</summary>
@@ -31,7 +36,7 @@ public sealed class ShortcutDef
     {
         try
         {
-            return Type.ToLowerInvariant() switch
+            string describe = Type.ToLowerInvariant() switch
             {
                 "url" => "Opens " + Target,
                 "file" => "Opens file — " + Target,
@@ -40,6 +45,9 @@ public sealed class ShortcutDef
                 "snippet" => "Snippet — Enter copies the text",
                 _ => Target,
             };
+            // v2.5 (Task 4.3) — surface the global hotkey right on the row
+            if (!string.IsNullOrWhiteSpace(Hotkey)) describe += "  ·  " + Hotkey;
+            return describe;
         }
         catch { return Target; }
     }
@@ -124,6 +132,7 @@ public sealed class ShortcutStore
     {
         Id = s.Id, Name = s.Name, Type = s.Type, Target = s.Target,
         Steps = new List<string>(s.Steps ?? new List<string>()), Keywords = s.Keywords,
+        Hotkey = s.Hotkey,   // v2.5 — Task 4.3
     };
 
     // ---------------------------------------------------------------- persistence

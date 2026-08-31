@@ -48,6 +48,10 @@ public partial class LauncherWindow : Window
     /// <summary>v2.3.0-alpha.3 — the shared AI service, reused by the chat window (one cache, one log).</summary>
     public AiService Ai => _ai;
     private readonly BookmarkIndex _bookmarks = new(); // v2.3 — B/ Chrome & Edge bookmarks
+    private readonly PluginStore? _plugins;            // v2.5 — Task 4.2 JSON plugin commands
+
+    /// <summary>v2.5 (Task 4.3) — hotkey id → shortcut id for the per-shortcut global hotkeys.</summary>
+    private readonly Dictionary<int, string> _shortcutHotkeyMap = new();
     private readonly DispatcherTimer _debounce;
     private readonly DispatcherTimer _statusTimer;
     private HotkeyService? _hotkey;
@@ -103,7 +107,8 @@ public partial class LauncherWindow : Window
     public event Action<List<MacroStep>, string?>? RecordFinishRequested;
 
     public LauncherWindow(Settings settings, ShortcutStore? shortcuts = null, MacroRecorder? recorder = null,
-                          ClipboardHistory? clips = null, UsageStore? usage = null, Favourites? favourites = null)
+                          ClipboardHistory? clips = null, UsageStore? usage = null, Favourites? favourites = null,
+                          PluginStore? plugins = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -111,9 +116,10 @@ public partial class LauncherWindow : Window
         _recorder = recorder;
         _clips = clips;
         _favs = favourites ?? new Favourites();
+        _plugins = plugins;
         _files.MaxEntries = Math.Max(10_000, _settings.MaxIndexedFiles);
 
-        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips, usage, _favs, _ai, _bookmarks);
+        _engine = new SearchEngine(_apps, _files, _settings, _shortcuts, _recorder, _clips, usage, _favs, _ai, _bookmarks, _plugins);
 
         // v2.2 — placeholder so the ContextMenuOpening routed event always fires;
         // BuildRowMenu swaps in the real menu (or null) before WPF auto-opens it.
@@ -177,6 +183,9 @@ public partial class LauncherWindow : Window
                     DiagnosticLogger.Log("Window", $"Configured hotkey unavailable — fallback '{active}' active");
             }
 
+            // v2.5 (DEV_PLAN Task 4.3) — register every shortcut's global hotkey too
+            ReapplyShortcutHotkeys();
+
             // v2.0 → v2.4.0-alpha.2 — the HWND now exists; ApplyTheme applies DWM
             // chrome (round corners, dark mode) and the material (acrylic or solid)
             // in one place.
@@ -209,10 +218,34 @@ public partial class LauncherWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == NativeMethods.WM_HOTKEY && wParam.ToInt32() == HotkeyService.HotkeyId)
+        if (msg == NativeMethods.WM_HOTKEY)
         {
-            handled = true;
-            try { ToggleLauncher(); } catch (Exception ex) { DiagnosticLogger.LogException("Window.Hotkey", ex); }
+            int id = wParam.ToInt32();
+            if (id == HotkeyService.HotkeyId)
+            {
+                handled = true;
+                try { ToggleLauncher(); } catch (Exception ex) { DiagnosticLogger.LogException("Window.Hotkey", ex); }
+            }
+            else if (_shortcutHotkeyMap.TryGetValue(id, out var shortcutId))
+            {
+                // v2.5 (DEV_PLAN Task 4.3) — a per-shortcut hotkey fired: run the
+                // shortcut whether or not the launcher is visible (that's the point).
+                handled = true;
+                try
+                {
+                    string? err = _engine.Execute(new ResultItem { Title = shortcutId, Glyph = "⚡", Kind = ResultKind.Shortcut, RunArgument = shortcutId });
+                    if (err is not null)
+                    {
+                        DiagnosticLogger.Log("Hotkey", $"Shortcut hotkey '{shortcutId}' failed: {err}");
+                        if (IsVisible) StatusText.Text = err;
+                    }
+                    else
+                    {
+                        DiagnosticLogger.Log("Hotkey", $"Shortcut hotkey ran '{shortcutId}'");
+                    }
+                }
+                catch (Exception ex) { DiagnosticLogger.LogException("Window.ShortcutHotkey", ex); }
+            }
         }
         return IntPtr.Zero;
     }
@@ -770,6 +803,14 @@ public partial class LauncherWindow : Window
                 return;
             }
 
+            // v2.5 (DEV_PLAN Task 4.2) — plugin management lands on Settings → Plugins
+            if (item.RunArgument == "cmd:plugins-manage")
+            {
+                HideAnimated();
+                SettingsPageRequested?.Invoke(7);
+                return;
+            }
+
             // v1.5 — macro recording flow (v1.5.1: always hand focus back to the
             // input box — clicking a row moved keyboard focus to the list, so the
             // keyboard appeared dead right after starting a recording)
@@ -880,6 +921,7 @@ public partial class LauncherWindow : Window
                 case ResultKind.Image:
                 case ResultKind.Tool:
                 case ResultKind.Shortcut:
+                case ResultKind.Plugin:   // v2.5 — Task 4.2 plugin commands run like any launch
                     PauseGlow();
                     var error = _engine.Execute(item); // launch first, then hide on success
                     if (error is null)
@@ -1833,6 +1875,63 @@ public partial class LauncherWindow : Window
         {
             DiagnosticLogger.LogException("Window.RebuildIndex", ex);
         }
+    }
+
+    // ---------------------------------------------------------------- v2.5 — per-shortcut hotkeys (DEV_PLAN Task 4.3)
+
+    /// <summary>
+    /// Re-registers every shortcut's global hotkey. Called on startup, after the
+    /// shortcut editor saves, and whenever Settings touches shortcuts — the map
+    /// (hotkey id → shortcut id) is rebuilt from scratch each time, so the WndProc
+    /// side can never hold a stale id.
+    /// </summary>
+    public void ReapplyShortcutHotkeys()
+    {
+        try
+        {
+            if (_hotkey is null) return;
+            foreach (int id in _shortcutHotkeyMap.Keys.ToList())
+                _hotkey.UnregisterId(id);
+            _shortcutHotkeyMap.Clear();
+
+            if (_shortcuts is null) return;
+            int next = 1;
+            foreach (var def in _shortcuts.Snapshot())
+            {
+                if (string.IsNullOrWhiteSpace(def.Hotkey)) continue;
+                if (_shortcutHotkeyMap.Count >= HotkeyService.MaxShortcutHotkeys)
+                {
+                    DiagnosticLogger.Log("Hotkey", $"'{def.Name}' skipped — {HotkeyService.MaxShortcutHotkeys} shortcut-hotkey cap reached");
+                    continue;
+                }
+                int id = HotkeyService.ShortcutHotkeyBase + next++;
+                if (_hotkey.TryRegisterId(id, def.Hotkey))
+                    _shortcutHotkeyMap[id] = def.Id;
+                else
+                    DiagnosticLogger.Log("Hotkey", $"'{def.Name}' hotkey '{def.Hotkey}' unavailable (taken by another app?)");
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.ReapplyShortcutHotkeys", ex);
+        }
+    }
+
+    /// <summary>
+    /// Editor feedback after a save: is THIS shortcut's hotkey live right now?
+    /// "" when the shortcut defines no hotkey.
+    /// </summary>
+    public string DescribeShortcutHotkeyState(string shortcutId)
+    {
+        try
+        {
+            string combo = _shortcuts?.Find(shortcutId)?.Hotkey ?? "";
+            if (string.IsNullOrWhiteSpace(combo)) return "";
+            bool active = _shortcutHotkeyMap.ContainsValue(shortcutId);
+            return active ? $"Global hotkey {combo} is live — press it anywhere."
+                          : $"Global hotkey {combo} could NOT register — another app may own it. Try a different combination.";
+        }
+        catch { return ""; }
     }
 
     private void OnGearClick(object sender, MouseButtonEventArgs e)

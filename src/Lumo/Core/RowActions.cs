@@ -56,7 +56,8 @@ public static class RowActions
         if (arg.StartsWith("cmd:manage-shortcuts", StringComparison.OrdinalIgnoreCase)) return false;
         if (arg.StartsWith("cmd:ai", StringComparison.OrdinalIgnoreCase)) return false;   // v2.3 — the "Ask …" row is transient UI state
         return item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web
-                        or ResultKind.Image or ResultKind.Tool or ResultKind.Shortcut;
+                        or ResultKind.Image or ResultKind.Tool or ResultKind.Shortcut
+                        or ResultKind.Plugin;   // v2.5 — a plugin command with its arg survives the pin
     }
 
     /// <summary>
@@ -104,6 +105,12 @@ public static class RowActions
 
             case ResultKind.Shortcut:
                 // the RunArgument is the shortcut id, not a path — CopyPath would be noise
+                list.Add(RowAction.Open);
+                list.Add(RowAction.CopyName);
+                break;
+
+            case ResultKind.Plugin:
+                // v2.5 — RunArgument is "plugin:<id>:<keyword>[ <arg>]", not a path
                 list.Add(RowAction.Open);
                 list.Add(RowAction.CopyName);
                 break;

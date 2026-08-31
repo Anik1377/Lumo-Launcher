@@ -25,18 +25,67 @@ public sealed class SearchEngine
     private readonly Favourites? _favs;              // v2.2 — pinned favourites
     private readonly AiService? _ai;                 // v2.3 — ? answers (cache lives here, requests never block)
     private readonly BookmarkIndex? _bookmarks;      // v2.3 — B/ Chrome & Edge bookmarks
+    private readonly PluginStore? _plugins;          // v2.5 — Task 4.2 JSON plugin commands
     private bool _restartPending;                    // v2.2 — a countdown restart is armed
+
+    /// <summary>v2.5 (DEV_PLAN Task 4.1) — declarative prefix routes. Built-ins register
+    /// in the constructor; callers may Register/Unregister extra routes (the plugin
+    /// system keeps its keyword routing out of here — that is token-based, not prefix-based).</summary>
+    public PrefixRouter Router { get; } = new();
 
     public SearchEngine(AppIndex apps, FileIndex files, Settings settings, ShortcutStore? shortcuts = null,
                         MacroRecorder? recorder = null, ClipboardHistory? clips = null, UsageStore? usage = null,
-                        Favourites? favourites = null, AiService? ai = null, BookmarkIndex? bookmarks = null)
+                        Favourites? favourites = null, AiService? ai = null, BookmarkIndex? bookmarks = null,
+                        PluginStore? plugins = null)
     {
         _apps = apps; _files = files; _settings = settings; _shortcuts = shortcuts; _recorder = recorder; _clips = clips;
         _usage = usage;
         _favs = favourites;
         _ai = ai;
         _bookmarks = bookmarks;
+        _plugins = plugins;
+        RegisterBuiltinRoutes();
     }
+
+    // ---------------------------------------------------------------- v2.5 — route table (DEV_PLAN Task 4.1)
+
+    /// <summary>Thin adapter that turns one row-builder method into a declarative route.</summary>
+    private sealed class RouteHandler : IPrefixHandler
+    {
+        private readonly string _prefix;
+        private readonly Func<string, List<ResultItem>> _run;
+        private readonly string[] _exact;
+
+        public RouteHandler(string prefix, Func<string, List<ResultItem>> run, params string[] exact)
+        { _prefix = prefix; _run = run; _exact = exact; }
+
+        public string Prefix => _prefix;
+        public IEnumerable<string> ExactAliases => _exact;
+        public List<ResultItem> Handle(string arg) => _run(arg);
+    }
+
+    /// <summary>
+    /// The declarative route table — the exact prefixes the old SearchCore if-chain
+    /// matched, now data. Order does NOT matter: the router always tries the longest
+    /// prefix first, so "AI/" wins over "A/" by construction.
+    /// </summary>
+    private void RegisterBuiltinRoutes() => new List<IPrefixHandler>
+    {
+        new RouteHandler("AI/", AiChatRows, "AI"),   // v2.3.0-alpha.3 — dedicated chat tab ("AI" alone opens it too)
+        new RouteHandler("A/", AppRows),
+        new RouteHandler("F/", FileRows),
+        new RouteHandler("C/", CalcRows),
+        new RouteHandler("W/", WebRows),
+        new RouteHandler("I/", ImageRows),
+        new RouteHandler("U/", ToolRows),
+        new RouteHandler("H/", ClipboardRows),        // v1.6 — clipboard history
+        new RouteHandler("B/", BookmarkRows),         // v2.3 — Chrome & Edge bookmarks
+        new RouteHandler("S/", WindowRows),           // v1.6 — window management
+        new RouteHandler("?", AiRows),                // v2.3 — AI / natural-language answers
+        new RouteHandler("!", SnippetRows),           // v1.6 — snippet search
+        new RouteHandler("P/", PluginRows),           // v2.5 — Task 4.2 plugin commands
+        new RouteHandler("/", ShortcutRoute),         // v1.4 — /sc stripping inside
+    }.ForEach(Router.Register);
 
     public List<ResultItem> Search(string rawQuery)
     {
@@ -76,67 +125,40 @@ public sealed class SearchEngine
         var query = (rawQuery ?? string.Empty).Trim();
         if (query.Length == 0) return DefaultRows();
 
-        // v2.3.0-alpha.3 — AI/ : the dedicated AI chat tab. Checked BEFORE A/ so the
-        // longer prefix wins — "ai/…" must never fall through to app search. "AI"
-        // alone (Enter) opens the chat too, exactly like the user brief asks.
-        if (query.StartsWith("AI/", StringComparison.OrdinalIgnoreCase))
-            return AiChatRows(query[3..].Trim());
-        if (query.Equals("AI", StringComparison.OrdinalIgnoreCase))
-            return AiChatRows("");
+        // v2.5 (Task 4.1) — the old if-chain is now the declarative PrefixRouter table.
+        // Static routes come FIRST: a plugin keyword like "ai" can never shadow AI/.
+        if (Router.Match(query, out string routeArg) is { } handler)
+            return SafeRoute(handler, routeArg);
 
-        if (query.StartsWith("A/", StringComparison.OrdinalIgnoreCase))
-            return AppRows(query[2..].Trim());
-
-        if (query.StartsWith("F/", StringComparison.OrdinalIgnoreCase))
-            return FileRows(query[2..].Trim());
-
-        if (query.StartsWith("C/", StringComparison.OrdinalIgnoreCase))
-            return CalcRows(query[2..].Trim());
-
-        if (query.StartsWith("W/", StringComparison.OrdinalIgnoreCase))
-            return WebRows(query[2..].Trim());
-
-        if (query.StartsWith("I/", StringComparison.OrdinalIgnoreCase))
-            return ImageRows(query[2..].Trim());
-
-        if (query.StartsWith("U/", StringComparison.OrdinalIgnoreCase))
-            return ToolRows(query[2..].Trim());
-
-        // v1.6 — H/ : Raycast-style clipboard history
-        if (query.StartsWith("H/", StringComparison.OrdinalIgnoreCase))
-            return ClipboardRows(query[2..].Trim());
-
-        // v2.3 (DEV_PLAN Task 3.2) — B/ : Chrome & Edge bookmarks
-        if (query.StartsWith("B/", StringComparison.OrdinalIgnoreCase))
-            return BookmarkRows(query[2..].Trim());
-
-        // v2.3 (DEV_PLAN Task 3.1, flagship) — ? : AI / natural-language answers.
-        // The prefix row appears instantly; the answer arrives via the AiService
-        // cache (the window fires the request off the UI thread) and this same
-        // query then re-renders with the Answer row — the pipeline stays synchronous.
-        if (query.StartsWith("?"))
-            return AiRows(query[1..].Trim());
-
-        // v1.6 — S/ : Raycast-style window management (snap / maximize / center)
-        if (query.StartsWith("S/", StringComparison.OrdinalIgnoreCase))
-            return WindowRows(query[2..].Trim());
-
-        // v1.6 — !keyword : snippet search (type ! and part of a snippet name)
-        if (query.StartsWith("!"))
-            return SnippetRows(query[1..].Trim());
-
-        // v1.4 — /sc <name> : user shortcuts & macros. Any "/…" query enters
-        // shortcut mode; a leading "sc" token is optional and stripped.
-        if (query.StartsWith("/"))
-        {
-            string rest = query[1..].Trim();
-            if (rest.Equals("sc", StringComparison.OrdinalIgnoreCase)) rest = "";
-            else if (rest.StartsWith("sc ", StringComparison.OrdinalIgnoreCase)) rest = rest[3..].Trim();
-            return ShortcutRows(rest);
-        }
+        // v2.5 (Task 4.2) — plugin keyword routing ("emo sunset", bare "time") for
+        // everything no static route claimed. Token-exact — see Plugins.KeywordRoutes.
+        if (_plugins is not null && _plugins.TryRoute(query, out var pdef, out var pcmd, out var parg))
+            return PluginCommandRows(pdef, pcmd, parg);
 
         // Default view: apps + tools matching, plus top files.
         return MixedRows(query);
+    }
+
+    /// <summary>v2.5 — one broken route must not kill the search (DEV_PLAN §0 rule 2).</summary>
+    private List<ResultItem> SafeRoute(IPrefixHandler handler, string arg)
+    {
+        try { return handler.Handle(arg); }
+        catch (Exception ex)
+        {
+            Services.DiagnosticLogger.LogException($"SearchEngine.Route:{handler.Prefix}", ex);
+            return new List<ResultItem>
+            {
+                new() { Title = "That view failed (logged)", Subtitle = ex.Message, Glyph = "!", Kind = ResultKind.Error }
+            };
+        }
+    }
+
+    /// <summary>v1.4 — "/" enters shortcut mode; a leading "sc" token is optional and stripped.</summary>
+    private List<ResultItem> ShortcutRoute(string rest)
+    {
+        if (rest.Equals("sc", StringComparison.OrdinalIgnoreCase)) rest = "";
+        else if (rest.StartsWith("sc ", StringComparison.OrdinalIgnoreCase)) rest = rest[3..].Trim();
+        return ShortcutRows(rest);
     }
 
     // ---------------------------------------------------------------- rows
@@ -186,6 +208,7 @@ public sealed class SearchEngine
             new() { Title = "AI/  AI chat", Subtitle = "Enter opens the chat window — or type a question:  AI/explain quantum computing", Glyph = "✦", Kind = ResultKind.Hint, RunArgument = "AI/", ForwardText = "" },
             new() { Title = "?  Ask AI", Subtitle = "type ? then a question — e.g.  ?regex for an ISO date  (enable in Settings)", Glyph = "?", Kind = ResultKind.Hint, RunArgument = "?" },
             new() { Title = "!  Snippets", Subtitle = "type ! then a name — your paste-anywhere texts, e.g.  !email", Glyph = "S", Kind = ResultKind.Hint, RunArgument = "!" },
+            new() { Title = "P/  Plugins", Subtitle = "your JSON plugin commands — browse, run, or copy a starter", Glyph = "P", Kind = ResultKind.Hint, RunArgument = "P/" },   // v2.5 — Task 4.2
             new() { Title = "/sc  Shortcuts & macros", Subtitle = "your saved one-tap launches — e.g.  /sc work", Glyph = "⚡", Kind = ResultKind.Hint, RunArgument = "/sc" },
             new() { Title = "Settings — customize Lumo", Subtitle = "themes · accent colour · glow border · hotkey · index", Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:app-settings" },
         });
@@ -447,6 +470,32 @@ public sealed class SearchEngine
         {
             foreach (var def in _shortcuts.PrefixMatches(q, 2))
                 rows.Add(ShortcutRow(def));
+        }
+
+        // v2.5 (Task 4.2) — quick-hit plugin commands whose keyword starts with the query
+        if (_plugins is not null)
+        {
+            foreach (var (def, cmd) in PluginPrefixMatches(q, 2))
+            {
+                if (cmd.ArgOptional)
+                    rows.Add(new ResultItem
+                    {
+                        Title = string.IsNullOrWhiteSpace(cmd.Name) ? cmd.Keyword : cmd.Name,
+                        Subtitle = $"{def.Name} · {cmd.TypeName} — press Enter",
+                        Glyph = string.IsNullOrWhiteSpace(cmd.Glyph) ? "P" : cmd.Glyph,
+                        Kind = ResultKind.Plugin,
+                        RunArgument = $"plugin:{def.Id}:{cmd.Keyword}",
+                    });
+                else
+                    rows.Add(new ResultItem
+                    {
+                        Title = string.IsNullOrWhiteSpace(cmd.Name) ? cmd.Keyword : cmd.Name,
+                        Subtitle = $"type {cmd.Keyword} + a query  ·  {def.Name}",
+                        Glyph = string.IsNullOrWhiteSpace(cmd.Glyph) ? "P" : cmd.Glyph,
+                        Kind = ResultKind.Hint,
+                        RunArgument = cmd.Keyword + " ",
+                    });
+            }
         }
 
         if (_files.Ready)
@@ -712,6 +761,173 @@ public sealed class SearchEngine
         return rows;
     }
 
+    // ---------------------------------------------------------------- v2.5 — plugins (Task 4.2)
+
+    /// <summary>P/ — the plugin browser: command rows + management rows.</summary>
+    private List<ResultItem> PluginRows(string q)
+    {
+        _plugins?.EnsureFresh();
+        var rows = new List<ResultItem>();
+        var enabled = _plugins?.Enabled() ?? new List<PluginDefinition>();
+        int cmdCount = enabled.Sum(p => p.Commands.Count);
+
+        rows.Add(new ResultItem
+        {
+            Title = "PLUGINS",
+            Subtitle = enabled.Count == 0
+                ? "declarative JSON commands — no code, no installs"
+                : $"{enabled.Count} plugin{(enabled.Count == 1 ? "" : "s")} · {cmdCount} command{(cmdCount == 1 ? "" : "s")} · type a keyword or browse",
+            Kind = ResultKind.Header,
+        });
+
+        foreach (var def in enabled)
+        {
+            foreach (var cmd in def.Commands)
+            {
+                string haystack = $"{cmd.Name} {cmd.Keyword} {cmd.Subtitle}";
+                if (q.Length > 0 && Fuzzy.Score(q, haystack) <= 0) continue;
+                string glyph = string.IsNullOrWhiteSpace(cmd.Glyph) ? "P" : cmd.Glyph;
+                if (cmd.ArgOptional)
+                {
+                    // no query needed — the browsing row IS the command, Enter runs it
+                    rows.Add(new ResultItem
+                    {
+                        Title = string.IsNullOrWhiteSpace(cmd.Name) ? cmd.Keyword : cmd.Name,
+                        Subtitle = $"type {cmd.Keyword}  ·  {cmd.Subtitle}",
+                        Glyph = glyph, Kind = ResultKind.Plugin,
+                        RunArgument = $"plugin:{def.Id}:{cmd.Keyword}",
+                    });
+                }
+                else
+                {
+                    // needs a query — Enter drops "kw " into the input (standard Hint fill)
+                    rows.Add(new ResultItem
+                    {
+                        Title = string.IsNullOrWhiteSpace(cmd.Name) ? cmd.Keyword : cmd.Name,
+                        Subtitle = $"type {cmd.Keyword} + a query  ·  {cmd.Subtitle}",
+                        Glyph = glyph, Kind = ResultKind.Hint,
+                        RunArgument = cmd.Keyword + " ",
+                    });
+                }
+            }
+        }
+
+        if (q.Length == 0)
+        {
+            if (enabled.Count == 0)
+                rows.Add(new ResultItem
+                {
+                    Title = "No plugins yet — copy a starter",
+                    Subtitle = "Enter copies a working plugin.json to the clipboard, then paste it into a new folder",
+                    Glyph = "P", Kind = ResultKind.Tool, RunArgument = "cmd:plugin-starter",
+                });
+            rows.Add(new ResultItem
+            {
+                Title = "Open plugins folder",
+                Subtitle = AppPaths.PluginsDir + " — one folder per plugin, each with a plugin.json",
+                Glyph = "P", Kind = ResultKind.Tool, RunArgument = "cmd:plugins-folder",
+            });
+            rows.Add(new ResultItem
+            {
+                Title = "Rescan plugins",
+                Subtitle = "reload every plugin.json right now",
+                Glyph = "⟳", Kind = ResultKind.Tool, RunArgument = "cmd:plugins-rescan",
+            });
+            rows.Add(new ResultItem
+            {
+                Title = "Manage plugins",
+                Subtitle = "enable / disable per plugin in the settings window",
+                Glyph = "⚙", Kind = ResultKind.Tool, RunArgument = "cmd:plugins-manage",
+            });
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// v2.5 — plugin commands whose KEYWORD starts with the query (mirrors
+    /// ShortcutStore.PrefixMatches): quick-hit discoverability on the default view.
+    /// Only fires while the typed text is a strict prefix of the keyword — the
+    /// moment you add a space the command becomes the routed view instead.
+    /// </summary>
+    private List<(PluginDefinition Def, PluginCommand Cmd)> PluginPrefixMatches(string query, int max)
+    {
+        var list = new List<(PluginDefinition, PluginCommand)>();
+        if (query.Length == 0 || _plugins is null) return list;
+        foreach (var def in _plugins.Enabled())
+            foreach (var cmd in def.Commands)
+                if (cmd.Keyword.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    list.Add((def, cmd));
+                    if (list.Count >= max) return list;
+                }
+        return list;
+    }
+
+    /// <summary>The row a ROUTED keyword query gets — ready to run with the typed arg.</summary>
+    private List<ResultItem> PluginCommandRows(PluginDefinition def, PluginCommand cmd, string arg)
+    {
+        if (arg.Length == 0 && !cmd.ArgOptional)
+        {
+            return new()
+            {
+                new ResultItem
+                {
+                    Title = $"{cmd.Name} — add a query",
+                    Subtitle = $"type {cmd.Keyword} then what to {(cmd.Type == "copy" ? "copy with" : "search/open with")} it",
+                    Glyph = string.IsNullOrWhiteSpace(cmd.Glyph) ? "P" : cmd.Glyph, Kind = ResultKind.Hint,
+                }
+            };
+        }
+
+        return new()
+        {
+            new ResultItem
+            {
+                Title = string.IsNullOrWhiteSpace(cmd.Name) ? cmd.Keyword : cmd.Name,
+                Subtitle = $"{def.Name} · {cmd.TypeName} — press Enter"
+                           + (cmd.ArgOptional && arg.Length == 0 ? "" : $": {Clip(arg, 60)}"),
+                Glyph = string.IsNullOrWhiteSpace(cmd.Glyph) ? "P" : cmd.Glyph,
+                Kind = ResultKind.Plugin,
+                RunArgument = $"plugin:{def.Id}:{cmd.Keyword}" + (arg.Length > 0 ? " " + arg : ""),
+            }
+        };
+    }
+
+    /// <summary>Runs a plugin command row. Returns null on success, else a user-facing error.</summary>
+    private string? RunPlugin(string runArgument)
+    {
+        if (_plugins?.TryRouteExact(runArgument, out var def, out var cmd, out var arg) != true)
+            return "Plugin command not found — it may have been disabled, uninstalled or renamed";
+
+        try
+        {
+            switch (cmd.Type.ToLowerInvariant())
+            {
+                case "copy":
+                    TrySetClipboard(Plugins.Expand(cmd.Text, arg));
+                    break;
+
+                case "open":
+                    // raw substitution — this type is for local paths AND plain URLs
+                    OpenAnyTarget(Environment.ExpandEnvironmentVariables(Plugins.Expand(cmd.Template, arg)));
+                    break;
+
+                default:   // "web" — the {query} part is URL-escaped, the rest of the template is not
+                    string url = Plugins.Expand(cmd.Template, arg.Length > 0 ? Uri.EscapeDataString(arg) : arg);
+                    OpenUrl(url);
+                    break;
+            }
+            _usage?.Record("plugin:" + def.Id);   // v2.1 — MRU keeps plugin launches warm too
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Services.DiagnosticLogger.LogException("SearchEngine.RunPlugin", ex);
+            return $"Plugin '{def.Name}' failed — {ex.InnerException?.Message ?? ex.Message}";
+        }
+    }
+
     private static string Clip(string s, int n)
     {
         s = s?.Trim() ?? "";
@@ -723,7 +939,7 @@ public sealed class SearchEngine
     public static bool IsExecutable(ResultItem item) =>
         item.Kind is ResultKind.App or ResultKind.File or ResultKind.Web or ResultKind.Image
             or ResultKind.Tool or ResultKind.Calculator or ResultKind.Shortcut or ResultKind.Clipboard
-            or ResultKind.Answer;
+            or ResultKind.Answer or ResultKind.Plugin;
 
     /// <summary>
     /// Runs the item. Returns null on success, or a short human-readable
@@ -761,6 +977,9 @@ public sealed class SearchEngine
 
                 case ResultKind.Tool:
                     return RunTool(item.RunArgument);
+
+                case ResultKind.Plugin:      // v2.5 — a JSON plugin command (arg rides in RunArgument)
+                    return RunPlugin(item.RunArgument);
 
                 case ResultKind.Shortcut:
                     string? shortcutError = RunShortcut(item.RunArgument);
@@ -802,6 +1021,12 @@ public sealed class SearchEngine
             case "cmd:settings": OpenPath(AppPaths.SettingsDir); break;
             case "cmd:log": OpenPath(AppPaths.DataDir); break;
             case "cmd:clear-clipboard": _clips?.Clear(); break;
+
+            // v2.5 (DEV_PLAN Task 4.2) — plugin management
+            case "cmd:plugins-folder": OpenPath(AppPaths.PluginsDir); break;
+            case "cmd:plugins-rescan": _plugins?.Rescan(); break;
+            case "cmd:plugins-manage": OpenPath(AppPaths.PluginsDir); break;
+            case "cmd:plugin-starter": TrySetClipboard(Plugins.StarterJson); break;
 
             // v1.6 — window management; Apply returns null on success (→ launcher hides,
             // you see the snap happen) or an error (→ shown in the status bar)

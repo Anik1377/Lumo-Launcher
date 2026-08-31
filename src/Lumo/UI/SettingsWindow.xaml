@@ -393,6 +393,14 @@
                                     <TextBlock Text="Shortcuts" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </RadioButton>
+                            <RadioButton Tag="7" Checked="OnNavChanged" Style="{StaticResource NavRadio}">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE8A9;" FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                               Foreground="{DynamicResource TitleBrush}" Margin="0,0,12,0"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="Plugins" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </RadioButton>
                             <RadioButton Tag="6" Checked="OnNavChanged" Style="{StaticResource NavRadio}">
                                 <StackPanel Orientation="Horizontal">
                                     <TextBlock Text="&#xE8BD;" FontFamily="Segoe MDL2 Assets" FontSize="16"
@@ -808,6 +816,88 @@
                                         <TextBlock x:Name="ShortcutsEmpty" Text="No shortcuts yet — create your first one above. A good start: a URL you open every day."
                                                    FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}" Margin="0,6,0,0"
                                                    TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- ================= PLUGINS (v2.5, DEV_PLAN Task 4.2) ================= -->
+                        <ScrollViewer x:Name="PanelPlugins" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <TextBlock Text="Plugins" Style="{StaticResource SectionTitle}"/>
+
+                                <Border Style="{StaticResource Card}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Declarative JSON commands" Style="{StaticResource SettingName}"/>
+                                            <TextBlock Style="{StaticResource SettingDesc}" TextWrapping="Wrap"
+                                                       Text="One folder per plugin, each with a plugin.json that defines keyword commands — open a URL, open a path or copy text. No code, no installs, nothing leaves your PC."/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Content="Copy starter plugin.json" Style="{StaticResource GhostButton}"
+                                                    VerticalAlignment="Center" Margin="0,0,8,0" Click="OnCopyStarterPlugin"/>
+                                            <Button Content="⟳ Rescan" Style="{StaticResource AccentButton}"
+                                                    VerticalAlignment="Center" Click="OnRescanPlugins"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="INSTALLED PLUGINS" FontSize="11.5" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource SubtitleBrush}"/>
+                                            <Button Grid.Column="1" Content="Open plugins folder" Style="{StaticResource GhostButton}"
+                                                    Padding="12,6" Click="OnOpenPluginsFolder"/>
+                                        </Grid>
+
+                                        <ItemsControl x:Name="PluginsList" Margin="0,6,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="&#xE8A9;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"
+                                                                           Margin="0,1,8,0"/>
+                                                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Meta}" FontSize="11" Margin="8,1,0,0"
+                                                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Commands}" FontSize="11.5" Margin="19,2,0,0"
+                                                                       Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                            <TextBlock Text="Enabled" FontSize="11.5" Margin="0,1,8,0"
+                                                                       Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                                            <CheckBox IsChecked="{Binding Enabled, Mode=TwoWay}" Checked="OnPluginToggle" Unchecked="OnPluginToggle"
+                                                                      VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <TextBlock x:Name="PluginsEmpty" Text="No plugins yet — press “Copy starter plugin.json”, create a folder in the plugins dir, paste it as plugin.json, then Rescan. Or type P/ in Lumo."
+                                                   FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}" Margin="0,6,0,0"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="PluginActionStatus" FontSize="11.5" Margin="0,8,0,0"
+                                                   Foreground="{DynamicResource AccentBrush}" Visibility="Collapsed" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="PluginsFolderText" FontSize="11" Margin="0,8,0,0"
+                                                   Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

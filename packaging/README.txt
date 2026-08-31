@@ -1,7 +1,24 @@
 ======================================================
-  LUMO v2.4.0-alpha.7  —  universal launcher for Windows
+  LUMO v2.5.0-alpha.1  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.5.0-alpha.1 (DEV_PLAN Phase 4 — "Platform")
+---------------------------------------------------------------
+1. PLUGINS - your own launcher commands as plain JSON. Make a
+   folder in %APPDATA%\Lumo\plugins\<name>\ with a plugin.json
+   defining keyword commands: web search (URL template with
+   {query}), open a path/URL, or copy text. Type P/ in Lumo to
+   browse, or just type the keyword ("emo sunset"). Settings ->
+   Plugins manages them, and P/ can copy a starter file. No
+   code, no installs, nothing leaves your PC.
+2. PER-SHORTCUT GLOBAL HOTKEYS - edit any shortcut (/sc) and
+   give it a combo like Ctrl+Alt+G: it runs from anywhere,
+   even when Lumo is hidden. Up to 16; captured in the same
+   editor, live the moment you save.
+3. DECLARATIVE ROUTER - the search prefixes became a proper
+   route table (same behavior, cleaner engine, per-route error
+   guard, and the doorway plugins plug into).
 
 WHAT'S NEW IN v2.4.0-alpha.7 (the tray icon round)
 ---------------------------------------------------------------

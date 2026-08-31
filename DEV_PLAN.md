@@ -4,10 +4,12 @@ Purpose: Turn the 15 feature suggestions in feature-suggestions.md into an order
 
 Repo: src/Lumo · Stack: C# / WPF / .NET 8 · Branch target: main
 
-> **Version mapping (v2.1 note):** this plan was drafted against the v1.x numbering.
+> **Version mapping (v2.5 note):** this plan was drafted against the v1.x numbering.
 > On the current v2 baseline the phases ship as: Phase 0+1 → **v2.1.0-alpha.1**,
-> Phase 2 → v2.2.0-alpha.x, Phase 3 → v2.3.0-alpha.x, Phase 4 → v2.4.0-alpha.x,
-> Phase 5 → v2.5.0-alpha.x.
+> Phase 2 → v2.2.0-alpha.x, Phase 3 → v2.3.0-alpha.x.
+> The v2.4.0-alpha.x line was consumed by the Raycast UI overhaul + AI chat window
+> (user-driven, outside this plan), so the remaining phases shifted up one minor:
+> Phase 4 → **v2.5.0-alpha.x**, Phase 5 → v2.6.0-alpha.x.
 
 ## 0. Agent operating rules (read first)
 
@@ -99,13 +101,31 @@ CI runs tests before publish.
   unknown tokens stay verbatim, no recursion) applied to snippet copies and
   macro step targets.
 
-## Phase 4 — v2.4 "Platform" (#11, #12)
+## Phase 4 — v2.5 "Platform" (#11, #12) ✅ (shipped in v2.5.0-alpha.1)
 
-- **Task 4.1 — PrefixRouter refactor** (IPrefixHandler + declarative routes).
-- **Task 4.2 — Plugin / command system** (%APPDATA%\Lumo\plugins\<id>\plugin.json).
-- **Task 4.3 — Custom per-shortcut / per-command hotkeys.**
+- **Task 4.1 — PrefixRouter refactor ✅** Core/PrefixRouter.cs: `IPrefixHandler`
+  (Prefix + ExactAliases + Handle) and a longest-prefix-first, case-insensitive
+  `PrefixRouter`. SearchEngine's 14-branch if-chain became a declarative route
+  table registered in the ctor; every route is exception-guarded per handler
+  (§0 rule 2). Behavior-preserving — the row builders are untouched.
+- **Task 4.2 — Plugin / command system ✅** (shipped as declarative JSON, not
+  executable code — keeps §0 rule 7's single-portable-exe + no-untrusted-code
+  promise). Core/Plugins.cs (pure parser/validator/expander) +
+  Services/PluginStore.cs (%APPDATA%\Lumo\plugins\<id>\plugin.json; 64 plugins,
+  24 commands each, first plugin owns a keyword, tolerant corrupt-file skip,
+  mtime-probed EnsureFresh). Commands: `web` / `open` / `copy` with a {query}
+  placeholder (URL-escaped for web). Routing: `P/` browser, token-exact keyword
+  ("kw …" / bare "kw"), quick-hits on the default view; static routes always
+  win over plugin keywords. Settings → Plugins page: enable/disable per plugin,
+  open folder, rescan, copy-a-starter.
+- **Task 4.3 — Custom per-shortcut / per-command hotkeys ✅** ShortcutDef.Hotkey
+  (persisted in shortcuts.json) + HotkeyService multi-registration
+  (TryRegisterId under ShortcutHotkeyBase + n, ≤16, registration refuses bare /
+  Shift-only combos). The shortcut editor gained a hotkey capture box (same key
+  set as the main hotkey); the launcher re-registers all of them on save and
+  runs the shortcut from anywhere — launcher hidden included.
 
-## Phase 5 — v2.5 "Product" (#13, #14, #15)
+## Phase 5 — v2.6 "Product" (#13, #14, #15) — the last unimplemented phase
 
 - **Task 5.1 — Auto-update service** (GitHub Releases check + staged download).
 - **Task 5.2 — Portable data mode** (data/ folder next to the exe).
