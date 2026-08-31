@@ -219,4 +219,40 @@ public static class Plugins
           ]
         }
         """;
+
+    /// <summary>
+    /// v2.6.0-alpha.2 — a ready-to-paste prompt for any AI chat: it carries the
+    /// whole manifest contract so the answer is usually a valid plugin.json on
+    /// the first try. Shown in docs/PLUGIN_DEVELOPMENT.md and copyable from
+    /// Settings → Plugins ("Copy AI prompt") and the P/ browser.
+    /// </summary>
+    public const string AiPrompt = """
+        Create a Lumo launcher plugin for me. Output ONLY a single valid plugin.json, no commentary.
+
+        Lumo plugins are declarative JSON files — no code. The file is saved as
+        %APPDATA%\Lumo\plugins\<folder-name>\plugin.json where <folder-name> is the plugin id.
+
+        Top-level fields:
+          "name"    (string, display name, max 60 chars)
+          "author"  (string, max 60 chars)
+          "version" (string, e.g. "1.0.0")
+          "commands" (array of 1–24 command objects)
+
+        Each command object:
+          "keyword"   REQUIRED — 1–24 chars, only a-z 0-9 and '-'; no leading/trailing/double '-'.
+                      Users type this keyword in the launcher, optionally followed by a space and a query.
+          "type"      "web" (open a search URL — default), "open" (open a URL or file path), or "copy" (copy text).
+          "template"  for "web"/"open" — the target URL/path; "{query}" is replaced by the typed text
+                      (URL-escaped for "web", raw for "open").
+          "text"      for "copy" — the text to put on the clipboard; may contain "{query}".
+          "name"      optional row title (max 60 chars)
+          "subtitle"  optional row description (max 120 chars)
+          "glyph"     optional 1–4 char icon shown on the row
+          "argOptional" true — when the command works with NO query ("{query}" omitted/empty), bare "keyword" runs it.
+
+        Rules: every command needs the payload its type requires; keywords must be unique within the file;
+        keep keywords short and memorable; web templates must be real, working search URLs.
+
+        My plugin: <DESCRIBE YOUR PLUGIN HERE — what sites/paths/texts, which keywords you want>
+        """;
 }

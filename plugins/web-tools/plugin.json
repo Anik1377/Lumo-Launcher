@@ -1,0 +1,43 @@
+{
+  "name": "Web Utilities",
+  "author": "Lumo",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "keyword": "tr",
+      "name": "Translate",
+      "subtitle": "Google Translate — any language to English",
+      "type": "web",
+      "template": "https://translate.google.com/?sl=auto&tl=en&text={query}&op=translate"
+    },
+    {
+      "keyword": "weather",
+      "name": "Weather lookup",
+      "subtitle": "wttr.in forecast for a place — e.g.  weather dhaka",
+      "type": "web",
+      "template": "https://wttr.in/{query}"
+    },
+    {
+      "keyword": "wayback",
+      "name": "Wayback Machine",
+      "subtitle": "open an archived copy of a URL",
+      "type": "web",
+      "template": "https://web.archive.org/web/*/{query}"
+    },
+    {
+      "keyword": "isdown",
+      "name": "Is it down?",
+      "subtitle": "check whether a site is down for everyone",
+      "type": "web",
+      "template": "https://downforeveryoneorjustme.com/{query}"
+    },
+    {
+      "keyword": "tempmail",
+      "name": "Temporary email",
+      "subtitle": "open temp-mail.org — a throwaway inbox",
+      "type": "open",
+      "template": "https://temp-mail.org",
+      "argOptional": true
+    }
+  ]
+}

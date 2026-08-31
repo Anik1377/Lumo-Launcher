@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.4.0--alpha.2-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.6.0--alpha.2-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -18,38 +18,237 @@ Press a global hotkey from anywhere, type a few characters, and launch apps, fil
 calculations, web searches and system utilities — entirely from the keyboard.
 
 > 💾 **Download the ready-to-run exe from the
-> [Releases page](https://github.com/Anik1377/Lumo-Launcher/releases/latest)**
+> [Releases page](https://github.com/Anik1377/Lumo-Launcher/releases)**
 > — extract the zip and run `Lumo.exe`. No installer needed.
 
 ---
 
-## ✨ Features
+## ✨ Features — everything, broken down
+
+### Search & launch
 
 | | Feature | Detail |
 |---|---------|--------|
-| ⌨️ | **Keyboard-first** | Global hotkey (default `Alt+Space`) summons a centered search window anywhere in Windows |
-| 🚀 | **Command prefixes** | `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `B/` bookmarks · `U/` utilities · `/sc` your shortcuts · `?` ask AI |
-| ⚡ | **Shortcuts & macros** | Save your own one-tap launches — a URL, a file, a folder, or a multi-step macro — and run them with `/sc name` |
-| 🔍 | **Hybrid file index** | Background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
-| 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)` — results copy to clipboard on Enter |
-| 🪟 | **Raycast-grade design** | A complete visual overhaul modelled on Raycast's command palette: near-black surface ladder (`#0E0F12` canvas → elevated fields), hairline strokes, quiet neutral selection with an accent pill, embedded **Inter** typography (OFL), and a flush search header — one design system across the launcher, Settings and the AI chat |
-| 🖆️ | **Clean vector icons** | A coherent Fluent-style outline icon set (24×24 stroke paths) for every row, hint and button — razor sharp at any DPI, tinted by your accent |
-| 🌈 | **Rim glow effect** | A soft comet of light that orbits the **true window perimeter, inside the rim** — never outside — 5 presets, solid accent, 3 speeds, pauses when hidden |
-| 📋 | **Clipboard history** | `H/` — your last 50 copies with timestamps, searchable, in memory only |
-| ▣ | **Window management** | `S/` — snap the last window left/right, maximize, center or restore; multi-monitor aware |
-| 📝 | **Snippets** | Save paste-anywhere texts as shortcuts and trigger with `!name` — multi-line supported, with live variables: `{{date}}`, `{{time}}`, `{{clipboard}}`, `{{name:Jane}}` |
-| 🤖 | **AI answers & chat** | `?` + a question for a quick answer on the result row, or type `AI/` and press Enter for a dedicated chat tab — streaming replies, markdown, history, local Ollama (no key) or an Anthropic API key |
-| 🔖 | **Browser bookmarks** | `B/` searches your Chrome & Edge bookmarks (all profiles) — read-only, fuzzy, newest first on the empty query |
-| 🎬 | **Fluid motion** | Spring-in window, cascading result rows, smooth hover transitions — with a reduced-motion master switch |
-| 🎨 | **Accent theming** | 9 accent presets (Raycast red leads) + custom hex, driving the whole highlight system |
-| 🌗 | **Dark / light / auto theme** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
-| ⏰ | **Start with Windows** | One toggle in Settings (per-user Run key, no admin rights) |
-| 🧳 | **Truly portable** | One ~2 MB exe (Inter embedded), no installer |
-| 🛡️ | **Never freezes** | Bounded in-memory search pipeline, 60 ms debounce, every handler exception-guarded |
-| 📋 | **Diagnostics log** | Everything recorded to `%LOCALAPPDATA%\Lumo\log.txt` for painless troubleshooting |
-| ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`, again to close) any result: **Open** (the Enter path), containing folder, copy path/name, terminal there, run as administrator, pin — with a separator before the pin pair |
-| ★ | **Pinned favourites** | A FAVOURITES section leads the empty view, newest pin first (up to 12) — pin via the menu **or the hover ★ right on the row** (`favourites.json`) |
-| 👁️ | **Preview pane** | `Tab` previews the selection — text-file heads (binary-safe, 512 KB cap), image thumbnails, clipboard entries, URLs — read off-thread with stale-read protection |
+| ⌨️ | **Keyboard-first** | Global hotkey (default `Alt+Space`) summons a centered search window anywhere in Windows; `↑↓`/`Enter`/`Esc` select/run/hide |
+| 🚀 | **Command prefixes** | 14 built-in views — `A/` apps · `F/` files · `C/` calculator · `W/` web · `I/` images · `U/` utilities · `H/` clipboard · `S/` windows · `B/` bookmarks · `AI/` chat · `?` ask AI · `!` snippets · `P/` plugins · `/sc` shortcuts (full table below) |
+| 🔍 | **Hybrid file index** | `F/` — background crawl with a tunable cap (10k–300k files) and instant quick-scan fallback while indexing |
+| 🔥 | **MRU ranking** | Every launch is counted (`usage.json`); equal matches are boosted up to ×2 + a recency nudge, so the apps and files you actually use float to the top |
+| ★ | **Pinned favourites** | A FAVOURITES section leads the empty view, newest pin first (up to 12) — pin via the right-click menu **or the hover ★** on any row (`favourites.json`) |
+| ✂️ | **Row quick actions** | Right-click (or `Ctrl+→`) any row: **Open** (what Enter does), containing folder, copy path/name, open in terminal, run as administrator, pin — each row type gets only the actions that make sense for it |
+| 👁️ | **Preview pane** | `Tab` previews the selection — text-file heads (binary-safe, 512 KB cap), image thumbnails, clipboard entries, snippet bodies, URLs — read off-thread with stale-read protection |
+
+### Calculations & conversions (`C/`)
+
+| | Feature | Detail |
+|---|---------|--------|
+| 🧮 | **Safe calculator** | `C/(1920*1080)/3`, `sqrt(2)^10`, `log(1000)`, bare `pi`/`e` — results copy to clipboard on Enter |
+| 📏 | **Unit conversion** | `C/10 ft in cm`, `C/5kg in lbs`, `C/100f to c` — length, mass, volume, data, temperature, all offline |
+| 💱 | **Currency conversion** | `C/50 usd to eur` — static fallback rates, quietly refreshed from open.er-api.com every 12 h; the keystroke path never touches the network |
+
+### Web & knowledge
+
+| | Feature | Detail |
+|---|---------|--------|
+| 🌐 | **Web search** | `W/` searches your default engine; `W/example.com` opens a URL directly |
+| 🔀 | **Per-query quick-switch** | `W/github dotnet`, `W/youtube cats`, `W/ddg …`, `W/wiki …` route that one query to the named provider — 16 built-ins + your own via `CustomWebProviders` (table below) |
+| 🖼️ | **Image search** | `I/aurora borealis` — Google Images results |
+| 🔖 | **Browser bookmarks** | `B/` searches Chrome & Edge bookmarks (all profiles, capped at 8) read-only in the background — fuzzy over name, folder path and URL, newest first on the empty query |
+
+### Shortcuts, snippets & windows
+
+| | Feature | Detail |
+|---|---------|--------|
+| ⚡ | **Shortcuts & macros** | Save one-tap launches — a URL, a file, a folder, or a macro of up to 12 steps — run with `/sc name` or from anywhere with **a per-shortcut global hotkey** (up to 16, e.g. `Ctrl+Alt+G`) |
+| 📝 | **Snippets with variables** | Save paste-anywhere texts and trigger with `!name` — Enter copies, Ctrl+V pastes. Live variables: `{{date}}`, `{{time}}`, `{{datetime}}`, `{{clipboard}}`, `{{name:Jane}}` (fallback default), `{{cursor}}`; unknown tokens stay verbatim, expansion never recurses |
+| 🎙️ | **Macro recorder** | Record a launch sequence live (`/sc` → record), replay it from one row, cancel a pending restart countdown from the same list |
+| ▣ | **Window management** | `S/` — snap the last-active window left/right half, maximize, center or restore; multi-monitor aware |
+
+### AI (local or Anthropic)
+
+| | Feature | Detail |
+|---|---------|--------|
+| 🤖 | **Quick AI answers** | `?` + a question — the answer lands right on the result row; Enter copies it. Requests fire off the UI thread, deduped in-flight, stale replies discarded, 8-entry scratchpad cache |
+| 💬 | **AI chat** | `AI/` (or the bare word `AI`) opens a dedicated chat tab — streaming replies, markdown rendering, multi-line input |
+| 🗂️ | **Chat sessions** | Full history (`chats.json`, 40 sessions / 200 messages) with a Raycast-style slide-over sidebar, pin/rename/delete curation, `Ctrl+N` new chat, last-answer-only regenerate |
+| 🎭 | **Personas** | 6 built-in system-prompt personas + your own (`personas.json`, edited in Settings → AI) — pick per chat from the persona chip flyout |
+| 🔌 | **Providers** | **Ollama** (local, no key — one-click setup incl. model pull) or **Anthropic** Messages API (key stored only in `settings.json`, redacted from every log line) |
+
+### Plugins (extensible keywords)
+
+| | Feature | Detail |
+|---|---------|--------|
+| 🧩 | **JSON plugins** | New keyword commands as a single `plugin.json` — `web` (search URL), `open` (URL/path), `copy` (clipboard text), each with a `{query}` placeholder. No code, no DLLs, nothing leaves your PC |
+| 📥 | **First-party catalog** | **Settings → Plugins → Browse catalog** — download ready-made plugins (Developer Search, Social Search, Copy Kit…) straight from the Lumo repo, one click, live immediately |
+| 🤖 | **AI authoring prompt** | A copyable prompt (in the app and in the docs) that makes any AI assistant write a valid `plugin.json` for you — [guide](docs/PLUGIN_DEVELOPMENT.md) |
+| ⌨️ | **Token routing** | Type the keyword alone or + a query (`emo sunset`); keywords that start with what you type surface as quick-hits; `P/` lists everything with a starter, the folder, a rescan and the AI prompt |
+
+### Appearance & behaviour
+
+| | Feature | Detail |
+|---|---------|--------|
+| 🪟 | **Raycast-grade design** | Near-black surface ladder, hairline strokes, quiet selection with an accent pill, embedded **Inter** typography, flush search header — one design system across launcher, Settings and AI chat |
+| 🧊 | **Frosted glass** | Real DWM acrylic blur-behind under the launcher card (fallback to solid where unsupported; `"Acrylic": false` to opt out) |
+| 🌈 | **Rim glow** | A soft comet of light orbiting the true window perimeter, inside the rim — 6 styles, 3 speeds, brightness/thickness sliders, pauses when hidden, zero idle CPU |
+| 🎨 | **Accent theming** | 9 accent presets (Raycast red `#FF6363` leads) + custom `#RRGGBB`, driving the whole highlight system |
+| 🌗 | **Dark / light / auto** | Follows the Windows colour mode in Auto, or force Dark/Light — persisted in `settings.json` |
+| 🎬 | **Fluid motion** | Spring-in window, cascading rows, press-feedback dip, mirrored exit — a reduced-motion master switch + Windows "show animations" respected |
+| 📐 | **Layout controls** | Launcher width 560–900 px, Win11 rounded or square corners, comfortable/compact row density |
+
+### Platform
+
+| | Feature | Detail |
+|---|---------|--------|
+| ⌨️ | **Hotkey choice** | Recorder in Settings; combos of `Ctrl Alt Shift Win` + letter/digit/`F1`–`F24`/`Space`/`` ` ``; auto-fallback chain if taken (why not `Win+Space`? [Reserved by Windows](#-usage--every-key)) |
+| 📥 | **Auto-update** | Quietly checks GitHub Releases ~daily (opt-out); tray nudge + Settings → About card: check now, download with progress, open the staged zip. Installing stays a two-step by design — extract over `Lumo.exe` |
+| 🧳 | **Portable data mode** | A `data` folder next to `Lumo.exe` redirects EVERY store (settings, shortcuts, chats, plugins, favourites, log, updates) into it — the whole setup travels on a USB stick; no folder = classic `%APPDATA%\Lumo`, byte-identical |
+| 🧭 | **First-run tour** | A 3-step intro (hotkey → prefixes → data & updates) on first launch, skip-safe, replayable from Settings → About |
+| 🖥️ | **System tray** | Single-click opens the launcher; right-click menu; update balloon; the real app icon everywhere (tray included) |
+| 🚀 | **Start with Windows** | One toggle (per-user Run key, no admin rights) |
+| 🛡️ | **Never freezes** | Bounded, synchronous, in-memory search pipeline; 60 ms debounce; every handler exception-guarded — a text change can never throw or block the UI thread |
+| 📋 | **Diagnostics log** | Everything recorded to the log for painless troubleshooting — open via `U/log` |
+| 📦 | **Truly portable** | One ~2.5 MB framework-dependent exe (Inter embedded), .NET 8 Desktop Runtime required |
+
+---
+
+## 🎹 Usage — every key, every prefix
+
+### The prefixes
+
+| Prefix | View | Examples |
+|--------|------|----------|
+| *(none)* | Mixed: apps + files + tools + plugin quick-hits | `chrome`, `report` |
+| `A/` | Installed applications | `A/chrome`, `A/term` |
+| `F/` | Files (hybrid index) | `F/report`, `F/tax 2025` |
+| `C/` | Calculator + units + currency | `C/(1920*1080)/3` · `C/10 ft in cm` · `C/50 usd to eur` |
+| `W/` | Web search (default engine; a URL opens directly) | `W/weather tomorrow` · `W/github.com` |
+| `I/` | Image search | `I/aurora borealis` |
+| `U/` | System utilities (list below) | `U/lock`, `U/mute`, `U/restart` |
+| `H/` | Clipboard history (last 50, in-memory) | `H/api`, pick a row to copy again |
+| `S/` | Window management for the last-active window | `S/left`, `S/max` |
+| `B/` | Chrome & Edge bookmarks | `B/github` |
+| `AI/` | AI chat tab (bare word `AI` works too) | `AI/explain quantum computing` |
+| `?` | Quick AI answer on the row (enable in Settings → AI) | `?regex for an ISO date` |
+| `!` | Snippets — Enter copies, Ctrl+V pastes | `!email`, `!addr` |
+| `P/` | Plugins — browse, run, manage | `P/`, `emo sunset` (keyword + query) |
+| `/sc` | Shortcuts & macros (`sc` optional) | `/sc work`, `/sc` → *New shortcut* |
+
+### `W/` quick-switch keywords
+
+The first word of a `W/` query names the provider for that one query —
+`W/github dotnet 8` searches GitHub, `W/ddg news` DuckDuckGo, while your
+default engine stays untouched:
+
+| Keyword | Searches | | Keyword | Searches |
+|---|---|---|---|---|
+| `google` | Google | | `news` | Google News |
+| `bing` | Bing | | `images` | Google Images |
+| `ddg` / `duckduckgo` | DuckDuckGo | | `amazon` | Amazon |
+| `github` | GitHub | | `npm` | npm |
+| `youtube` | YouTube | | `nuget` | NuGet |
+| `maps` | Google Maps | | `so` / `stackoverflow` | Stack Overflow |
+| `wiki` | Wikipedia | | `scholar` | Google Scholar |
+
+Add your own in `settings.json` → `CustomWebProviders`
+(`"keyword": "https://site.com/?q={0}"`) — custom entries win over built-ins.
+
+### `U/` utilities
+
+`lock` · `sleep` · `hibernate` · `mute` (volume toggle) · `empty bin` ·
+`night light` · `battery` · `restart` · `restart in 10 seconds` (cancellable —
+a ✕ row floats to the top until it fires) · `shutdown` · `settings` (window) ·
+`settings file` · `log`
+
+### Snippet variables
+
+| Token | Expands to |
+|---|---|
+| `{{date}}` | today, ISO (`2026-08-31`) |
+| `{{time}}` | current time |
+| `{{datetime}}` | date + time |
+| `{{clipboard}}` | current clipboard text |
+| `{{name:Jane}}` | a fill-in with a fallback default |
+| `{{cursor}}` | caret marker for future paste positioning |
+
+Unknown tokens stay **verbatim** (a visible typo beats silent loss) and
+expansion is never recursive.
+
+### Keys
+
+| Keys | Action |
+|------|--------|
+| `Alt+Space` *(default)* | Open / hide Lumo (or single-click the tray icon) |
+| `↑ ↓` / `Enter` / `Esc` | select / run / hide |
+| `Tab` | open the preview pane for the selection |
+| `Ctrl+→` | open the quick-action menu (again closes) |
+| `Ctrl+N` (in AI chat) | new chat session |
+| `F11` | fullscreen / window toggle (AI chat) |
+
+### Plugins in one minute
+
+A plugin is a folder with one `plugin.json` — new keywords for the launcher,
+no code:
+
+```json
+{
+  "name": "My first plugin",
+  "author": "you",
+  "version": "1.0",
+  "commands": [
+    { "keyword": "so", "name": "Stack Overflow search", "type": "web",
+      "template": "https://stackoverflow.com/search?q={query}" },
+    { "keyword": "time", "type": "open", "template": "https://time.is", "argOptional": true }
+  ]
+}
+```
+
+Drop it in `%APPDATA%\Lumo\plugins\<id>\plugin.json`, rescan, and `so rust
+lifetimes` / bare `time` work everywhere. Or **Settings → Plugins → Browse
+catalog** to one-click install the first-party set (Developer Search, Dev
+Tools, Social Search, Movies & Music, Shopping, Quick Jumps, Web Utilities,
+Copy Kit). The full schema, routing rules, limits and the copyable AI
+authoring prompt live in the
+**[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
+
+
+## 🆕 What's new in v2.6.0-alpha.2 — the plugin ecosystem
+
+Phase 4's plugin system grows an ecosystem: official plugins installable from
+inside the app, a full development guide, and an AI authoring shortcut.
+
+1. **📥 First-party plugin catalog.** **Settings → Plugins → Browse catalog**
+   fetches the official catalog from the Lumo repo and installs any plugin
+   with one click — the manifest is downloaded, validated with the production
+   parser, written to your plugins folder and rescanned; the keywords work
+   immediately. The launch set: **Developer Search** (so, mdn, npm, pypi,
+   crates, docker), **Developer Tools** (regex, devdocs, caniuse, jsonfmt,
+   ghstatus, speedtest), **Social Search** (reddit, x, yt, twitch, pins),
+   **Movies & Music** (imdb, sp, netflix, tmdb, lastfm), **Shopping** (amzn,
+   ebay, ali, etsy), **Quick Jumps** (gmail, gcal, gdrive, keep, notion,
+   trello, whatsweb, teleweb), **Web Utilities** (tr, weather, wayback,
+   isdown, tempmail) and **Copy Kit** (lorem, greet, shrug, tableflip,
+   divider…). The catalog is fetched on demand — never at startup, never on a
+   keystroke — and installs are atomic (tmp-file swap) and re-runnable as the
+   update path. P/ gained a *Download first-party plugins* row too.
+2. **📖 Plugin development guide.** A new
+   **[docs/PLUGIN_DEVELOPMENT.md](docs/PLUGIN_DEVELOPMENT.md)** — the full
+   manifest schema as tables, the three command types with examples, routing
+   rules (static routes win, token-exact keywords, first-plugin-owns-keyword),
+   the hard limits, debugging via the log, publishing to the official catalog
+   via PR, and an FAQ.
+3. **🤖 AI authoring prompt.** A ready-to-paste prompt carrying the whole
+   plugin contract — copy it from **Settings → Plugins → Copy AI prompt**,
+   from **P/**, or from the guide, describe the plugin you want in one line,
+   and any AI chat returns a valid `plugin.json`.
+4. **📚 README, fully broken down.** Every feature (through v2.6), every
+   prefix with examples, every `W/` quick-switch keyword, every utility, the
+   snippet variables, and the plugins section now live in the README as
+   reference tables.
+5. **🧪 +22 tests → 290.** Catalog parsing (junk rows, https-only, id
+   sanitization, dedupe, caps, clipping), install-state comparison (numeric
+   version ordering, non-version fallbacks), the atomic manifest write path,
+   the AI prompt contract, and a repo-consistency test that fails the build
+   if a registry entry ever drifts from its manifest (or two first-party
+   plugins ever claim the same keyword).
 
 ## 🆕 What's new in v2.4.0-alpha.2 — the frosted-glass material
 
@@ -514,29 +713,17 @@ Built after studying [Raycast for Windows](https://www.raycast.com/windows) — 
 
 ## 📦 Installation
 
-1. Grab the latest zip from **[Releases](https://github.com/Anik1377/Lumo-Launcher/releases/latest)**.
+1. Grab the latest zip from **[Releases](https://github.com/Anik1377/Lumo-Launcher/releases)**
+   (every release is a prerelease — pick the newest `v*` at the top).
 2. Extract anywhere (e.g. `D:\Tools\Lumo`).
 3. Run `Lumo.exe`.
 4. Requires the [.NET 8 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/8.0/runtime).
-
-## 🚀 Usage
-
-| Keys | Action |
-|------|--------|
-| `Alt+Space` | Open / hide Lumo (or single-click the tray icon) |
-| type | search apps + files + web at once |
-| `A/chrome` | applications only |
-| `F/report` | file search |
-| `C/(1920*1080)/3` | calculator (Enter copies the result) |
-| `W/weather tomorrow` | web search — `W/example.com` opens a URL |
-| `I/aurora borealis` | image search |
-| `U/lock` | utilities: `lock` · `sleep` · `empty bin` · `restart` · `shutdown` · `settings` · `log` |
-| `/sc` or `/sc name` | **shortcuts & macros** — run a saved launch, or press Enter on *New shortcut* to create one |
-| `↑ ↓` / `Enter` / `Esc` | select / run / hide |
+5. Optional: make an empty `data` folder next to `Lumo.exe` for [portable mode](#platform).
 
 ## ⚙️ Settings — `%APPDATA%\Lumo\settings.json`
 
-The Settings window writes this file for you; every key can still be edited by hand:
+The Settings window writes this file for you; every key can still be edited by hand
+(a selection — the full set is written on save and read tolerantly):
 
 ```json
 {
@@ -544,18 +731,27 @@ The Settings window writes this file for you; every key can still be edited by h
   "Theme": "dark",
   "WebEngine": "google",
   "HideOnFocusLoss": false,
-  "AccentColor": "#7C6CFF",
-  "BorderEffect": true,
+  "AccentColor": "#FF6363",
   "BorderStyle": "Aurora",
-  "BorderSpeedSec": 3.5,
+  "BorderSpeedSec": 9.0,
   "AnimationsEnabled": true,
+  "Acrylic": true,
   "StartWithWindows": false,
-  "MaxIndexedFiles": 150000
+  "MaxIndexedFiles": 150000,
+  "DisabledPlugins": [],
+  "CustomWebProviders": { "lumo": "https://github.com/Anik1377/Lumo-Launcher?q={0}" },
+  "AiEnabled": false,
+  "AiStyle": "ollama",
+  "AiEndpoint": "http://localhost:11434",
+  "AiModel": "llama3.2",
+  "UpdatesEnabled": true,
+  "FirstRunDone": true
 }
 ```
 
 `Theme` accepts `dark`, `light` or `auto` (follows the Windows colour mode).
 `Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24`, `Space` or `` ` ``.
+`WebEngine` accepts `google`, `bing` or `duckduckgo`.
 
 ## ⚡ Shortcuts & macros — `%APPDATA%\Lumo\shortcuts.json`
 
@@ -569,13 +765,25 @@ Saved shortcuts live next to `settings.json` and are managed from the launcher
   "Type": "url",
   "Target": "https://mail.google.com",
   "Steps": [],
-  "Keywords": "gmail work"
+  "Keywords": "gmail work",
+  "Hotkey": "Ctrl+Alt+M"
 }
 ```
 
 `Type` is `url`, `file`, `folder` or `macro` — for a macro, put one target per line in
 `Steps` (URLs and paths, up to 12); they all open when the shortcut runs.
 `Keywords` are optional extra terms that help `/sc` find it.
+`Hotkey` (optional) registers a **global combo for this one shortcut** — it runs
+from anywhere, even with Lumo hidden (up to 16, bare/Shift-only combos refused;
+captured with the same recorder in the shortcut editor).
+
+## 🧩 Plugins — `%APPDATA%\Lumo\plugins\`
+
+One folder per plugin, each holding a declarative `plugin.json` — see the
+**[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)** for the complete
+schema, routing rules, limits, the official first-party catalog and the
+copyable AI authoring prompt. Manage everything from **Settings → Plugins**
+or `P/` in the launcher.
 
 ## 🛠️ Building from source
 
@@ -596,10 +804,11 @@ with the zip attached automatically.
 - [x] Apple-clean UI + fluid motion + auto theme (v1.3)
 - [x] User shortcuts & macros with `/sc` (v1.4)
 - [x] Windows 11 Fluent UI overhaul + full-window Settings app + rim glow (v2.0)
-- [ ] Plugin API for custom commands
+- [x] Pin results / usage-frequency ranking (v2.1/v2.2 — MRU + favourites)
+- [x] Plugin system for custom commands (v2.5 — declarative JSON, no code)
+- [x] First-party plugin catalog + in-app install (v2.6.0-alpha.2)
 - [ ] Everything SDK backend for instant full-disk search
 - [ ] Result icons extracted from real shortcuts
-- [ ] Pin results / usage-frequency ranking
 
 ## 📄 License
 

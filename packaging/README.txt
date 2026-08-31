@@ -1,7 +1,36 @@
 ======================================================
-  LUMO v2.6.0-alpha.1  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.2  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.2 (the plugin ecosystem)
+---------------------------------------------------------------
+1. FIRST-PARTY PLUGIN CATALOG. Settings -> Plugins now has a
+   Browse catalog button: it fetches the official plugin set
+   straight from the Lumo repo and installs any plugin with one
+   click - manifest downloaded, validated, activated instantly.
+   Launch set: Developer Search (so, mdn, npm, pypi, crates,
+   docker), Developer Tools (regex, devdocs, caniuse, jsonfmt,
+   ghstatus, speedtest), Social Search (reddit, x, yt, twitch,
+   pins), Movies & Music (imdb, sp, netflix, tmdb, lastfm),
+   Shopping (amzn, ebay, ali, etsy), Quick Jumps (gmail, gcal,
+   gdrive, keep, notion, trello, whatsweb, teleweb), Web
+   Utilities (tr, weather, wayback, isdown, tempmail) and Copy
+   Kit (lorem, greet, shrug, tableflip, divider). P/ also
+   gained a "Download first-party plugins" row. The catalog is
+   fetched on demand only - never at startup, never per
+   keystroke.
+2. PLUGIN DEVELOPMENT GUIDE. docs/PLUGIN_DEVELOPMENT.md on
+   GitHub: the full manifest schema, the three command types,
+   routing rules, limits, debugging, and how to publish your
+   own plugin to the official catalog with a PR.
+3. AI AUTHORING PROMPT. Copy a ready-made prompt (Settings ->
+   Plugins -> Copy AI prompt, or P/) that makes any AI chat
+   write a valid plugin.json for you - describe the plugin in
+   one line, paste the answer, rescan, done.
+4. README REFERENCE. The README now documents every feature,
+   every prefix, every W/ quick-switch keyword, every utility
+   and the snippet variables as lookup tables.
 
 WHAT'S NEW IN v2.6.0-alpha.1 (DEV_PLAN Phase 5 — "Product")
 ---------------------------------------------------------------

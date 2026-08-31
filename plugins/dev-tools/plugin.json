@@ -1,0 +1,52 @@
+{
+  "name": "Developer Tools",
+  "author": "Lumo",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "keyword": "regex",
+      "name": "Regex101",
+      "subtitle": "test a regular expression on regex101.com",
+      "type": "web",
+      "template": "https://regex101.com/?regex={query}"
+    },
+    {
+      "keyword": "devdocs",
+      "name": "DevDocs lookup",
+      "subtitle": "search devdocs.io across every API",
+      "type": "web",
+      "template": "https://devdocs.io/#q={query}"
+    },
+    {
+      "keyword": "caniuse",
+      "name": "caniuse",
+      "subtitle": "browser support tables for web features",
+      "type": "web",
+      "template": "https://caniuse.com/?search={query}"
+    },
+    {
+      "keyword": "jsonfmt",
+      "name": "JSON formatter",
+      "subtitle": "open codebeautify.org's JSON viewer",
+      "type": "open",
+      "template": "https://codebeautify.org/jsonviewer",
+      "argOptional": true
+    },
+    {
+      "keyword": "ghstatus",
+      "name": "GitHub status",
+      "subtitle": "is GitHub up right now?",
+      "type": "open",
+      "template": "https://www.githubstatus.com",
+      "argOptional": true
+    },
+    {
+      "keyword": "speedtest",
+      "name": "Internet speed test",
+      "subtitle": "opens fast.com",
+      "type": "open",
+      "template": "https://fast.com",
+      "argOptional": true
+    }
+  ]
+}

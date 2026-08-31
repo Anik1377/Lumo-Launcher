@@ -1,0 +1,71 @@
+{
+  "name": "Quick Jumps",
+  "author": "Lumo",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "keyword": "gmail",
+      "name": "Gmail",
+      "subtitle": "open mail.google.com",
+      "type": "open",
+      "template": "https://mail.google.com",
+      "argOptional": true
+    },
+    {
+      "keyword": "gcal",
+      "name": "Google Calendar",
+      "subtitle": "open calendar.google.com",
+      "type": "open",
+      "template": "https://calendar.google.com",
+      "argOptional": true
+    },
+    {
+      "keyword": "gdrive",
+      "name": "Google Drive",
+      "subtitle": "open drive.google.com",
+      "type": "open",
+      "template": "https://drive.google.com",
+      "argOptional": true
+    },
+    {
+      "keyword": "keep",
+      "name": "Google Keep",
+      "subtitle": "open keep.google.com notes",
+      "type": "open",
+      "template": "https://keep.google.com",
+      "argOptional": true
+    },
+    {
+      "keyword": "notion",
+      "name": "Notion",
+      "subtitle": "open notion.so workspace",
+      "type": "open",
+      "template": "https://www.notion.so",
+      "argOptional": true
+    },
+    {
+      "keyword": "trello",
+      "name": "Trello",
+      "subtitle": "open trello.com boards",
+      "type": "open",
+      "template": "https://trello.com",
+      "argOptional": true
+    },
+    {
+      "keyword": "whatsweb",
+      "name": "WhatsApp Web",
+      "subtitle": "open web.whatsapp.com",
+      "type": "open",
+      "template": "https://web.whatsapp.com",
+      "argOptional": true
+    },
+    {
+      "keyword": "teleweb",
+      "name": "Telegram Web",
+      "subtitle": "open web.telegram.org",
+      "type": "open",
+      "template": "https://web.telegram.org",
+      "argOptional": true
+    }
+  ]
+}

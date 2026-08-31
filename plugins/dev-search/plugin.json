@@ -1,0 +1,49 @@
+{
+  "name": "Developer Search",
+  "author": "Lumo",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "keyword": "so",
+      "name": "Stack Overflow search",
+      "subtitle": "search stackoverflow.com",
+      "type": "web",
+      "template": "https://stackoverflow.com/search?q={query}"
+    },
+    {
+      "keyword": "mdn",
+      "name": "MDN Web Docs",
+      "subtitle": "search developer.mozilla.org",
+      "type": "web",
+      "template": "https://developer.mozilla.org/en-US/search?q={query}"
+    },
+    {
+      "keyword": "npm",
+      "name": "npm packages",
+      "subtitle": "search npmjs.com",
+      "type": "web",
+      "template": "https://www.npmjs.com/search?q={query}"
+    },
+    {
+      "keyword": "pypi",
+      "name": "PyPI packages",
+      "subtitle": "search pypi.org",
+      "type": "web",
+      "template": "https://pypi.org/search/?q={query}"
+    },
+    {
+      "keyword": "crates",
+      "name": "Rust crates",
+      "subtitle": "search crates.io",
+      "type": "web",
+      "template": "https://crates.io/search?q={query}"
+    },
+    {
+      "keyword": "docker",
+      "name": "Docker Hub images",
+      "subtitle": "search hub.docker.com",
+      "type": "web",
+      "template": "https://hub.docker.com/search?q={query}"
+    }
+  ]
+}

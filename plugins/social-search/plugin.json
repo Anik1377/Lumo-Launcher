@@ -1,0 +1,42 @@
+{
+  "name": "Social Search",
+  "author": "Lumo",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "keyword": "reddit",
+      "name": "Reddit search",
+      "subtitle": "search reddit.com",
+      "type": "web",
+      "template": "https://www.reddit.com/search/?q={query}"
+    },
+    {
+      "keyword": "x",
+      "name": "X (Twitter) search",
+      "subtitle": "search x.com posts",
+      "type": "web",
+      "template": "https://x.com/search?q={query}"
+    },
+    {
+      "keyword": "yt",
+      "name": "YouTube search",
+      "subtitle": "search youtube.com videos",
+      "type": "web",
+      "template": "https://www.youtube.com/results?search_query={query}"
+    },
+    {
+      "keyword": "twitch",
+      "name": "Twitch search",
+      "subtitle": "search twitch.tv channels and streams",
+      "type": "web",
+      "template": "https://www.twitch.tv/search?term={query}"
+    },
+    {
+      "keyword": "pins",
+      "name": "Pinterest search",
+      "subtitle": "search pinterest.com pins",
+      "type": "web",
+      "template": "https://www.pinterest.com/search/pins/?q={query}"
+    }
+  ]
+}

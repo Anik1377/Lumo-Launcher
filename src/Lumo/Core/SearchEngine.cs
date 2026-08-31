@@ -829,9 +829,21 @@ public sealed class SearchEngine
             });
             rows.Add(new ResultItem
             {
+                Title = "Download first-party plugins",   // v2.6.0-alpha.2
+                Subtitle = "browse the official catalog and install keyword sets with one click",
+                Glyph = "P", Kind = ResultKind.Tool, RunArgument = "cmd:plugins-get",
+            });
+            rows.Add(new ResultItem
+            {
                 Title = "Rescan plugins",
                 Subtitle = "reload every plugin.json right now",
                 Glyph = "⟳", Kind = ResultKind.Tool, RunArgument = "cmd:plugins-rescan",
+            });
+            rows.Add(new ResultItem
+            {
+                Title = "Copy AI plugin prompt",   // v2.6.0-alpha.2
+                Subtitle = "a ready-to-paste prompt that makes any AI write a valid plugin.json",
+                Glyph = "P", Kind = ResultKind.Tool, RunArgument = "cmd:plugin-ai-prompt",
             });
             rows.Add(new ResultItem
             {
@@ -1027,6 +1039,8 @@ public sealed class SearchEngine
             case "cmd:plugins-rescan": _plugins?.Rescan(); break;
             case "cmd:plugins-manage": OpenPath(AppPaths.PluginsDir); break;
             case "cmd:plugin-starter": TrySetClipboard(Plugins.StarterJson); break;
+            // v2.6.0-alpha.2 — first-party catalog + AI authoring prompt
+            case "cmd:plugin-ai-prompt": TrySetClipboard(Plugins.AiPrompt); break;
 
             // v1.6 — window management; Apply returns null on success (→ launcher hides,
             // you see the snap happen) or an error (→ shown in the status bar)

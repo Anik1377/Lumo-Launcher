@@ -37,6 +37,9 @@ public partial class SettingsWindow : Window
     private readonly Action? _recordMacro;       // v1.5
     private readonly Func<bool>? _recordingActive; // v1.5.1 — is a recording live right now?
     private readonly PluginStore? _plugins;      // v2.5 — Task 4.2 JSON plugins
+    private readonly FirstPartyStore? _firstParty;   // v2.6.0-alpha.2 — first-party catalog + downloads
+    private List<FirstPartyEntry>? _firstPartyCatalog;   // last fetched catalog (null until Browse)
+    private readonly HashSet<string> _firstPartyBusy = new(StringComparer.OrdinalIgnoreCase);  // ids mid-install
     private readonly Func<ShortcutDef, string>? _shortcutHotkeyFeedback;   // v2.5 — Task 4.3
     private readonly UpdateService? _updates;    // v2.6 — Task 5.1 update check + staged download
     private readonly Action? _replayOnboarding;  // v2.6 — Task 5.3 replay the intro tour
@@ -73,6 +76,7 @@ public partial class SettingsWindow : Window
         _recordMacro = recordMacro;
         _recordingActive = recordingActive;
         _plugins = plugins;
+        if (_plugins is not null) _firstParty = new FirstPartyStore(_plugins);   // v2.6.0-alpha.2
         _shortcutHotkeyFeedback = shortcutHotkeyFeedback;
         _updates = updates;
         _replayOnboarding = replayOnboarding;
@@ -90,7 +94,10 @@ public partial class SettingsWindow : Window
 
         // v2.5 (Task 4.2) — live plugin list; the store raises Changed on every rescan
         if (_plugins is not null)
-            _plugins.Changed += () => Dispatcher.InvokeAsync(() => { try { LoadPluginList(); } catch { } });
+            _plugins.Changed += () => Dispatcher.InvokeAsync(() =>
+            {
+                try { LoadPluginList(); _firstPartyBusy.Clear(); LoadFirstPartyList(); } catch { }
+            });
         LoadPluginList();
 
         LogPathText.Text = "Log: " + AppPaths.LogFile;
@@ -309,6 +316,134 @@ public partial class SettingsWindow : Window
             PluginActionStatus.Visibility = Visibility.Visible;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.CopyStarter", ex); }
+    }
+
+    // ------------------------------------------------- first-party plugins (v2.6.0-alpha.2)
+
+    /// <summary>Bindable row for one catalog entry (Install button lives on the row).</summary>
+    public sealed class FirstPartyRowVM
+    {
+        public string Name { get; init; } = "";
+        public string Meta { get; init; } = "";
+        public string Description { get; init; } = "";
+        public string ButtonText { get; init; } = "Install";
+        public bool Installable { get; init; } = true;
+        public FirstPartyEntry Entry { get; init; } = new();
+    }
+
+    /// <summary>Fetches the official catalog from the Lumo repo (on demand — never at startup).</summary>
+    private async void OnBrowseFirstParty(object sender, RoutedEventArgs e)
+    {
+        if (_firstParty is null || sender is not Button browse) return;
+        try
+        {
+            browse.IsEnabled = false;
+            ShowFirstPartyStatus("Fetching the catalog from GitHub…");
+            var result = await _firstParty.FetchCatalogAsync();
+            if (!result.Ok)
+            {
+                ShowFirstPartyStatus(result.Error ?? "could not fetch the catalog");
+                return;
+            }
+            _firstPartyCatalog = result.Entries;
+            LoadFirstPartyList();
+            ShowFirstPartyStatus($"{result.Entries.Count} plugin(s) available — Install downloads the manifest into your plugins folder and activates it right away.");
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.BrowseFirstParty", ex); }
+        finally { browse.IsEnabled = true; }
+    }
+
+    /// <summary>Installs one entry: download → validate → write → rescan. The row shows "Installing…" meanwhile.</summary>
+    private async void OnInstallFirstParty(object sender, RoutedEventArgs e)
+    {
+        if (_firstParty is null || _firstPartyCatalog is null) return;
+        if ((sender as FrameworkElement)?.DataContext is not FirstPartyRowVM row) return;
+        if (sender is Button btn) btn.IsEnabled = false;
+        try
+        {
+            _firstPartyBusy.Add(row.Entry.Id);
+            LoadFirstPartyList();   // re-render with the busy state
+            ShowFirstPartyStatus($"Installing {row.Entry.Name}…");
+            var result = await _firstParty.InstallAsync(row.Entry);
+            ShowFirstPartyStatus(result.Ok
+                ? $"Installed {row.Entry.Name} — its keywords work immediately (type P/ or the keyword itself)."
+                : $"{row.Entry.Name}: {result.Error}");
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.InstallFirstParty", ex); }
+        finally
+        {
+            _firstPartyBusy.Remove(row.Entry.Id);
+            LoadFirstPartyList();   // fresh install states
+            LoadPluginList();       // the rescan inside InstallAsync may have changed the catalog
+        }
+    }
+
+    /// <summary>Renders the cached catalog against the installed set; hides the list until a fetch happened.</summary>
+    private void LoadFirstPartyList()
+    {
+        try
+        {
+            if (FirstPartyList is null) return;   // XAML not ready yet (ctor ordering)
+            if (_firstPartyCatalog is null)
+            {
+                FirstPartyList.ItemsSource = Array.Empty<FirstPartyRowVM>();
+                return;
+            }
+            FirstPartyList.ItemsSource = _firstPartyCatalog.Select(entry =>
+            {
+                var state = FirstParty.StateFor(entry, _firstParty?.FindInstalled(entry.Id));
+                bool busy = _firstPartyBusy.Contains(entry.Id);
+                return new FirstPartyRowVM
+                {
+                    Entry = entry,
+                    Name = string.IsNullOrWhiteSpace(entry.Name) ? entry.Id : entry.Name,
+                    Meta = string.Join(" · ", new[]
+                    {
+                        string.IsNullOrWhiteSpace(entry.Version) ? "" : "v" + entry.Version,
+                        string.IsNullOrWhiteSpace(entry.Author) ? "" : "by " + entry.Author,
+                        state == FirstPartyState.Missing ? "" : "installed",
+                    }.Where(s => s.Length > 0)),
+                    Description = entry.Description,
+                    ButtonText = busy ? "Installing…" : FirstParty.ButtonLabel(state),
+                    Installable = !busy,
+                };
+            }).ToList();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.LoadFirstPartyList", ex); }
+    }
+
+    private void ShowFirstPartyStatus(string text)
+    {
+        try
+        {
+            FirstPartyStatus.Text = text;
+            FirstPartyStatus.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.FirstPartyStatus", ex); }
+    }
+
+    /// <summary>Copies the AI authoring prompt — paste into any AI chat, describe the plugin, get a plugin.json.</summary>
+    private void OnCopyAiPrompt(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Windows.Clipboard.SetText(Plugins.AiPrompt);
+            ShowFirstPartyStatus("AI prompt copied — paste it into any AI chat, describe the plugin you want at the bottom, and save the answer as a plugin.json.");
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.CopyAiPrompt", ex); }
+    }
+
+    private void OnOpenPluginDocs(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = FirstParty.DocsUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OpenPluginDocs", ex); }
     }
 
     // ---------------------------------------------------------------- data location (v2.6 — Task 5.2) + tour (Task 5.3)

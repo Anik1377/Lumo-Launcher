@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "updated": "2026-08-31",
+  "plugins": [
+    {
+      "id": "dev-search",
+      "name": "Developer Search",
+      "description": "Stack Overflow, MDN, npm, PyPI, crates.io and Docker Hub — the six lookups every developer types a hundred times a day.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/dev-search/plugin.json"
+    },
+    {
+      "id": "dev-tools",
+      "name": "Developer Tools",
+      "description": "Regex101, DevDocs, caniuse, JSON lint, GitHub status and a speedtest — the small tools you otherwise bookmark.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/dev-tools/plugin.json"
+    },
+    {
+      "id": "social-search",
+      "name": "Social Search",
+      "description": "Search Reddit, X (Twitter), YouTube, Twitch and Pinterest straight from the launcher.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/social-search/plugin.json"
+    },
+    {
+      "id": "watchlist",
+      "name": "Movies & Music",
+      "description": "IMDb, Spotify, Netflix, TMDB and Last.fm lookups — settle the 'where do I watch this' question in one keystroke.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/watchlist/plugin.json"
+    },
+    {
+      "id": "shopping",
+      "name": "Shopping Search",
+      "description": "Price-check anything on Amazon, eBay, AliExpress and Etsy without leaving the keyboard.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/shopping/plugin.json"
+    },
+    {
+      "id": "quick-jumps",
+      "name": "Quick Jumps",
+      "description": "One-tap opens for Gmail, Calendar, Drive, Keep, Notion, Trello, WhatsApp Web and Telegram Web.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/quick-jumps/plugin.json"
+    },
+    {
+      "id": "web-tools",
+      "name": "Web Utilities",
+      "description": "Translate, weather, wayback machine, 'is it down' checks and more — everyday web helpers.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/web-tools/plugin.json"
+    },
+    {
+      "id": "copy-kit",
+      "name": "Copy Kit",
+      "description": "Lorem ipsum, signature starters, shrugs and dividers — text templates that land on your clipboard instantly.",
+      "author": "Lumo",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/Anik1377/Lumo-Launcher/main/plugins/copy-kit/plugin.json"
+    }
+  ]
+}

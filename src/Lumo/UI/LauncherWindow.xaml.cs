@@ -811,6 +811,14 @@ public partial class LauncherWindow : Window
                 return;
             }
 
+            // v2.6.0-alpha.2 — first-party plugin catalog, same page
+            if (item.RunArgument == "cmd:plugins-get")
+            {
+                HideAnimated();
+                SettingsPageRequested?.Invoke(7);
+                return;
+            }
+
             // v1.5 — macro recording flow (v1.5.1: always hand focus back to the
             // input box — clicking a row moved keyboard focus to the list, so the
             // keyboard appeared dead right after starting a recording)

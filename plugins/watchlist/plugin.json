@@ -1,0 +1,42 @@
+{
+  "name": "Movies & Music",
+  "author": "Lumo",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "keyword": "imdb",
+      "name": "IMDb lookup",
+      "subtitle": "movies, shows and people on imdb.com",
+      "type": "web",
+      "template": "https://www.imdb.com/find/?q={query}"
+    },
+    {
+      "keyword": "sp",
+      "name": "Spotify search",
+      "subtitle": "tracks, albums and artists on Spotify",
+      "type": "web",
+      "template": "https://open.spotify.com/search/{query}"
+    },
+    {
+      "keyword": "netflix",
+      "name": "Netflix search",
+      "subtitle": "search netflix.com titles",
+      "type": "web",
+      "template": "https://www.netflix.com/search?q={query}"
+    },
+    {
+      "keyword": "tmdb",
+      "name": "TMDB lookup",
+      "subtitle": "themoviedb.org movie and TV database",
+      "type": "web",
+      "template": "https://www.themoviedb.org/search?query={query}"
+    },
+    {
+      "keyword": "lastfm",
+      "name": "Last.fm lookup",
+      "subtitle": "music and artist info on last.fm",
+      "type": "web",
+      "template": "https://www.last.fm/search?q={query}"
+    }
+  ]
+}

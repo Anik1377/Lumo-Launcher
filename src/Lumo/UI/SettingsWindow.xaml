@@ -840,10 +840,70 @@
                                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                                             <Button Content="Copy starter plugin.json" Style="{StaticResource GhostButton}"
                                                     VerticalAlignment="Center" Margin="0,0,8,0" Click="OnCopyStarterPlugin"/>
-                                            <Button Content="⟳ Rescan" Style="{StaticResource AccentButton}"
+                                            <Button Content="&#x21BB; Rescan" Style="{StaticResource AccentButton}"
                                                     VerticalAlignment="Center" Click="OnRescanPlugins"/>
                                         </StackPanel>
                                     </Grid>
+                                </Border>
+
+                                <!-- v2.6.0-alpha.2 — first-party catalog: browse + one-click install -->
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="FIRST-PARTY PLUGINS" FontSize="11.5" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource SubtitleBrush}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}" TextWrapping="Wrap"
+                                                           Text="Ready-made keyword sets maintained in the Lumo repo. Install downloads the manifest and activates its keywords immediately — no restart."/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button x:Name="FirstPartyBrowse" Content="Browse catalog" Style="{StaticResource AccentButton}"
+                                                        VerticalAlignment="Center" Margin="0,0,8,0" Click="OnBrowseFirstParty"/>
+                                                <Button Content="Copy AI prompt" Style="{StaticResource GhostButton}"
+                                                        VerticalAlignment="Center" Margin="0,0,8,0" Click="OnCopyAiPrompt"
+                                                        ToolTip="Copy a ready-to-paste prompt that makes any AI assistant write a valid plugin.json"/>
+                                                <Button Content="Guide &#x2197;" Style="{StaticResource GhostButton}"
+                                                        VerticalAlignment="Center" Click="OnOpenPluginDocs"
+                                                        ToolTip="Open the plugin development guide on GitHub"/>
+                                            </StackPanel>
+                                        </Grid>
+
+                                        <TextBlock x:Name="FirstPartyStatus" FontSize="11.5" Margin="1,8,0,0" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource SubtitleBrush}" Visibility="Collapsed"/>
+
+                                        <ItemsControl x:Name="FirstPartyList" Margin="0,4,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel Grid.Column="0">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <TextBlock Text="&#xE8A9;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"
+                                                                           Margin="0,1,8,0"/>
+                                                                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                                           Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                                                                <TextBlock Text="{Binding Meta}" FontSize="11" Margin="8,1,0,0"
+                                                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                                            </StackPanel>
+                                                            <TextBlock Text="{Binding Description}" FontSize="11.5" Margin="19,2,12,0"
+                                                                       Foreground="{DynamicResource SubtitleBrush}" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                        <Button Grid.Column="1" Content="{Binding ButtonText}" Style="{StaticResource GhostButton}"
+                                                                Padding="12,6" VerticalAlignment="Center" MinWidth="78"
+                                                                Click="OnInstallFirstParty" IsEnabled="{Binding Installable}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
                                 </Border>
 
                                 <Border Style="{StaticResource Card}">

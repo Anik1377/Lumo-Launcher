@@ -1,0 +1,35 @@
+{
+  "name": "Shopping Search",
+  "author": "Lumo",
+  "version": "1.0.0",
+  "commands": [
+    {
+      "keyword": "amzn",
+      "name": "Amazon search",
+      "subtitle": "search amazon.com",
+      "type": "web",
+      "template": "https://www.amazon.com/s?k={query}"
+    },
+    {
+      "keyword": "ebay",
+      "name": "eBay search",
+      "subtitle": "search ebay.com listings",
+      "type": "web",
+      "template": "https://www.ebay.com/sch/i.html?_nkw={query}"
+    },
+    {
+      "keyword": "ali",
+      "name": "AliExpress search",
+      "subtitle": "search aliexpress.com",
+      "type": "web",
+      "template": "https://www.aliexpress.com/wholesale?SearchText={query}"
+    },
+    {
+      "keyword": "etsy",
+      "name": "Etsy search",
+      "subtitle": "search etsy.com handmade and vintage",
+      "type": "web",
+      "template": "https://www.etsy.com/search?q={query}"
+    }
+  ]
+}

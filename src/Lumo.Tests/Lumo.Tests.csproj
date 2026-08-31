@@ -54,6 +54,9 @@
     <!-- v2.6 (Phase 5) — release-version comparison, GitHub payload picker, update policy, portable roots -->
     <Compile Include="../Lumo/Core/UpdateCheck.cs" Link="Core/UpdateCheck.cs" />
     <Compile Include="../Lumo/Services/UpdateService.cs" Link="Services/UpdateService.cs" />
+    <!-- v2.6.0-alpha.2 — first-party plugin catalog (parse/state) + the install disk path -->
+    <Compile Include="../Lumo/Core/FirstParty.cs" Link="Core/FirstParty.cs" />
+    <Compile Include="../Lumo/Services/FirstPartyStore.cs" Link="Services/FirstPartyStore.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
     <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
     <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />
