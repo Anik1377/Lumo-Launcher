@@ -10,18 +10,25 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>2.6.0-alpha.6</Version>
-    <InformationalVersion>Lumo 2.6.0-alpha.6 (ALPHA — unstable build)</InformationalVersion>
+    <Version>2.6.0-alpha.7</Version>
+    <InformationalVersion>Lumo 2.6.0-alpha.7 (ALPHA — unstable build)</InformationalVersion>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
-    <!-- v2.6.0-alpha.5 — Whisper.net ships native whisper.dll; without this flag a
-         framework-dependent single-file publish would leave it OUT of the exe and
-         the release zip (exe only) would lose it. Embedded → extracted to temp at
-         first use, so the portable single exe promise holds. -->
-    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <!-- v2.6.0-alpha.7 — the whisper.cpp natives (whisper.dll + 3 ggml dlls)
+         ship as REAL FILES in runtimes/win-x64/ next to Lumo.exe. alpha.5/6
+         embedded them in the single-file exe (this flag true), which made the
+         .NET host extract them flat into %TEMP%\.net\... — but Whisper.net
+         1.9.1's loader only probes <exe dir>/runtimes/win-x64/ on disk and
+         never sees the temp extraction, so every field install died with
+         "Native Library not found in default paths" (dev runs worked: the
+         build output already has the folder). Loose files are the layout the
+         loader actually reads: nothing to extract, nothing to lock, and CI
+         packs the folder into the release zip (Core/VoiceWhisper.WhisperNative
+         pre-flights it with a readable message when it's missing). -->
+    <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

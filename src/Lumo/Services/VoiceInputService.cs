@@ -281,7 +281,13 @@ public sealed class VoiceInputService : IDisposable
                 string language = VoiceWhisper.ResolveLanguage(model, preferred);
                 var raw = await WhisperEngine.TranscribeAsync(clip, model, language, CancellationToken.None).ConfigureAwait(false);
                 if (raw is null)
-                    throw new InvalidOperationException("Whisper could not run — check the log or pick Windows speech in settings.json (\"VoiceEngine\": \"windows\").");
+                {
+                    // v2.6.0-alpha.7 — the engine's own readable reason (missing
+                    // runtime folder, unreadable model) leads; the log has details.
+                    string why = WhisperEngine.LastError ?? "check the log";
+                    throw new InvalidOperationException(
+                        $"Whisper could not run — {why} (Windows speech still works: \"VoiceEngine\": \"windows\" in settings.json).");
+                }
                 text = raw;
                 DiagnosticLogger.Log("Voice", $"Whisper ok ({text.Length} chars, lang {language})");
             }

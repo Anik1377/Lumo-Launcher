@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.6.0--alpha.6-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.6.0--alpha.7-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -17,9 +17,11 @@
 Press a global hotkey from anywhere, type a few characters, and launch apps, files,
 calculations, web searches and system utilities — entirely from the keyboard.
 
-> 💾 **Download the ready-to-run exe from the
+> 💾 **Download the ready-to-run build from the
 > [Releases page](https://github.com/Anik1377/Lumo-Launcher/releases)**
-> — extract the zip and run `Lumo.exe`. No installer needed.
+> — extract the **whole** zip into one folder (it contains `Lumo.exe` plus a
+> `runtimes\` folder the voice engine loads from) and run `Lumo.exe` from there.
+> No installer needed.
 
 ---
 
@@ -211,6 +213,36 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v2.6.0-alpha.7 — whisper actually starts: the "Native Library not found" fix
+
+Root-cause fix for the field report where recording worked but every
+transcription died with `FileNotFoundException: Native Library not found in
+default paths…`:
+
+1. **🎤 The whisper.cpp engine now ships where its loader actually looks.**
+   alpha.5/6 embedded the native dlls (`whisper.dll` + three `ggml` dlls)
+   inside the single-file exe and let .NET unpack them to a temp folder on
+   first run — but Whisper.net 1.9.1's loader probes **only**
+   `runtimes/win-x64/` next to Lumo.exe (verified against its source: the
+   check is a plain `Directory.Exists` + `File.Exists` walk) and never sees
+   the temp extraction. Dev runs worked because the build output already has
+   the folder; every installed copy failed. The dlls are now real files in
+   `runtimes/win-x64/` beside the exe — the exact layout the loader reads.
+   Nothing to extract, nothing for an antivirus to lock mid-extract, and
+   `Lumo.exe` is a lean single file again (~4.9 MB, down from ~10.4 MB).
+2. **📦 The release zip carries a `runtimes/` folder — keep it together.**
+   Extract the whole zip into one place and run `Lumo.exe` from there; if you
+   move the exe, move the folder with it. Lumo pre-flights the layout before
+   every transcription: a missing dll now yields a plain-English message —
+   *"the Whisper runtime file … is missing next to Lumo.exe
+   (runtimes/win-x64) — re-extract the full Lumo zip, keeping every file and
+   folder together"* — in both the chat failure line and `lumo-log.txt`,
+   instead of whisper's cryptic loader exception.
+3. **🧪 +7 tests → 358** — the layout rule (required dll set, path
+   composition, first-missing detection, message wording) is pure Core and
+   unit-tested; the packaging script packs just the `win-x64` natives this
+   x64-only app loads.
 
 ## 🆕 What's new in v2.6.0-alpha.6 — voice fixes: downloads that survive, a waveform that moves, a mic that never traps you
 

@@ -41,6 +41,13 @@ public static class WhisperEngine
     /// <summary>Directory the models are installed into (portable-mode aware via AppPaths).</summary>
     public static string ModelsDir => Path.Combine(Core.AppPaths.DataDir, "models");
 
+    /// <summary>
+    /// v2.6.0-alpha.7 — the last readable factory failure (missing runtime
+    /// layout, unreadable model file), for the UI's didn't-run message. Cleared
+    /// whenever a factory loads; null while the engine is healthy.
+    /// </summary>
+    public static string? LastError { get; private set; }
+
     public static string ModelPath(string fileName) => Path.Combine(ModelsDir, fileName);
 
     /// <summary>True when the model file exists and is at least 90 % of the advertised size.</summary>
@@ -333,19 +340,40 @@ public static class WhisperEngine
             }
             catch { }
 
+            // v2.6.0-alpha.7 pre-flight — Whisper.net 1.9.1 loads its natives
+            // only from runtimes/win-x64/ next to the exe (it never looks in
+            // the single-file temp extraction). When the zip was unpacked
+            // without that folder (or the exe was moved away from it), fail
+            // here in readable words instead of whisper's cryptic
+            // FileNotFoundException.
+            string? missing = Core.WhisperNative.MissingFile(AppContext.BaseDirectory, File.Exists);
+            if (missing is not null)
+            {
+                LastError = Core.WhisperNative.MissingMessage(missing);
+                DiagnosticLogger.Log("Voice.WhisperFactory", LastError);
+                _factory = null;
+                _factoryPath = null;
+                return null;
+            }
+
             try
             {
                 _factory = Whisper.net.WhisperFactory.FromPath(path);
                 _factoryPath = path;
+                LastError = null;
                 return _factory;
             }
             catch (Exception ex)
             {
                 DiagnosticLogger.LogException("Voice.WhisperFactory", ex);
+                LastError = Short(ex.Message);
                 _factory = null;
                 _factoryPath = null;
                 return null;
             }
         }
     }
+
+    /// <summary>Factory error for the UI: one readable line, never a stack.</summary>
+    private static string Short(string message) => message.Length > 160 ? message[..160] : message;
 }

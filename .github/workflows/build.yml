@@ -33,8 +33,16 @@ jobs:
         shell: pwsh
         run: |
           $tag = if ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF_NAME } else { 'dev-' + $env:GITHUB_SHA.Substring(0,7) }
+          $pub = 'src/Lumo/bin/Release/net8.0-windows/win-x64/publish'
           New-Item -ItemType Directory -Path 'stage/Lumo' -Force | Out-Null
-          Copy-Item 'src/Lumo/bin/Release/net8.0-windows/win-x64/publish/Lumo.exe' 'stage/Lumo/'
+          New-Item -ItemType Directory -Path 'stage/Lumo/runtimes' -Force | Out-Null
+          Copy-Item "$pub/Lumo.exe" 'stage/Lumo/'
+          # v2.6.0-alpha.7 — the whisper.cpp natives ship as real files:
+          # Whisper.net 1.9.1 probes ONLY runtimes/win-x64 next to the exe and
+          # never sees single-file self-extract temp copies. The publish tree
+          # also carries win-arm64/win-x86 natives this x64-only app can't use,
+          # so just the win-x64 folder goes into the zip.
+          Copy-Item "$pub/runtimes/win-x64" 'stage/Lumo/runtimes/' -Recurse
           Copy-Item 'packaging/README.txt' 'stage/Lumo/'
           Compress-Archive -Path 'stage/Lumo' -DestinationPath "Lumo-launcher-$tag.zip"
           Add-Content $env:GITHUB_ENV "ZIP_NAME=Lumo-launcher-$tag.zip"

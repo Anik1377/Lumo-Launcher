@@ -1,7 +1,36 @@
 ======================================================
-  LUMO v2.6.0-alpha.6  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.7  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.7 (whisper actually starts)
+---------------------------------------------------------------
+1. THE FIX FOR "NATIVE LIBRARY NOT FOUND". alpha.5/6 hid the
+   whisper.cpp engine (whisper.dll + 3 ggml dlls) inside
+   Lumo.exe and let .NET unpack it to a temp folder on first
+   run - but Whisper.net 1.9.1 only ever looks in a
+   runtimes\win-x64 folder NEXT TO Lumo.exe. On real installs
+   the two never met: recording worked, then every
+   transcription died with "Native Library not found in
+   default paths". The engine now ships as real files in
+   runtimes\win-x64\ beside the exe - the exact layout the
+   loader reads. No temp unpacking, nothing for an antivirus
+   to lock mid-extract, and Lumo.exe is a lean ~4.9 MB
+   single file again.
+2. THE ZIP HAS A FOLDER NOW - KEEP IT TOGETHER. The release
+   zip contains Lumo.exe, README.txt and a runtimes\ folder.
+   Extract the WHOLE zip into one folder and run Lumo.exe
+   from there; if you move or copy Lumo.exe, move the
+   runtimes folder with it. Lumo checks the folder before
+   every transcription - if something is missing you get a
+   plain-English message ("the Whisper runtime file ... is
+   missing next to Lumo.exe - re-extract the full Lumo zip")
+   instead of the old cryptic loader error, in the chat and
+   in lumo-log.txt.
+3. EVERYTHING FROM alpha.6 CARRIES OVER: model downloads
+   that resume + retry, the engine release before a model
+   re-install (the "file is in use" fix), the auto-gain
+   waveform, and the setup card's mic + close buttons.
 
 WHAT'S NEW IN v2.6.0-alpha.6 (voice fixes)
 ---------------------------------------------------------------

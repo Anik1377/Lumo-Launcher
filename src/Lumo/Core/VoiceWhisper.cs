@@ -82,3 +82,59 @@ public static class VoiceWhisper
             : "auto";
     }
 }
+
+/// <summary>
+/// v2.6.0-alpha.7 — the on-disk layout Whisper.net 1.9.1 demands NEXT TO the
+/// exe. Its loader never looks at the .NET single-file temp extraction dir:
+/// it checks &lt;exe dir&gt;/runtimes/win-x64/ for the native dlls and throws
+/// "Native Library not found in default paths" when the folder is absent.
+/// alpha.5/6 shipped the dlls embedded inside the single-file exe — invisible
+/// to that check, which is exactly why voice died on installed machines
+/// ("whisper failed with log…") while dev runs worked (the build output always
+/// has the folder). The fix is packaging: the dlls ship as real files in
+/// runtimes/win-x64/ beside Lumo.exe, and the zip carries the folder. This
+/// helper keeps the required file list and the readable diagnostics pure so a
+/// half-extracted zip is caught with an actionable message instead of
+/// whisper's cryptic loader exception.
+/// </summary>
+public static class WhisperNative
+{
+    /// <summary>Folder (relative to the exe) the Whisper.net loader probes on Windows x64. Display form.</summary>
+    public const string RuntimeFolder = "runtimes/win-x64";
+
+    /// <summary>
+    /// The exact win-x64 set Whisper.net.Runtime 1.9.1 copies into
+    /// runtimes/win-x64/ (its build targets): whisper.dll plus the three ggml
+    /// dlls the CPU build of whisper.cpp needs. A Whisper.net upgrade that
+    /// adds or renames natives must update this list — the pre-flight in
+    /// WhisperEngine refuses to start the factory while one is missing.
+    /// </summary>
+    public static readonly IReadOnlyList<string> RequiredFiles =
+    [
+        "whisper.dll", "ggml-whisper.dll", "ggml-base-whisper.dll", "ggml-cpu-whisper.dll",
+    ];
+
+    /// <summary>The absolute path of the runtime folder under the app's base directory.</summary>
+    public static string FolderPath(string baseDir) => Path.Combine(baseDir, "runtimes", "win-x64");
+
+    /// <summary>The absolute path of one native dll under the runtime folder.</summary>
+    public static string FilePath(string baseDir, string fileName) =>
+        Path.Combine(FolderPath(baseDir), fileName);
+
+    /// <summary>
+    /// First required dll missing from the layout, or null when the folder is
+    /// complete. <paramref name="exists"/> is injected so the rule stays pure
+    /// (WhisperEngine passes File.Exists; tests pass a fake).
+    /// </summary>
+    public static string? MissingFile(string baseDir, Func<string, bool> exists)
+    {
+        foreach (var f in RequiredFiles)
+            if (!exists(FilePath(baseDir, f)))
+                return f;
+        return null;
+    }
+
+    /// <summary>Short actionable reason for the chat failure line and the log.</summary>
+    public static string MissingMessage(string missingFile) =>
+        $"the Whisper runtime file {missingFile} is missing next to Lumo.exe ({RuntimeFolder}) — re-extract the full Lumo zip, keeping every file and folder together";
+}
