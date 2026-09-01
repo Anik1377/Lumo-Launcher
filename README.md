@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.6.0--alpha.5-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.6.0--alpha.6-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -211,6 +211,34 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v2.6.0-alpha.6 — voice fixes: downloads that survive, a waveform that moves, a mic that never traps you
+
+First field-report fixes for the alpha.5 voice + prompt-kit build:
+
+1. **📥 Whisper downloads can't strand you anymore.** Broken or interrupted
+   model downloads now **resume where they stopped** (partial data lands in a
+   stable `.part` file; each attempt continues with an HTTP Range request) and
+   transient failures **retry automatically** — one network hiccup no longer
+   kills a 148–488 MB stream. Stale temp files from earlier attempts are
+   swept.
+2. **🔓 The "file is in use" error is gone.** Re-downloading (or repairing) a
+   model used to fail because the loaded Whisper engine still held the model
+   file open — the engine is now released before the fresh file moves into
+   place, and the move itself retries a few times to ride out an antivirus
+   scanner that's still inspecting the fresh download.
+3. **📈 The waveform reacts to every mic.** The bars now **auto-gain** against
+   a decaying peak: a quiet microphone gets amplified (up to ~3.6×) instead of
+   drawing a near-flat line, silence stays perfectly flat, and after loud
+   speech the sensitivity recovers gradually. Slightly taller bars, too.
+4. **🎤 The setup card gained a mic button and a way back.** The one-time
+   Whisper download card now has a **real mic button** — record right away
+   with the built-in Windows speech, no download needed — and a **close (✕)
+   button** (Esc still works) so a failed download can never trap you away
+   from the prompt. The Windows-speech fallback is now **session-only**: one
+   fallback no longer permanently demotes Whisper in settings.json.
+5. **🧪 +2 tests → 351.** The auto-gain curve (quiet lifted, silence flat,
+   saturation clamped, gradual re-sensitization).
 
 ## 🆕 What's new in v2.6.0-alpha.5 — Whisper voice + the prompt-kit AI chat
 

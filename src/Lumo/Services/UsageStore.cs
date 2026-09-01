@@ -108,7 +108,14 @@ public sealed class UsageStore
         try
         {
             if (!File.Exists(_file)) return;
-            using var doc = JsonDocument.Parse(File.ReadAllText(_file));
+            // v2.6.0-alpha.6 — a fresh-written file can transiently fail to open
+            // while an antivirus scans it (observed as a CI test flake: the read
+            // threw, the catch-all swallowed it, and the store looked empty).
+            // Retry briefly before giving up — same medicine the model downloader
+            // needed for the same disease.
+            string json = ReadWithRetry(_file);
+            if (json.Length == 0) return;
+            using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.ValueKind != JsonValueKind.Object) return;
             lock (_gate)
             {
@@ -144,6 +151,24 @@ public sealed class UsageStore
             DiagnosticLogger.Log("UsageStore", $"Loaded {_m.Count} usage entries");
         }
         catch (Exception ex) { DiagnosticLogger.LogException("UsageStore.Load", ex); }
+    }
+
+    /// <summary>
+    /// v2.6.0-alpha.6 — reads the store file, retrying up to 3 times on the
+    /// transient IO errors an antivirus scanner (or a concurrent writer) can
+    /// produce right after the file was written. Returns "" when the file
+    /// ultimately can't be read — the tolerant-load contract stands.
+    /// </summary>
+    private static string ReadWithRetry(string file)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try { return File.ReadAllText(file); }
+            catch (Exception ex) when (attempt < 3 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(120 * attempt);
+            }
+        }
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };

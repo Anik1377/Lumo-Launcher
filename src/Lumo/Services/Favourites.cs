@@ -149,13 +149,18 @@ public sealed class Favourites
         catch (Exception ex) { DiagnosticLogger.LogException("Favourites.Save", ex); }
     }
 
-    /// <summary>Tolerant load — a corrupt or half-written file costs nothing.</summary>
+    /// <summary>Tolerant load — a corrupt or half-written file costs nothing.
+    /// v2.6.0-alpha.6 — the read itself retries past the transient lock an
+    /// antivirus scanner can hold on a freshly written file (the same CI flake
+    /// UsageStore.Load needed medicine for).</summary>
     public void Load()
     {
         try
         {
             if (!File.Exists(_file)) return;
-            using var doc = JsonDocument.Parse(File.ReadAllText(_file));
+            string json = ReadWithRetry(_file);
+            if (json.Length == 0) return;
+            using var doc = JsonDocument.Parse(json);
             if (doc.RootElement.ValueKind != JsonValueKind.Array) return;
             lock (_gate)
             {
@@ -180,6 +185,20 @@ public sealed class Favourites
                 DiagnosticLogger.Log("Favourites", $"Loaded {_items.Count} pinned favourites");
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Favourites.Load", ex); }
+    }
+
+    /// <summary>v2.6.0-alpha.6 — reads the store file, retrying past the transient
+    /// IO errors an antivirus scanner can produce right after a fresh write.</summary>
+    private static string ReadWithRetry(string file)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try { return File.ReadAllText(file); }
+            catch (Exception ex) when (attempt < 3 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(120 * attempt);
+            }
+        }
     }
 
     private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };

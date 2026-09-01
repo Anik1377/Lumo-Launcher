@@ -24,10 +24,10 @@ public sealed class VoiceWaveform : FrameworkElement
 {
     private const int BarCount = 56;
     private const int ScrollTicks = 3;          // 33 ms ticks per scroll ≈ 10 Hz scroll rate
-    private const double MaxBarFraction = 0.46; // of the control height, per half
 
     private readonly double[] _bars = new double[BarCount];
     private double _target;                     // latest pushed level
+    private double _peak;                       // auto-gain reference (decays slowly)
     private int _tick;
     private DispatcherTimer? _timer;
 
@@ -73,13 +73,19 @@ public sealed class VoiceWaveform : FrameworkElement
         Freeze();
         Array.Clear(_bars);
         _target = 0;
+        _peak = 0;
         InvalidateVisual();
     }
 
-    /// <summary>Feeds the next mic loudness reading (0..1, already normalized by VoiceAudio.RmsToLevel).</summary>
+    /// <summary>
+    /// Feeds the next mic loudness reading (0..1, already normalized by VoiceAudio.RmsToLevel).
+    /// v2.6.0-alpha.6 — the reading passes through auto-gain (a decaying peak
+    /// reference) so quiet microphones still produce visible motion; silence
+    /// stays flat.
+    /// </summary>
     public void Push(double level)
     {
-        _target = Math.Clamp(level, 0, 1);
+        _target = Core.VoiceAudio.AutoGain(Math.Clamp(level, 0, 1), ref _peak);
     }
 
     private void Tick()
@@ -106,7 +112,7 @@ public sealed class VoiceWaveform : FrameworkElement
         double half = h / 2.0;
         double slot = w / BarCount;
         double barW = Math.Max(1.5, slot - 2.0);
-        double maxHalf = h * MaxBarFraction;
+        double maxHalf = h * 0.52;   // v2.6.0-alpha.6 — slightly taller bars now that auto-gain normalizes input
         Color c = BarColor;
 
         for (int i = 0; i < BarCount; i++)

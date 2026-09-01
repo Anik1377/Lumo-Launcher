@@ -813,8 +813,13 @@
                             </StackPanel>
                         </StackPanel>
                         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- v2.6.0-alpha.6 — a real mic button on the card: one tap records
+                                 right now with the built-in Windows speech, no download needed. -->
+                            <Button x:Name="VoiceSetupMicButton" Style="{StaticResource VoiceRoundButton}"
+                                    Content="&#xE720;" Click="OnVoiceUseWindowsClick"
+                                    ToolTip="Record right away with the built-in Windows speech (no download)"/>
                             <Button x:Name="VoiceDownloadButton" Style="{StaticResource VoiceAccentButton}"
-                                    Click="OnVoiceDownloadClick">
+                                    Margin="10,0,0,0" Click="OnVoiceDownloadClick">
                                 <TextBlock Text="Download"/>
                             </Button>
                             <Button x:Name="VoiceWindowsButton" Style="{StaticResource GhostChip}" Margin="10,0,0,0"
@@ -826,6 +831,11 @@
                                                Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
+                            <!-- v2.6.0-alpha.6 — the card is never a trap: an always-available
+                                 way back to the prompt row (Esc does the same). -->
+                            <Button x:Name="VoiceSetupCancelButton" Style="{StaticResource VoiceRoundButton}"
+                                    Content="&#xE8BB;" Margin="10,0,0,0" Click="OnVoiceSetupCancelClick"
+                                    ToolTip="Back to the prompt (Esc)"/>
                         </StackPanel>
                     </Grid>
                 </Grid>

@@ -64,6 +64,7 @@ public partial class AiChatWindow : Window
     private DateTime? _voicePauseStarted;
     private TimeSpan _voicePausedTotal;
     private bool _voiceSetupOpen;                                   // the Whisper setup card is up
+    private string? _voiceEngineOverride;                           // v2.6.0-alpha.6 — session-only engine fallback from the setup card (never persisted)
     private VoiceWhisper.WhisperModel? _setupModel;                 // the model the card offers
     private CancellationTokenSource? _voiceDlCts;                   // active model download
 
@@ -599,7 +600,11 @@ public partial class AiChatWindow : Window
         {
             if (_voice.IsListening || _voiceSetupOpen || _generating || !_settings.VoiceEnabled) return;
             _voiceBase = PromptBox.Text;   // transcription joins whatever is already typed
-            bool engineWhisper = !string.Equals(_settings.VoiceEngine, VoiceInputService.EngineWindows, StringComparison.OrdinalIgnoreCase);
+            // v2.6.0-alpha.6 — the setup card's mic/"Use Windows speech" is a SESSION
+            // fallback: it must not permanently demote Whisper in settings.json (a
+            // failed download used to strand the user on the weaker engine forever).
+            bool engineWhisper = _voiceEngineOverride is null &&
+                                 !string.Equals(_settings.VoiceEngine, VoiceInputService.EngineWindows, StringComparison.OrdinalIgnoreCase);
             string model = string.IsNullOrWhiteSpace(_settings.VoiceModel)
                 ? VoiceWhisper.DefaultModelId : _settings.VoiceModel.Trim();
             _voice.Start(_settings.VoiceLanguage,
@@ -789,6 +794,20 @@ public partial class AiChatWindow : Window
 
     private void OnVoiceStopClick(object sender, RoutedEventArgs e) => StopVoice();
 
+    /// <summary>v2.6.0-alpha.6 — back out of the setup card: cancel any running download and restore the prompt row.</summary>
+    private void OnVoiceSetupCancelClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            try { _voiceDlCts?.Cancel(); } catch { }
+            _setupModel = null;
+            HideVoiceOverlay();
+            UpdateMicState();
+            PromptBox.Focus();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceSetupCancel", ex); }
+    }
+
     private void OnVoiceCancelClick(object sender, RoutedEventArgs e)
     {
         try
@@ -885,13 +904,17 @@ public partial class AiChatWindow : Window
             VoiceDownloadPanel.Visibility = Visibility.Collapsed;
 
             VoiceSetupDesc.Text = $"Whisper runs fully offline and is far more accurate than Windows speech. " +
-                                  $"One-time download: {m.Name} · {m.SizeLabel} — then the mic just works, no connection needed.";
+                                  $"One-time download: {m.Name} · {m.SizeLabel} — then the mic just works, no connection needed. " +
+                                  $"Broken downloads resume where they stopped.";
             VoiceDownloadButton.Content = new TextBlock { Text = $"Download · {m.SizeLabel}" };
             VoiceDownloadButton.IsEnabled = true;
-            VoiceWindowsButton.IsEnabled = VoiceInputService.IsSupported;
-            VoiceWindowsButton.ToolTip = VoiceInputService.IsSupported
+            bool sapi = VoiceInputService.IsSupported;
+            VoiceWindowsButton.IsEnabled = sapi;
+            VoiceWindowsButton.ToolTip = sapi
                 ? "Skip the download — record with the built-in Windows recognizer"
                 : "Windows speech is not installed on this PC";
+            VoiceSetupMicButton.Visibility = sapi ? Visibility.Visible : Visibility.Collapsed;
+            VoiceSetupMicButton.IsEnabled = sapi;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceSetup", ex); }
     }
@@ -907,6 +930,7 @@ public partial class AiChatWindow : Window
             VoiceDownloadText.Text = "Starting…";
             VoiceDownloadButton.IsEnabled = false;
             VoiceWindowsButton.IsEnabled = false;
+            VoiceSetupMicButton.IsEnabled = false;
 
             var progress = new Progress<double>(v =>
             {
@@ -946,9 +970,13 @@ public partial class AiChatWindow : Window
                 HideVoiceOverlay();
                 return;
             }
-            VoiceDownloadText.Text = error;   // the card stays up with the reason
+            // the card stays up with the reason + the resume promise; the mic,
+            // download retry and the way back are all still one tap away
+            VoiceDownloadText.Text = error + " — the next attempt resumes where it stopped. You can also record right away with the mic button.";
             VoiceDownloadButton.IsEnabled = true;
-            VoiceWindowsButton.IsEnabled = VoiceInputService.IsSupported;
+            bool sapi = VoiceInputService.IsSupported;
+            VoiceWindowsButton.IsEnabled = sapi;
+            VoiceSetupMicButton.IsEnabled = sapi;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceDownloadDone", ex); }
     }
@@ -957,8 +985,10 @@ public partial class AiChatWindow : Window
     {
         try
         {
-            _settings.VoiceEngine = VoiceInputService.EngineWindows;
-            _settings.Save();
+            // v2.6.0-alpha.6 — session-only fallback: record with Windows speech NOW
+            // without uninstalling Whisper as the default engine (that stays a
+            // settings.json decision: "VoiceEngine": "windows").
+            _voiceEngineOverride = VoiceInputService.EngineWindows;
             _setupModel = null;
             HideVoiceOverlay();
             UpdateMicState();

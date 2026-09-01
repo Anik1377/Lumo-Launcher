@@ -119,6 +119,35 @@ public class Alpha5VoiceTests
         Assert.Empty(VoiceAudio.ToFloatSamples(new byte[] { 0x01 }));        // lone byte ignored
     }
 
+    // ---------------------------------------------------------------- meter auto-gain
+
+    [Fact]
+    public void AutoGain_lifts_quiet_mics_and_keeps_silence_flat()
+    {
+        double peak = 0;
+        Assert.Equal(0, VoiceAudio.AutoGain(0, ref peak));            // silence never manufactures motion
+        double quiet = VoiceAudio.AutoGain(0.1, ref peak);            // a quiet mic still moves the bars
+        Assert.InRange(quiet, 0.3, 1.0);
+        Assert.Equal(0, VoiceAudio.AutoGain(0, ref peak));            // silence stays flat after gain adapts
+    }
+
+    [Fact]
+    public void AutoGain_loud_levels_saturate_and_resensitize_gradually()
+    {
+        double peak = 0;
+        double loud = VoiceAudio.AutoGain(0.9, ref peak);             // near-full-scale passes through
+        Assert.InRange(loud, 0.99, 1.0);
+        Assert.Equal(1, VoiceAudio.AutoGain(2.0, ref peak));          // out-of-range input clamps, never overflows
+
+        // after the spike the peak decays ~0.8 %/push, so repeated quiet speech
+        // gains more and more — sensitivity recovers gradually, never snaps
+        double first = VoiceAudio.AutoGain(0.1, ref peak);
+        double mid = VoiceAudio.AutoGain(0.1, ref peak);
+        double last = VoiceAudio.AutoGain(0.1, ref peak);
+        Assert.True(mid > first && last > mid);
+        Assert.True(last <= 1.0);
+    }
+
     // ---------------------------------------------------------------- think splitter
 
     [Fact]

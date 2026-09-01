@@ -1,7 +1,32 @@
 ======================================================
-  LUMO v2.6.0-alpha.5  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.6  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.6 (voice fixes)
+---------------------------------------------------------------
+1. WHISPER DOWNLOADS SURVIVE BAD NETWORKS. Broken or
+   interrupted model downloads now RESUME where they stopped
+   (a stable .part file + HTTP Range) and transient failures
+   retry automatically - one network hiccup no longer kills a
+   148-488 MB stream.
+2. THE "FILE IS IN USE" ERROR IS GONE. Re-downloading a model
+   used to fail because the loaded Whisper engine still held
+   the file open - the engine is released before the fresh
+   file moves into place, and the move retries past antivirus
+   scans.
+3. THE WAVEFORM REACTS TO EVERY MIC. The bars auto-gain
+   against a decaying peak: a quiet microphone is amplified
+   (~3.6x max) instead of drawing a near-flat line; silence
+   stays flat; sensitivity recovers gradually after loud
+   speech. Slightly taller bars too.
+4. THE SETUP CARD HAS A MIC BUTTON AND A WAY BACK. Record
+   right away with the built-in Windows speech (mic button on
+   the card, no download), and a close (X) button (Esc works
+   too) so a failed download can never trap you. The Windows
+   fallback is session-only - it no longer permanently demotes
+   Whisper in settings.json.
+5. +2 TESTS -> 351.
 
 WHAT'S NEW IN v2.6.0-alpha.5 (Whisper voice + the prompt-kit
 AI chat)

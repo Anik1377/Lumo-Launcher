@@ -145,4 +145,30 @@ public static class VoiceAudio
         double x = Math.Min(1.0, (rms - SilenceRms) / (LoudRms - SilenceRms));
         return Math.Pow(x, 0.6);
     }
+
+    /// <summary>Gain ceiling for <see cref="AutoGain"/> — quiet mics are amplified at most this much.</summary>
+    public const double MaxAutoGain = 1.0 / 0.28;
+
+    /// <summary>How fast the auto-gain peak decays (per push, at ~10 Hz — ~8 %/s).</summary>
+    public const double AutoGainDecay = 0.992;
+
+    /// <summary>
+    /// v2.6.0-alpha.6 — auto-gain for the waveform meter: normalizes the incoming
+    /// level against a decaying peak so a QUIET microphone still moves the bars.
+    /// The alpha.5 mapping left near-flat lines on mics whose RMS sat below the
+    /// loudness curve — "is it actually recording?" must not depend on mic gain.
+    /// Stateful (the decaying peak lives in the caller's ref), pure otherwise:
+    ///   · silence (0) stays 0 — gain never manufactures motion out of silence;
+    ///   · a quiet level is amplified toward full scale (capped at MaxAutoGain);
+    ///   · a loud level passes through untouched;
+    ///   · the peak decays slowly, so after loud speech the meter gradually
+    ///     re-sensitizes instead of snapping.
+    /// </summary>
+    public static double AutoGain(double level, ref double peak)
+    {
+        if (level <= 0) { peak = Math.Max(0, peak * AutoGainDecay); return 0; }
+        peak = Math.Max(peak * AutoGainDecay, level);
+        double gain = 1.0 / Math.Max(0.28, peak);
+        return Math.Clamp(level * gain, 0, 1);
+    }
 }
