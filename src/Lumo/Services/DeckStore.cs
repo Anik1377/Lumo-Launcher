@@ -168,7 +168,22 @@ public sealed class DeckStore
         Directory.CreateDirectory(Path.GetDirectoryName(file) ?? ".");
         var tmp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllBytes(tmp, stream.ToArray());
-        File.Move(tmp, file, overwrite: true);
+
+        // Windows truth (the alpha.6 lesson, now doctrine): a fresh write can be
+        // briefly held by an antivirus scan, and MoveFileEx(REPLACE_EXISTING) then
+        // fails with Access Denied. Retry a few times before giving up.
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Move(tmp, file, overwrite: true);
+                break;
+            }
+            catch (Exception ex) when (attempt < 4 && ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(120 * attempt);
+            }
+        }
 
         foreach (var stale in Directory.GetFiles(Path.GetDirectoryName(file) ?? ".", Path.GetFileName(file) + ".*.tmp"))
         {
