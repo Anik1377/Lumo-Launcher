@@ -76,6 +76,14 @@ public partial class App : Application
             _window = new LauncherWindow(_settings, _shortcuts, _recorder, _clips, _usage, _favs, _plugins);
             MainWindow = _window;
 
+            // v3.0 — App Deck global numpad hotkeys land here from the launcher's
+            // WndProc: launch straight from the store, no window needs to be open.
+            _window.DeckSlotHotkey += slot =>
+            {
+                try { DeckStore.Current.Launch(slot); }
+                catch (Exception ex) { DiagnosticLogger.LogException("App.DeckHotkey", ex); }
+            };
+
             _window.SettingsRequested += () =>
             {
                 try { OpenSettings(); } catch (Exception ex) { DiagnosticLogger.LogException("App.OpenSettings", ex); }
@@ -199,7 +207,8 @@ public partial class App : Application
                     catch { return ""; }
                 },
                 updates: _updates,                       // v2.6 — Task 5.1 updates card
-                replayOnboarding: () => Dispatcher.InvokeAsync(ShowOnboarding));
+                replayOnboarding: () => Dispatcher.InvokeAsync(ShowOnboarding),
+                applyDeckHotkeys: () => { try { _window?.ReapplyDeckHotkeys(); } catch { } });   // v3.0 — App Deck
 
             _settingsWindow.Topmost = true; // stay above other apps while customizing
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;

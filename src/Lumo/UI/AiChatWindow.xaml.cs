@@ -292,6 +292,74 @@ public partial class AiChatWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.OpenSettings", ex); }
     }
 
+    // ------------------------------------- v3.0 — the hub: AI tab / App Deck tab
+
+    private AppDeckView? _deckView;
+    private bool _deckActive;
+
+    private void OnRailTabChanged(object sender, RoutedEventArgs e)
+    {
+        // fires during XAML parse (RailAi IsChecked=True) before the tree is complete
+        if (RailDeck is null || RailAi is null || DeckHost is null) return;
+        SwitchTab(RailDeck.IsChecked == true);
+    }
+
+    private void SwitchTab(bool deck)
+    {
+        if (_deckActive == deck) return;
+        _deckActive = deck;
+        try
+        {
+            if (deck)
+            {
+                if (DeckHost.Child is null) DeckHost.Child = new AppDeckView(_settings);
+                ((AppDeckView)DeckHost.Child).Refresh();
+                DeckHost.Visibility = Visibility.Visible;
+                if (_settings.AnimationsEnabled)
+                    DeckHost.BeginAnimation(OpacityProperty,
+                        new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160))
+                        { EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut } });
+                Keyboard.Focus(DeckHost);   // the chat prompt must not hold focus underneath
+            }
+            else
+            {
+                DeckHost.Visibility = Visibility.Collapsed;
+                PromptBox.Focus();
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SwitchTab", ex); }
+    }
+
+    private void OnRailSettingsClick(object sender, RoutedEventArgs e)
+    {
+        try { SettingsRequested?.Invoke(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.RailSettings", ex); }
+    }
+
+    /// <summary>Digit/numpad launching on the deck tab. Returns true when consumed.</summary>
+    private bool HandleDeckKey(Key key)
+    {
+        if (!_deckActive) return false;
+        if (Keyboard.FocusedElement is TextBox) return false;   // typing in the editor stays typing
+
+        int slot = key switch
+        {
+            Key.D1 or Key.NumPad1 => 0,
+            Key.D2 or Key.NumPad2 => 1,
+            Key.D3 or Key.NumPad3 => 2,
+            Key.D4 or Key.NumPad4 => 3,
+            Key.D5 or Key.NumPad5 => 4,
+            Key.D6 or Key.NumPad6 => 5,
+            Key.D7 or Key.NumPad7 => 6,
+            Key.D8 or Key.NumPad8 => 7,
+            Key.D9 or Key.NumPad9 => 8,
+            _ => -1,
+        };
+        if (slot < 0) return false;
+        ((AppDeckView)DeckHost.Child).LaunchSlot(slot);
+        return true;
+    }
+
     // ---------------------------------------------------------------- empty state / chips
 
     private void BuildChips()
@@ -391,6 +459,20 @@ public partial class AiChatWindow : Window
     {
         try
         {
+            // v3.0 — the deck tab consumes Esc (editor first, then back to the AI tab)
+            // and the numpad/digit keys before any chat shortcut gets a look in.
+            if (_deckActive)
+            {
+                if (e.Key == Key.Escape)
+                {
+                    e.Handled = true;
+                    var view = (AppDeckView?)DeckHost.Child;
+                    if (view is null || !view.TryCloseEditor()) SwitchTab(false);
+                    return;
+                }
+                if (HandleDeckKey(e.Key)) { e.Handled = true; return; }
+            }
+
             if (e.Key == Key.Escape)
             {
                 e.Handled = true;
@@ -413,7 +495,7 @@ public partial class AiChatWindow : Window
                 e.Handled = true;
                 StopVoice();   // v2.6.0-alpha.5 — Enter finishes the clip while the overlay holds the input row
             }
-            else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control && !_voice.IsListening)
+            else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control && !_voice.IsListening && !_deckActive)
             {
                 // v2.6.0-alpha.5 — pasting a screenshot attaches it (prompt-kit
                 // ImageAttachment) instead of letting the TextBox swallow it
@@ -424,12 +506,12 @@ public partial class AiChatWindow : Window
                 e.Handled = true;
                 SetFullscreen(!_fullscreen);   // v2.4.0-alpha.6 — fullscreen toggle
             }
-            else if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control)
+            else if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control && !_deckActive)
             {
                 e.Handled = true;
                 OnNewChat(sender, e);
             }
-            else if (e.Key == Key.M && Keyboard.Modifiers == ModifierKeys.Control)
+            else if (e.Key == Key.M && Keyboard.Modifiers == ModifierKeys.Control && !_deckActive)
             {
                 e.Handled = true;                                  // v2.6.0-alpha.3 — voice typing toggle
                 ToggleVoice();

@@ -32,6 +32,7 @@ public partial class SettingsWindow : Window
     private readonly Settings _snapshot;      // values at open — Cancel restores these
     private readonly Action _applyAppearance;
     private readonly Func<string> _applyHotkey;
+    private readonly Action? _applyDeckHotkeys;   // v3.0 — deck numpad re-registration
     private readonly Action _rebuildIndex;
     private readonly ShortcutStore _shortcuts;   // v1.4
     private readonly Action? _recordMacro;       // v1.5
@@ -64,7 +65,8 @@ public partial class SettingsWindow : Window
                           Func<bool>? recordingActive = null, int initialPage = 0,
                           PluginStore? plugins = null,
                           Func<ShortcutDef, string>? shortcutHotkeyFeedback = null,
-                          UpdateService? updates = null, Action? replayOnboarding = null)
+                          UpdateService? updates = null, Action? replayOnboarding = null,
+                          Action? applyDeckHotkeys = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -72,6 +74,7 @@ public partial class SettingsWindow : Window
         _applyAppearance = applyAppearance;
         _applyHotkey = applyHotkey;
         _rebuildIndex = rebuildIndex;
+        _applyDeckHotkeys = applyDeckHotkeys;
         _shortcuts = shortcuts ?? new ShortcutStore();
         _recordMacro = recordMacro;
         _recordingActive = recordingActive;
@@ -654,6 +657,13 @@ public partial class SettingsWindow : Window
             BorderEffectToggle.IsChecked = _settings.BorderEffect;
             // v3.0 — the border style pills / comet speed / glow sliders are gone with
             // the comet engine; the rim is the edge shine now (BorderEffect only).
+            DeckGlobalHotkeysToggle.IsChecked = _settings.DeckGlobalHotkeys;   // v3.0 — App Deck
+            DeckGlobalHotkeysToggle.Click += (_, _) =>
+            {
+                if (_suppress) return;
+                _settings.DeckGlobalHotkeys = DeckGlobalHotkeysToggle.IsChecked == true;
+                FooterHint.Text = "Numpad hotkeys will apply on Save (or Cancel to undo)";
+            };
 
             if (string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase))
                 ThemeLight.IsChecked = true;
@@ -1347,6 +1357,7 @@ public partial class SettingsWindow : Window
             _settings.StartWithWindows = _pendingStartWithWindows;
             StartupManager.SetEnabled(_pendingStartWithWindows);
             _settings.Save();
+            _applyDeckHotkeys?.Invoke();   // v3.0 — apply the deck hotkey toggle
             DiagnosticLogger.Log("Settings", "Saved");
             Close();
         }
@@ -1364,6 +1375,7 @@ public partial class SettingsWindow : Window
             _settings.RestoreFrom(_snapshot);
             _applyAppearance();
             _applyHotkey(); // put back the hotkey that was registered before the window opened
+            _applyDeckHotkeys?.Invoke();   // v3.0 — undo any deck-hotkey toggle change
             Close();
         }
         catch (Exception ex)

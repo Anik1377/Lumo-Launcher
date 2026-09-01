@@ -1,7 +1,24 @@
 ======================================================
-  LUMO v3.0.0-alpha.1  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.2  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.2 (the Lumo hub + App Deck)
+---------------------------------------------------------------
+1. THE WINDOW IS A HUB. A quiet nav rail on the left edge:
+   AI (the chat) and APP DECK, with a settings gear at the
+   bottom. Switching tabs never disturbs the chat.
+2. APP DECK. Nine quick-launch slots in a 3x3 grid that
+   mirrors your numpad. Click a card to launch, drop a file
+   onto a card to assign it, right-click to edit (name,
+   target, arguments, start-in). Icons are pulled from the
+   exe/shortcut automatically. Numpad 1-9 launches while
+   Lumo is focused - the top-row digits work too.
+3. OPTIONAL GLOBAL NUMPAD. Settings -> General can register
+   numpad 1-9 system-wide so the deck fires from anywhere.
+   Off by default - inside full-screen games the numpad
+   belongs to the game first.
+4. Slots live in appdeck.json beside your other settings.
 
 WHAT'S NEW IN v3.0.0-alpha.1 (the v3 foundation)
 ---------------------------------------------------------------

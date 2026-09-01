@@ -1,0 +1,180 @@
+<UserControl x:Class="Lumo.UI.AppDeckView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:Lumo.UI">
+
+    <!--
+        v3.0 — App Deck: nine quick-launch slots bound to numpad 1–9.
+        The 3×3 grid mirrors the numpad's physical layout, so muscle memory
+        points at the right card. Slots are built in code (they need per-slot
+        icons and drag-drop wiring); the editor is an overlay card so assigning
+        never leaves the surface.
+    -->
+
+    <UserControl.Resources>
+        <Style x:Key="DeckGhostButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="7"
+                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DeckAccentButton" TargetType="Button" BasedOn="{StaticResource DeckGhostButton}">
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="7"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DeckFieldBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource FieldBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="9,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- header -->
+        <Grid Grid.Row="0" Margin="26,20,26,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="App Deck" FontSize="20" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TitleBrush}"/>
+                <TextBlock FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
+                           Foreground="{DynamicResource SubtitleBrush}"
+                           Text="Nine slots for the apps and games you want one keystroke away — press numpad 1–9 while Lumo is open. Drop a file onto a card, or click an empty card to assign it."/>
+            </StackPanel>
+            <Button x:Name="DeckHelpButton" Grid.Column="1" Style="{StaticResource DeckGhostButton}"
+                    VerticalAlignment="Top" Content="How it works" Click="OnHowItWorksClick"/>
+        </Grid>
+
+        <!-- the 3×3 grid (cards built in code) -->
+        <ScrollViewer Grid.Row="1" behaviors:SmoothScroll.Enabled="True"
+                      VerticalScrollBarVisibility="Auto" Padding="26,8,26,0">
+            <UniformGrid x:Name="DeckGrid" Rows="3" Columns="3" Margin="0,4,0,0"/>
+        </ScrollViewer>
+
+        <!-- status line: launch feedback / errors -->
+        <TextBlock x:Name="DeckStatus" Grid.Row="2" Margin="26,6,26,12" FontSize="11.5"
+                   Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
+
+        <!-- ============ slot editor overlay ============ -->
+        <Grid x:Name="EditorOverlay" Grid.Row="0" Grid.RowSpan="3" Visibility="Collapsed">
+            <Border x:Name="EditorScrim" Background="#66000000" MouseLeftButtonDown="OnEditorCancel"/>
+            <Border Width="440" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="{DynamicResource CardBrush}" CornerRadius="14"
+                    BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                    Margin="20" KeyboardNavigation.TabNavigation="Continue">
+                <StackPanel Margin="20,18">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border x:Name="EditorIconHost" Width="40" Height="40" CornerRadius="9"
+                                Background="{DynamicResource GlyphBoxBrush}" Margin="0,0,12,0"/>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="EditorTitle" Text="Slot 1" FontSize="14.5" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TitleBrush}"/>
+                            <TextBlock x:Name="EditorKeycap" FontSize="11"
+                                       Foreground="{DynamicResource SubtitleBrush}" Margin="0,2,0,0"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="Name" FontSize="11.5" Margin="0,14,0,4" Foreground="{DynamicResource SubtitleBrush}"/>
+                    <TextBox x:Name="EditorName" Style="{StaticResource DeckFieldBox}" MaxLength="40"/>
+
+                    <TextBlock Text="Target (exe, shortcut, folder, URL…)" FontSize="11.5" Margin="0,10,0,4"
+                               Foreground="{DynamicResource SubtitleBrush}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBox x:Name="EditorTarget" Style="{StaticResource DeckFieldBox}" MaxLength="400"/>
+                        <Button x:Name="EditorBrowse" Grid.Column="1" Style="{StaticResource DeckGhostButton}"
+                                Content="Browse…" Margin="8,0,0,0" Click="OnEditorBrowse"/>
+                    </Grid>
+
+                    <TextBlock Text="Arguments (optional)" FontSize="11.5" Margin="0,10,0,4"
+                               Foreground="{DynamicResource SubtitleBrush}"/>
+                    <TextBox x:Name="EditorArgs" Style="{StaticResource DeckFieldBox}" MaxLength="300"
+                             FontFamily="Cascadia Mono, Consolas, Courier New" FontSize="12"/>
+
+                    <TextBlock Text="Start in (optional folder)" FontSize="11.5" Margin="0,10,0,4"
+                               Foreground="{DynamicResource SubtitleBrush}"/>
+                    <TextBox x:Name="EditorWorkDir" Style="{StaticResource DeckFieldBox}" MaxLength="400"/>
+
+                    <Grid Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="EditorClear" Style="{StaticResource DeckGhostButton}" Content="Clear slot"
+                                Click="OnEditorClear"/>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal">
+                            <Button Style="{StaticResource DeckGhostButton}" Content="Cancel"
+                                    Click="OnEditorCancel"/>
+                            <Button x:Name="EditorSave" Style="{StaticResource DeckAccentButton}" Content="Save slot"
+                                    Margin="8,0,0,0" Click="OnEditorSave"/>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

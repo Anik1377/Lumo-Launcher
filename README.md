@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.0--alpha.1-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-3.0.0--alpha.2-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -213,6 +213,29 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v3.0.0-alpha.2 — the Lumo hub: an App Deck bound to your numpad
+
+v3 phase 2 of 3:
+
+1. **🎛️ The window is a hub now.** A quiet nav rail lives on the left edge of
+   the AI window: **AI** (the chat) and **App Deck**, plus a settings gear at
+   the bottom. Switching keeps the chat's state alive underneath — the deck is
+   an overlay, not a page reload.
+2. **🎮 App Deck — nine one-keystroke launches.** A 3×3 grid that mirrors your
+   numpad's physical layout. Click a card to launch, drop any file/shortcut
+   onto a card to assign it, right-click (or click an empty card) to edit name,
+   target, arguments and start-in folder. Icons are extracted from the exe/lnk
+   automatically. While Lumo is focused, **numpad 1–9** (or the top-row digits)
+   launch the matching slot instantly.
+3. **🌍 Optional global hotkeys.** Settings → General → *Global numpad
+   hotkeys* registers numpad 1–9 system-wide (MOD_NOREPEAT, per-user, no
+   admin) so the deck fires from anywhere — including over full-screen games
+   that don't own the keys. Off by default, and the trade is spelled out in
+   the setting itself.
+4. **💾 Slots persist.** `appdeck.json` in the data folder follows the same
+   atomic-store doctrine as everything else; the launch policy validates the
+   target and reports readable errors ("Can't find X — it may have moved").
 
 ## 🆕 What's new in v3.0.0-alpha.1 — the v3 foundation: a real design system, themes you can share, and an actual installer
 

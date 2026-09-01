@@ -22,6 +22,12 @@ public sealed class HotkeyService : IDisposable
     /// <summary>v2.5 — sane cap on per-shortcut hotkeys (Win32 would allow more; UX would not).</summary>
     public const int MaxShortcutHotkeys = 16;
 
+    /// <summary>v3.0 — base id for the App Deck global numpad hotkeys (base + 0..8 = numpad 1..9).</summary>
+    public const int DeckHotkeyBase = HotkeyId + 0x2000;
+
+    /// <summary>MOD_NOREPEAT — v3.0 deck hotkeys hold a key down without auto-repeat launches.</summary>
+    public const uint MOD_NOREPEAT = 0x4000;
+
     /// <summary>The combo that actually registered successfully (human readable).</summary>
     public string ActiveDescription { get; private set; } = "(none)";
 
@@ -126,6 +132,28 @@ public sealed class HotkeyService : IDisposable
 
     /// <summary>True when this extra id currently holds a registration.</summary>
     public bool IsIdRegistered(int id) => _extraIds.Contains(id);
+
+    /// <summary>
+    /// v3.0 — App Deck: registers numpad slot <paramref name="slotIndex"/> (0..8) as a
+    /// BARE global hotkey (no modifier — the whole point is one-keystroke launches).
+    /// The bare-key trade is deliberate and opt-in via Settings → App Deck; games that
+    /// own the numpad win (RegisterHotKey simply fails and the deck stays focus-only).
+    /// </summary>
+    public bool TryRegisterDeckId(int id, int slotIndex)
+    {
+        if (slotIndex is < 0 or > 8) return false;
+        if (id == HotkeyId) return false;
+        UnregisterId(id);
+        // VK_NUMPAD1..9 = 0x61..0x69; MOD_NOREPEAT so holding a key doesn't machine-gun launches.
+        if (!NativeMethods.RegisterHotKey(_hwnd, id, MOD_NOREPEAT, (uint)(0x61 + slotIndex)))
+        {
+            DiagnosticLogger.Log("Hotkey", $"deck numpad {slotIndex + 1} (id {id}) FAILED — likely owned by a game/fullscreen app");
+            return false;
+        }
+        _extraIds.Add(id);
+        DiagnosticLogger.Log("Hotkey", $"deck numpad {slotIndex + 1} registered (id {id})");
+        return true;
+    }
 
     /// <summary>Re-checks a combo WITHOUT registering it — true when the combo is parseable.</summary>
     public static bool IsValidCombo(string combo) => TryParseCombo(combo, out _, out _);

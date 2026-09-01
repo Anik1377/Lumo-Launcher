@@ -67,6 +67,9 @@
     <!-- v3.0 — theme files (import/export format), theme resolution (presets > legacy) -->
     <Compile Include="../Lumo/Core/ThemeFile.cs" Link="Core/ThemeFile.cs" />
     <Compile Include="../Lumo/Core/ThemeSelect.cs" Link="Core/ThemeSelect.cs" />
+    <!-- v3.0 — App Deck slot model + store -->
+    <Compile Include="../Lumo/Core/DeckSlots.cs" Link="Core/DeckSlots.cs" />
+    <Compile Include="../Lumo/Services/DeckStore.cs" Link="Services/DeckStore.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
     <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
     <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />

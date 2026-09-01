@@ -472,6 +472,21 @@
                                                 </StackPanel>
                                             </Border>
                                         </Grid>
+
+                                        <!-- v3.0 — App Deck -->
+                                        <Separator Background="{DynamicResource BorderLineBrush}" Margin="0,14"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Global numpad hotkeys (App Deck)" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}" TextWrapping="Wrap"
+                                                           Text="Register numpad 1–9 as system-wide hotkeys so the deck launches from anywhere. Off by default: inside full-screen games the numpad belongs to the game — leave this off unless you actually want it."/>
+                                            </StackPanel>
+                                            <ToggleButton x:Name="DeckGlobalHotkeysToggle" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Center"/>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>

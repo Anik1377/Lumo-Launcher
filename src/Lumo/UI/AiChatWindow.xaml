@@ -3,9 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:Lumo.UI"
         xmlns:behaviors="clr-namespace:Lumo.UI"
-        Title="Lumo AI"
-        Width="860" Height="640"
-        MinWidth="640" MinHeight="460"
+        Title="Lumo"
+        Width="900" Height="640"
+        MinWidth="700" MinHeight="500"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -581,6 +581,58 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- v3.0 — hub nav rail: 40 px glyph radios; the active tab is a soft fill
+             with the accent glyph, matching the quiet-rail pattern -->
+        <Style x:Key="RailRadio" TargetType="RadioButton">
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="40"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" CornerRadius="10" Background="Transparent">
+                            <TextBlock Text="{TemplateBinding Content}" FontSize="{TemplateBinding FontSize}"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectedBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="RailButton" TargetType="Button" BasedOn="{StaticResource RailRadio}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="10" Background="Transparent">
+                            <TextBlock Text="{TemplateBinding Content}" FontSize="15"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- the card fills the whole window: DWM draws rounding + shadow on the true edge
@@ -592,6 +644,10 @@
             TextElement.FontFamily="/Assets/Fonts/#Inter"
             BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1">
         <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>   <!-- v3.0 — the hub nav rail -->
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>   <!-- caption -->
                 <RowDefinition Height="Auto"/>   <!-- AI-off banner -->
@@ -602,7 +658,7 @@
 
             <!-- ============ caption — v2.4.0-alpha.4: quiet dark band, hairline only;
                  the model chip is now a clickable picker ============ -->
-            <Border Grid.Row="0" x:Name="CaptionBar" Background="{DynamicResource CaptionBrush}"
+            <Border Grid.Row="0" Grid.ColumnSpan="2" x:Name="CaptionBar" Background="{DynamicResource CaptionBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="0,0,0,1"
                     CornerRadius="8,8,0,0" MouseLeftButtonDown="OnDragWindow">
                 <Grid Height="46" Margin="14,0">
@@ -614,7 +670,7 @@
                                   Fill="White" Stretch="Uniform" Width="11" Height="11"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
-                        <TextBlock Text="Lumo AI" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,0,0"
+                        <TextBlock Text="Lumo" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,0,0"
                                    Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
                         <!-- model picker → ChatGPT-style borderless text button
                              (dot shows provider liveness) -->
@@ -665,8 +721,33 @@
                 </Grid>
             </Border>
 
+            <!-- ============ v3.0 — the hub nav rail: AI chat / App Deck / settings.
+                 A quiet 54 px strip under the caption; the active tab reads by its
+                 accent glyph + soft fill, never a loud highlight bar. ============ -->
+            <Border Grid.Row="1" Grid.RowSpan="4" Grid.Column="0" x:Name="NavRail"
+                    Background="{DynamicResource CaptionBrush}"
+                    BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="0,0,1,0">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,10">
+                        <Button x:Name="RailSettingsButton" Style="{StaticResource RailButton}"
+                                Content="&#xE713;" Click="OnRailSettingsClick"
+                                ToolTip="Open Lumo settings"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,8">
+                        <RadioButton x:Name="RailAi" Style="{StaticResource RailRadio}"
+                                     Content="&#xE99A;" GroupName="RailTab" IsChecked="True"
+                                     Checked="OnRailTabChanged" Unchecked="OnRailTabChanged"
+                                     ToolTip="AI chat"/>
+                        <RadioButton x:Name="RailDeck" Style="{StaticResource RailRadio}"
+                                     Content="&#xE8A9;" GroupName="RailTab"
+                                     Checked="OnRailTabChanged" Unchecked="OnRailTabChanged"
+                                     ToolTip="App Deck — numpad 1–9 quick launch"/>
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
             <!-- ============ AI-off banner (actionable card) ============ -->
-            <Border x:Name="AiOffBanner" Grid.Row="1" Visibility="Collapsed" Margin="14,10,14,0"
+            <Border x:Name="AiOffBanner" Grid.Row="1" Grid.Column="1" Visibility="Collapsed" Margin="14,10,14,0"
                     Background="{DynamicResource WarnBrush}" CornerRadius="8"
                     BorderBrush="#3CCA5010" BorderThickness="1" Padding="12,8">
                 <Grid>
@@ -687,7 +768,7 @@
             </Border>
 
             <!-- ============ conversation column ============ -->
-            <Grid Grid.Row="2">
+            <Grid Grid.Row="2" Grid.Column="1">
                 <ScrollViewer x:Name="ChatScroll" behaviors:SmoothScroll.Enabled="True" VerticalScrollBarVisibility="Auto"
                               Padding="28,20,28,8" ScrollChanged="OnScrollChanged">
                     <Grid MaxWidth="760" HorizontalAlignment="Center">
@@ -721,7 +802,7 @@
             <!-- ============ prompt input (prompt-kit PromptInput, focus ring in code).
                  v2.6.0-alpha.5 — the border now hosts the attachment strip above the
                  prompt row (prompt-kit ImageAttachment: thumbnail + remove cap). ============ -->
-            <Border Grid.Row="3" x:Name="PromptShell" Margin="20,8,20,2" CornerRadius="24"
+            <Border Grid.Row="3" Grid.Column="1" x:Name="PromptShell" Margin="20,8,20,2" CornerRadius="24"
                     Background="{DynamicResource FieldBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
                 <Grid>
@@ -781,7 +862,7 @@
                  exactly one of the two shows). It also hosts the one-time Whisper model
                  setup card — shown BEFORE recording starts when the engine is whisper and
                  the model isn't installed yet. ============ -->
-            <Border x:Name="VoiceOverlay" Grid.Row="3" Margin="20,8,20,2" CornerRadius="24"
+            <Border x:Name="VoiceOverlay" Grid.Row="3" Grid.Column="1" Margin="20,8,20,2" CornerRadius="24"
                     Background="{DynamicResource FieldBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1" Visibility="Collapsed">
                 <Grid Margin="14,9">
@@ -868,7 +949,7 @@
 
             <!-- ============ hints — v2.6.0-alpha.8: the ChatGPT disclaimer line leads,
                  the keyboard captions follow quieter ============ -->
-            <StackPanel Grid.Row="4" HorizontalAlignment="Center" Margin="0,7,0,10">
+            <StackPanel Grid.Row="4" Grid.Column="1" HorizontalAlignment="Center" Margin="0,7,0,10">
                 <TextBlock HorizontalAlignment="Center" FontSize="10.5" Opacity="0.62"
                            Foreground="{DynamicResource SubtitleBrush}"
                            Text="Lumo AI can make mistakes — double-check important answers."/>
@@ -877,10 +958,17 @@
                            Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+M voice&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;F11 fullscreen&#160;&#160;&#183;&#160;&#160;esc stop / hide"/>
             </StackPanel>
 
+                        <!-- ============ v3.0 — the App Deck tab: an opaque overlay over the
+                 chat content (the chat keeps its state underneath; nothing is
+                 rebuilt when you switch back). Content is the AppDeckView
+                 UserControl, created in the constructor. ============ -->
+            <Border x:Name="DeckHost" Grid.Row="1" Grid.RowSpan="4" Grid.Column="1"
+                    Background="{DynamicResource PanelBrush}" Visibility="Collapsed"/>
+
             <!-- ============ v2.4.0-alpha.5 — chat history slide-over (Raycast pattern):
                  a scrim + left panel that overlays the whole card, so the window keeps
                  its compact footprint and history never steals permanent space. -->
-            <Grid x:Name="SidebarOverlay" Grid.Row="0" Grid.RowSpan="5" Visibility="Collapsed">
+            <Grid x:Name="SidebarOverlay" Grid.Row="0" Grid.RowSpan="5" Grid.ColumnSpan="2" Visibility="Collapsed">
                 <Border x:Name="SidebarScrim" Background="#66000000" MouseLeftButtonDown="OnSidebarScrimClick"/>
                 <Border x:Name="SidebarPanel" Width="252" HorizontalAlignment="Left"
                         Background="{DynamicResource CardBrush}"

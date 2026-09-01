@@ -51,6 +51,12 @@ public sealed class Settings
     public string ThemePreset { get; set; } = "";
     public string CustomThemeFile { get; set; } = "";
 
+    // ---- v3.0 — App Deck -----------------------------------------------------
+    // When true, numpad 1–9 are registered as GLOBAL hotkeys (no modifier) so the
+    // deck launches from anywhere — including inside games. Off by default: bare
+    // numpad keys belong to games first, and this is an opt-in trade.
+    public bool DeckGlobalHotkeys { get; set; } = false;
+
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -132,6 +138,7 @@ public sealed class Settings
         s.Acrylic           = GetBool(root, nameof(Acrylic), s.Acrylic);
         s.ThemePreset       = GetStr(root, nameof(ThemePreset), s.ThemePreset);             // v3.0
         s.CustomThemeFile   = GetStr(root, nameof(CustomThemeFile), s.CustomThemeFile);     // v3.0
+        s.DeckGlobalHotkeys = GetBool(root, nameof(DeckGlobalHotkeys), s.DeckGlobalHotkeys); // v3.0
         s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
         s.DisabledPlugins  = GetStrList(root, nameof(DisabledPlugins), s.DisabledPlugins);   // v2.5 — Task 4.2
         s.AiEnabled         = GetBool(root, nameof(AiEnabled), s.AiEnabled);
@@ -275,6 +282,7 @@ public sealed class Settings
         Acrylic = o.Acrylic;
         ThemePreset = o.ThemePreset;           // v3.0
         CustomThemeFile = o.CustomThemeFile;   // v3.0
+        DeckGlobalHotkeys = o.DeckGlobalHotkeys; // v3.0
         CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
         DisabledPlugins = new List<string>(o.DisabledPlugins);   // v2.5 — Task 4.2
         AiEnabled = o.AiEnabled;

@@ -78,6 +78,9 @@ public partial class LauncherWindow : Window
     /// <summary>v1.4 — user asked to create/edit a shortcut (row in /sc mode).</summary>
     public event Action<string?>? ShortcutEditorRequested;
 
+    /// <summary>v3.0 — a global App Deck numpad hotkey fired (0..8 = numpad 1..9).</summary>
+    public event Action<int>? DeckSlotHotkey;
+
     /// <summary>v1.4 — user asked to manage shortcuts (opens settings → Shortcuts).</summary>
     public event Action? ManageShortcutsRequested;
 
@@ -178,6 +181,9 @@ public partial class LauncherWindow : Window
             // v2.5 (DEV_PLAN Task 4.3) — register every shortcut's global hotkey too
             ReapplyShortcutHotkeys();
 
+            // v3.0 — App Deck global numpad hotkeys (opt-in via Settings)
+            ReapplyDeckHotkeys();
+
             // v2.0 → v2.4.0-alpha.2 — the HWND now exists; ApplyTheme applies DWM
             // chrome (round corners, dark mode) and the material (acrylic or solid)
             // in one place.
@@ -217,6 +223,14 @@ public partial class LauncherWindow : Window
             {
                 handled = true;
                 try { ToggleLauncher(); } catch (Exception ex) { DiagnosticLogger.LogException("Window.Hotkey", ex); }
+            }
+            else if (id >= HotkeyService.DeckHotkeyBase && id < HotkeyService.DeckHotkeyBase + 9)
+            {
+                // v3.0 — App Deck global numpad hotkey: launch the slot whether or not
+                // any Lumo window is visible (that's the one-keystroke point).
+                handled = true;
+                try { DeckSlotHotkey?.Invoke(id - HotkeyService.DeckHotkeyBase); }
+                catch (Exception ex) { DiagnosticLogger.LogException("Window.DeckHotkey", ex); }
             }
             else if (_shortcutHotkeyMap.TryGetValue(id, out var shortcutId))
             {
@@ -1623,6 +1637,35 @@ public partial class LauncherWindow : Window
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("Window.RebuildIndex", ex);
+        }
+    }
+
+    // ---------------------------------------------------------------- v3.0 — App Deck global hotkeys
+
+    /// <summary>
+    /// Registers/unregisters the deck's global numpad 1–9 hotkeys from
+    /// Settings.DeckGlobalHotkeys. Called on startup and whenever the toggle or a
+    /// slot assignment changes. Failures are logged and quiet — when a game owns the
+    /// numpad, the deck simply stays focus-only for that key.
+    /// </summary>
+    public void ReapplyDeckHotkeys()
+    {
+        try
+        {
+            if (_hotkey is null) return;
+            for (int i = 0; i < 9; i++)
+                _hotkey.UnregisterId(HotkeyService.DeckHotkeyBase + i);
+
+            if (!_settings.DeckGlobalHotkeys) return;
+            int registered = 0;
+            for (int i = 0; i < 9; i++)
+                if (_hotkey.TryRegisterDeckId(HotkeyService.DeckHotkeyBase + i, i)) registered++;
+            if (registered < 9)
+                DiagnosticLogger.Log("Hotkey", $"deck global hotkeys: {registered}/9 registered (some keys are owned elsewhere)");
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Window.ReapplyDeckHotkeys", ex);
         }
     }
 
