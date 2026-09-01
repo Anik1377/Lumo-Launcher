@@ -185,9 +185,17 @@ public sealed class DeckStore
             }
         }
 
+        // Sweep orphan tmps — but only STALE ones (older than 10 s). A tmp from a
+        // concurrent in-flight save is live; deleting it mid-write causes exactly the
+        // "Could not find file …tmp" the sweep exists to prevent.
         foreach (var stale in Directory.GetFiles(Path.GetDirectoryName(file) ?? ".", Path.GetFileName(file) + ".*.tmp"))
         {
-            try { File.Delete(stale); } catch { /* best-effort sweep */ }
+            try
+            {
+                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(stale) > TimeSpan.FromSeconds(10))
+                    File.Delete(stale);
+            }
+            catch { /* best-effort sweep */ }
         }
     }
 }
