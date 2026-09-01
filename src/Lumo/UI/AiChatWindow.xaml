@@ -3,8 +3,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="clr-namespace:Lumo.UI"
         Title="Lumo AI"
-        Width="780" Height="620"
-        MinWidth="560" MinHeight="440"
+        Width="860" Height="640"
+        MinWidth="640" MinHeight="460"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -148,12 +148,14 @@
             </Style.Triggers>
         </Style>
 
-        <!-- prompt-kit PromptInputSubmit — a gradient accent cap with a soft shadow and
-             a gentle hover-scale (the micro-motion that separates premium from flat).
-             Glyph via Tag (send ↑ / stop ■). SendBrush is assigned from the theme. -->
+        <!-- v2.6.0-alpha.8 — the ChatGPT send cap: a SOLID face circle with an
+             inverted glyph (white on near-black in light mode, black on white in
+             dark mode), no glow — the one element that reads "primary" is enough.
+             Gentle hover-scale kept (the micro-motion that separates premium from
+             flat). Glyph via Tag (send ↑ / stop ■); faces come from the theme. -->
         <Style x:Key="SendButton" TargetType="Button">
-            <Setter Property="Width" Value="34"/>
-            <Setter Property="Height" Value="34"/>
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Tag" Value="&#xE72A;"/>
@@ -164,15 +166,10 @@
                             <Grid.RenderTransform>
                                 <ScaleTransform x:Name="Sc" ScaleX="1" ScaleY="1"/>
                             </Grid.RenderTransform>
-                            <Ellipse x:Name="Cap" Fill="{DynamicResource SendBrush}">
-                                <Ellipse.Effect>
-                                    <DropShadowEffect BlurRadius="12" ShadowDepth="2" Direction="270"
-                                                      Opacity="0.30" Color="#FF101418"/>
-                                </Ellipse.Effect>
-                            </Ellipse>
+                            <Ellipse x:Name="Cap" Fill="{DynamicResource SendButtonFaceBrush}"/>
                             <TextBlock x:Name="Glyph" Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"
-                                       FontFamily="Segoe MDL2 Assets" FontSize="13"
-                                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                       FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                       Foreground="{DynamicResource SendButtonGlyphBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -228,8 +225,8 @@
                                 </Trigger.ExitActions>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="Cap" Property="Opacity" Value="0.38"/>
-                                <Setter TargetName="Glyph" Property="Opacity" Value="0.55"/>
+                                <Setter TargetName="Cap" Property="Opacity" Value="0.30"/>
+                                <Setter TargetName="Glyph" Property="Opacity" Value="0.45"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -241,8 +238,8 @@
              left of the send button and lights up with the accent while the mic is
              live (Tag == "listening", set from code; Content carries the glyph). -->
         <Style x:Key="MicButton" TargetType="Button">
-            <Setter Property="Width" Value="30"/>
-            <Setter Property="Height" Value="30"/>
+            <Setter Property="Width" Value="32"/>
+            <Setter Property="Height" Value="32"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Template">
@@ -252,7 +249,7 @@
                             <Ellipse x:Name="Cap" Fill="Transparent"
                                      Stroke="{DynamicResource BorderLineBrush}" StrokeThickness="1"/>
                             <TextBlock x:Name="Glyph" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
-                                       FontFamily="Segoe MDL2 Assets" FontSize="12.5"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="13"
                                        Foreground="{DynamicResource SubtitleBrush}"
                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
@@ -515,6 +512,32 @@
             </Setter>
         </Style>
 
+        <!-- v2.6.0-alpha.8 — ChatGPT-style top picker: a BORDERLESS text button in
+             the caption band (the model / persona name IS the control, the chevron
+             rides along; hover just breathes a soft fill). Replaces the bordered
+             ghost chip — the header reads like chatgpt.com's top bar now. -->
+        <Style x:Key="TopPickerButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="Transparent" CornerRadius="8" Padding="9,5">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource ChipBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- v2.4.0-alpha.4 — model picker dropdown: the launcher's rounded flyout
              (opaque FieldBrush card — a chromeless popup must paint its own backdrop),
              hairline stroke, soft shadow, hover rows. -->
@@ -592,15 +615,16 @@
                         </Grid>
                         <TextBlock Text="Lumo AI" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,0,0"
                                    Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
-                        <!-- model chip → picker button (dot shows provider liveness) -->
-                        <Button x:Name="ModelChip" Style="{StaticResource GhostChip}" Margin="12,0,0,0"
+                        <!-- model picker → ChatGPT-style borderless text button
+                             (dot shows provider liveness) -->
+                        <Button x:Name="ModelChip" Style="{StaticResource TopPickerButton}" Margin="8,0,0,0"
                                 VerticalAlignment="Center" Click="OnModelChipClick"
                                 ToolTip="Switch model">
                             <StackPanel Orientation="Horizontal">
                                 <Ellipse x:Name="ModelDot" Width="7" Height="7" VerticalAlignment="Center"
                                          Margin="0,0,7,0" Fill="#FF10B981"/>
-                                <TextBlock x:Name="ModelChipText" FontSize="11"
-                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="ModelChipText" FontSize="12.5" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text=" &#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="8"
                                            Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"
                                            Margin="6,1,0,0"/>
@@ -608,14 +632,14 @@
                         </Button>
                         <!-- v2.4.0-alpha.5 — persona chip: the system prompt that shapes
                              every reply in this chat; click = persona flyout -->
-                        <Button x:Name="PersonaChip" Style="{StaticResource GhostChip}" Margin="8,0,0,0"
+                        <Button x:Name="PersonaChip" Style="{StaticResource TopPickerButton}" Margin="4,0,0,0"
                                 VerticalAlignment="Center" Click="OnPersonaChipClick"
                                 ToolTip="Persona — the system prompt shaping every reply">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock x:Name="PersonaGlyph" FontFamily="Segoe MDL2 Assets" FontSize="11"
                                            Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
-                                <TextBlock x:Name="PersonaChipText" FontSize="11" Margin="6,0,0,0"
-                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="PersonaChipText" FontSize="12.5" FontWeight="SemiBold" Margin="6,0,0,0"
+                                           Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text=" &#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="8"
                                            Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"
                                            Margin="5,1,0,0"/>
@@ -664,8 +688,8 @@
             <!-- ============ conversation column ============ -->
             <Grid Grid.Row="2">
                 <ScrollViewer x:Name="ChatScroll" VerticalScrollBarVisibility="Auto"
-                              Padding="24,16,24,6" ScrollChanged="OnScrollChanged">
-                    <Grid MaxWidth="720" HorizontalAlignment="Center">
+                              Padding="28,20,28,8" ScrollChanged="OnScrollChanged">
+                    <Grid MaxWidth="760" HorizontalAlignment="Center">
                         <StackPanel x:Name="MessagesHost"/>
                     </Grid>
                 </ScrollViewer>
@@ -685,7 +709,7 @@
                               Fill="White" Stretch="Uniform" Width="24" Height="24"
                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
-                    <TextBlock Text="Ask anything" FontSize="22" FontWeight="SemiBold" Margin="0,18,0,0"
+                    <TextBlock Text="What can I help with?" FontSize="25" FontWeight="SemiBold" Margin="0,16,0,0"
                                Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center"/>
                     <TextBlock x:Name="EmptySub" FontSize="12.5" Margin="0,7,0,0" TextWrapping="Wrap"
                                Foreground="{DynamicResource SubtitleBrush}" HorizontalAlignment="Center"/>
@@ -696,7 +720,7 @@
             <!-- ============ prompt input (prompt-kit PromptInput, focus ring in code).
                  v2.6.0-alpha.5 — the border now hosts the attachment strip above the
                  prompt row (prompt-kit ImageAttachment: thumbnail + remove cap). ============ -->
-            <Border Grid.Row="3" x:Name="PromptShell" Margin="20,10,20,4" CornerRadius="18"
+            <Border Grid.Row="3" x:Name="PromptShell" Margin="20,8,20,2" CornerRadius="24"
                     Background="{DynamicResource FieldBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
                 <Grid>
@@ -704,8 +728,8 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <WrapPanel x:Name="AttachHost" Grid.Row="0" Margin="13,10,13,0" Visibility="Collapsed"/>
-                    <Grid Grid.Row="1" Margin="13,8">
+                    <WrapPanel x:Name="AttachHost" Grid.Row="0" Margin="15,10,15,0" Visibility="Collapsed"/>
+                    <Grid Grid.Row="1" Margin="15,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -736,15 +760,15 @@
                     <!-- v2.6.0-alpha.3 — voice typing: mic between the prompt and send; hidden
                          entirely when disabled in Settings or the PC has no speech recognizer. -->
                     <Button x:Name="AttachButton" Grid.Column="1" Style="{StaticResource MicButton}"
-                            Content="&#xE723;" VerticalAlignment="Bottom" Margin="8,0,0,3" Click="OnAttachClick"
+                            Content="&#xE723;" VerticalAlignment="Bottom" Margin="8,0,0,4" Click="OnAttachClick"
                             ToolTip="Attach an image (vision models) — or paste one" Visibility="Collapsed"/>
                     <Button x:Name="MicButton" Grid.Column="2" Style="{StaticResource MicButton}"
-                            Content="&#xE720;" VerticalAlignment="Bottom" Margin="8,0,0,3" Click="OnMicClick"
+                            Content="&#xE720;" VerticalAlignment="Bottom" Margin="8,0,0,4" Click="OnMicClick"
                             ToolTip="Voice input (Ctrl+M)" Visibility="Collapsed"/>
                     <Button x:Name="SendButton" Grid.Column="3" Style="{StaticResource SendButton}"
-                            VerticalAlignment="Bottom" Margin="10,0,0,2" Click="OnSendClick"/>
+                            VerticalAlignment="Bottom" Margin="10,0,0,3" Click="OnSendClick"/>
                     <Button x:Name="StopButton" Grid.Column="3" Style="{StaticResource SendButton}" Tag="&#xE71A;"
-                            VerticalAlignment="Bottom" Margin="10,0,0,2" Visibility="Collapsed" Click="OnStopClick"
+                            VerticalAlignment="Bottom" Margin="10,0,0,3" Visibility="Collapsed" Click="OnStopClick"
                             ToolTip="Stop generating"/>
                     </Grid>
                 </Grid>
@@ -756,7 +780,7 @@
                  exactly one of the two shows). It also hosts the one-time Whisper model
                  setup card — shown BEFORE recording starts when the engine is whisper and
                  the model isn't installed yet. ============ -->
-            <Border x:Name="VoiceOverlay" Grid.Row="3" Margin="20,10,20,4" CornerRadius="18"
+            <Border x:Name="VoiceOverlay" Grid.Row="3" Margin="20,8,20,2" CornerRadius="24"
                     Background="{DynamicResource FieldBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1" Visibility="Collapsed">
                 <Grid Margin="14,9">
@@ -841,11 +865,16 @@
                 </Grid>
             </Border>
 
-            <!-- ============ hints — v2.4.0-alpha.4: one quiet caption line replaces
-                 the boxed chip row (minimal) ============ -->
-            <TextBlock Grid.Row="4" HorizontalAlignment="Center" Margin="0,8,0,11"
-                       FontSize="10.5" Foreground="{DynamicResource SubtitleBrush}" Opacity="0.7"
-                       Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+M voice&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;F11 fullscreen&#160;&#160;&#183;&#160;&#160;esc stop / hide"/>
+            <!-- ============ hints — v2.6.0-alpha.8: the ChatGPT disclaimer line leads,
+                 the keyboard captions follow quieter ============ -->
+            <StackPanel Grid.Row="4" HorizontalAlignment="Center" Margin="0,7,0,10">
+                <TextBlock HorizontalAlignment="Center" FontSize="10.5" Opacity="0.62"
+                           Foreground="{DynamicResource SubtitleBrush}"
+                           Text="Lumo AI can make mistakes — double-check important answers."/>
+                <TextBlock HorizontalAlignment="Center" Margin="0,3,0,0" FontSize="10" Opacity="0.5"
+                           Foreground="{DynamicResource SubtitleBrush}"
+                           Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+M voice&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;F11 fullscreen&#160;&#160;&#183;&#160;&#160;esc stop / hide"/>
+            </StackPanel>
 
             <!-- ============ v2.4.0-alpha.5 — chat history slide-over (Raycast pattern):
                  a scrim + left panel that overlays the whole card, so the window keeps

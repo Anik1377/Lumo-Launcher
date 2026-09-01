@@ -233,13 +233,21 @@ public partial class AiChatWindow : Window
                 ? Color.FromRgb(0x0B, 0x0B, 0x0D) : Color.FromRgb(0xF1, 0xF1, 0xF4));
             Resources["ChipBrush"] = new SolidColorBrush(dark
                 ? Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
-            // v2.4.0-alpha.4 — MAXIMUM-CONTRAST user pill: near-white fill with
-            // near-black ink in dark mode, inverted in light mode. No accent tint,
-            // no border — the one loud element in an otherwise quiet window.
+            // v2.6.0-alpha.8 — ChatGPT-clone user pill: a QUIET elevated gray with
+            // near-white ink in dark mode (the old inverted near-white pill shouted;
+            // chatgpt.com's own bubble is the soft #2F2F2F), soft light-gray in
+            // light mode. The words carry the contrast, not the fill.
             Resources["UserBubbleBrush"] = new SolidColorBrush(dark
-                ? Color.FromRgb(0xF2, 0xF2, 0xF4) : Color.FromRgb(0x1B, 0x1B, 0x1E));
+                ? Color.FromRgb(0x2F, 0x2F, 0x33) : Color.FromRgb(0xE9, 0xE9, 0xEC));
             Resources["UserBubbleTextBrush"] = new SolidColorBrush(dark
-                ? Color.FromRgb(0x14, 0x14, 0x17) : Color.FromRgb(0xFA, 0xFA, 0xFB));
+                ? Color.FromRgb(0xF3, 0xF3, 0xF4) : Color.FromRgb(0x16, 0x16, 0x1A));
+            // v2.6.0-alpha.8 — the ChatGPT send cap: solid face with an INVERTED
+            // glyph (black on white in dark, white on near-black in light) — no
+            // glow, no gradient; the primary affordance reads by shape alone.
+            Resources["SendButtonFaceBrush"] = new SolidColorBrush(dark
+                ? System.Windows.Media.Colors.White : Color.FromRgb(0x0D, 0x0D, 0x0D));
+            Resources["SendButtonGlyphBrush"] = new SolidColorBrush(dark
+                ? Color.FromRgb(0x0D, 0x0D, 0x0D) : System.Windows.Media.Colors.White);
             Resources["AvatarBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2A));
             Resources["CodeBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x12, 0x12, 0x15) : Color.FromRgb(0xF6, 0xF6, 0xF8));
             Resources["WarnBrush"] = new SolidColorBrush(Color.FromArgb(0x2A, 0xCA, 0x50, 0x10));
@@ -1996,22 +2004,22 @@ public partial class AiChatWindow : Window
         try
         {
             _pendingUserPrompt = text;   // the next assistant completion pairs with this
-            var grid = new Grid { Margin = new Thickness(0, 4, 0, 12) };
+            var grid = new Grid { Margin = new Thickness(0, 4, 0, 10) };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            // v2.4.0-alpha.4 — MAXIMUM CONTRAST, no chrome: a flat inverted pill
-            // (near-white on dark / near-black on light) with no border and no tint.
-            // The user's words should be the loudest thing in the window.
+            // v2.6.0-alpha.8 — the ChatGPT bubble: a quiet elevated pill with a
+            // UNIFORM radius (no sharp tail) and generous padding; the gray fill
+            // separates the turn without shouting.
             var bubble = new Border
             {
                 Background = (Brush)Resources["UserBubbleBrush"],
                 BorderThickness = new Thickness(0),
-                CornerRadius = new CornerRadius(16, 16, 4, 16),   // prompt-kit: sharp tail corner toward the sender
-                Padding = new Thickness(13, 9, 13, 9),
-                MaxWidth = 560,
+                CornerRadius = new CornerRadius(20),
+                Padding = new Thickness(14, 9, 14, 10),
+                MaxWidth = 580,
                 HorizontalAlignment = HorizontalAlignment.Right,
             };
 
@@ -2030,8 +2038,8 @@ public partial class AiChatWindow : Window
                 {
                     Text = text,
                     TextWrapping = TextWrapping.Wrap,
-                    FontSize = 13.5,
-                    LineHeight = 19.5,
+                    FontSize = 14,
+                    LineHeight = 20,
                     Foreground = (Brush)Resources["UserBubbleTextBrush"],
                 });
             }
@@ -2091,7 +2099,9 @@ public partial class AiChatWindow : Window
     /// <summary>Assistant placeholder: gradient sparkle avatar + plain live text + (caller adds) typing dots.</summary>
     private (StackPanel Host, TextBlock Live) AppendAssistantBubble()
     {
-        var grid = new Grid { Margin = new Thickness(0, 4, 0, 14) };
+        // v2.6.0-alpha.8 — ChatGPT rhythm: a 26 px avatar and a GENEROUS bottom
+        // gap (22 px) so each turn reads as its own block on the page.
+        var grid = new Grid { Margin = new Thickness(0, 6, 0, 22) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
@@ -2099,10 +2109,10 @@ public partial class AiChatWindow : Window
         // mark (replaces the literal "?" glyph — the single cheapest look in the old build).
         var avatar = new Grid
         {
-            Width = 28,
-            Height = 28,
+            Width = 26,
+            Height = 26,
             VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(0, 1, 10, 0),
+            Margin = new Thickness(0, 1, 12, 0),
         };
         var disc = new System.Windows.Shapes.Ellipse
         {
@@ -2127,8 +2137,8 @@ public partial class AiChatWindow : Window
         var live = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            FontSize = 13.5,
-            LineHeight = 20,
+            FontSize = 14,
+            LineHeight = 21.5,
             Foreground = (Brush)Resources["TitleBrush"],
         };
         host.Children.Add(live);
@@ -2591,14 +2601,14 @@ public partial class AiChatWindow : Window
                         {
                             Text = "•  ",
                             Foreground = (Brush)Resources["AccentBrush"],
-                            FontSize = 13.5,
+                            FontSize = 14,
                             VerticalAlignment = VerticalAlignment.Top,
                         };
                         var content = new TextBlock
                         {
                             TextWrapping = TextWrapping.Wrap,
-                            FontSize = 13.5,
-                            LineHeight = 20,
+                            FontSize = 14,
+                            LineHeight = 21.5,
                             Foreground = (Brush)Resources["TitleBrush"],
                         };
                         AddInlineRuns(content, b.Text);
@@ -2617,10 +2627,10 @@ public partial class AiChatWindow : Window
                         var para = new TextBlock
                         {
                             TextWrapping = TextWrapping.Wrap,
-                            FontSize = 13.5,
-                            LineHeight = 20,
+                            FontSize = 14,
+                            LineHeight = 21.5,
                             Foreground = (Brush)Resources["TitleBrush"],
-                            Margin = new Thickness(0, 0, 0, 8),
+                            Margin = new Thickness(0, 0, 0, 10),
                         };
                         AddInlineRuns(para, p2.Text);
                         host.Children.Add(para);
@@ -2642,10 +2652,10 @@ public partial class AiChatWindow : Window
             Background = (Brush)Resources["CodeBrush"],
             BorderBrush = (Brush)Resources["BorderLineBrush"],
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(12),
             Padding = new Thickness(12, 8, 12, 10),
             Margin = new Thickness(0, 4, 0, 10),
-            MaxWidth = 640,
+            MaxWidth = 680,
             HorizontalAlignment = HorizontalAlignment.Left,
         };
 

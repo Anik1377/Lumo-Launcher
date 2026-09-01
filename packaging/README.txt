@@ -1,7 +1,28 @@
 ======================================================
-  LUMO v2.6.0-alpha.7  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.8  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.8 (the ChatGPT / Claude look)
+---------------------------------------------------------------
+1. THE AI CHAT NOW LOOKS LIKE CHATGPT. User messages sit in
+   the quiet gray pill with a uniform round shape (the old
+   inverted-white shout is gone), assistant answers are full-
+   width plain text with bigger type and generous spacing
+   between turns - the layout grammar of chatgpt.com and
+   claude.ai, still natively in WPF (no WebView).
+2. THE SIGNATURE SEND BUTTON. A solid circle with an inverted
+   arrow - black on white in dark mode, white on black in
+   light - like ChatGPT's. It dims when there is nothing to
+   send and becomes the stop button while a reply streams.
+3. BORDERLESS TOP PICKERS. The model and persona names in the
+   title bar are plain text buttons now (hover breathes a soft
+   fill) instead of boxed chips - the chatgpt.com top bar.
+4. POLISH. Bigger rounded prompt pill, wider conversation
+   column in a larger window, "What can I help with?" greeting,
+   rounder code blocks, and ChatGPT's disclaimer line ("Lumo AI
+   can make mistakes - double-check important answers.") under
+   the composer.
 
 WHAT'S NEW IN v2.6.0-alpha.7 (whisper actually starts)
 ---------------------------------------------------------------

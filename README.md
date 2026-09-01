@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.6.0--alpha.7-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.6.0--alpha.8-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -213,6 +213,31 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v2.6.0-alpha.8 — the AI chat, cloned to the ChatGPT / Claude design language
+
+With voice and text both working, the chat page itself now looks the part —
+rebuilt to the layout grammar of chatgpt.com and claude.ai, natively in WPF:
+
+1. **💬 ChatGPT's message rhythm.** User messages sit in the quiet elevated
+   gray pill (uniform 20 px radius, no more inverted-white shout) — chatgpt.com's
+   own `#2F2F2F` bubble. Assistant answers stay full-width plain text beside the
+   orb avatar, with a bigger 14 px body, taller 21.5 px line height and a
+   generous 22 px gap between turns — each answer reads as its own block on the
+   page, exactly like the real thing.
+2. **⬆️ The signature send cap.** The gradient accent button is gone: the
+   composer's send is now ChatGPT's solid circle with the inverted arrow — black
+   on white in dark mode, white on near-black in light — dimming while disabled
+   and doubling as the stop button mid-generation. No glow, no gradient.
+3. **🎛️ Borderless top pickers.** The model and persona chips dropped their
+   borders for chatgpt.com's top-bar treatment: the name IS the control, a small
+   chevron rides along, and hover breathes a soft fill instead of drawing a box.
+4. **📝 Composer & page polish.** The prompt shell grew to a rounded-24 pill
+   (matching the voice overlay), the conversation column widened to 760 px in a
+   larger 860×640 window, the empty state greets with **"What can I help
+   with?"**, code blocks round to 12 px, and the footer now carries ChatGPT's
+   disclaimer line — *"Lumo AI can make mistakes — double-check important
+   answers."* — above the quieter keyboard captions.
 
 ## 🆕 What's new in v2.6.0-alpha.7 — whisper actually starts: the "Native Library not found" fix
 
