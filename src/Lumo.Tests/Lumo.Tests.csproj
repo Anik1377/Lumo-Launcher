@@ -64,6 +64,9 @@
     <!-- v2.6.0-alpha.5 — Whisper model catalog + language mapping, reasoning splitter -->
     <Compile Include="../Lumo/Core/VoiceWhisper.cs" Link="Core/VoiceWhisper.cs" />
     <Compile Include="../Lumo/Core/ThinkSplit.cs" Link="Core/ThinkSplit.cs" />
+    <!-- v3.0 — theme files (import/export format), theme resolution (presets > legacy) -->
+    <Compile Include="../Lumo/Core/ThemeFile.cs" Link="Core/ThemeFile.cs" />
+    <Compile Include="../Lumo/Core/ThemeSelect.cs" Link="Core/ThemeSelect.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
     <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
     <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />

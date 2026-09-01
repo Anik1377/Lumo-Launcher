@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.6.0--alpha.8-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-3.0.0--alpha.1-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -213,6 +213,45 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v3.0.0-alpha.1 — the v3 foundation: a real design system, themes you can share, and an actual installer
+
+v3 phase 1 of 3 — the ground everything else builds on:
+
+1. **🎨 The WPF-UI Fluent library is in.** Lumo now builds on
+   [WPF-UI](https://wpfui.lepo.co) (lepoco/wpfui, MIT) — the leading Fluent
+   design library for WPF. Its modern implicit styles carry base controls
+   (buttons, toggles, scrollbars, tooltips) app-wide, while Lumo's own
+   `ThemeService` stays the palette authority and keeps the Fluent layer
+   synced to the active mode + accent. One component library, one design
+   language.
+2. **🖌️ One theme engine, five windows.** Every window used to hand-build
+   its own ~30 brushes (four near-identical `ApplyTheme` copies that had
+   already drifted apart). They all paint from the new shared
+   **ThemeService** now — which made the next item possible at all.
+3. **🎭 A theme system with import/export.** Seven built-in themes in the
+   gallery (Settings → Appearance): Lumo Dark/Light, **Claude Dusk**,
+   **Parchment**, **Nord**, **Matcha** and **Graphite** — each card is a live
+   miniature of the palette and applies instantly. **Import…** loads any
+   `lumo.theme/1` JSON file, **Export…** writes the current look to share.
+   Old settings keep working: with no theme picked, the classic dark/light/
+   auto + accent pair rules.
+4. **✨ The glow system, fixed to minimalism.** The orbiting rim comet (two
+   light blobs, 720-point perimeter sampling, a rendering clock, style
+   presets, speed/brightness/thickness sliders) is **gone**. What remains is
+   the **edge shine**: a 1 px light catch along the launcher's top edge that
+   settles into the hairline — a static brush, zero idle CPU, nothing moves.
+   The AI orb halo breathes a whisper instead of a lighthouse pulse.
+5. **🎈 Smooth scrolling everywhere it matters.** A new `SmoothScroll`
+   behavior glides the Settings panels, the AI chat log and long lists with
+   exponential easing on the composition clock instead of WPF's hard
+   48 px wheel jumps — honors the animations master switch and reduced-motion.
+6. **📦 Lumo is actually installable now.** Tag releases ship a real
+   **`LumoSetup-<version>.exe`** (Inno Setup) next to the portable zip:
+   per-user install to `%LOCALAPPDATA%\Programs\Lumo`, no admin prompt,
+   start-menu + optional desktop shortcut, optional start-with-Windows,
+   a real uninstaller — and the full portable layout (Lumo.exe +
+   `runtimes\win-x64\`) lands intact either way.
 
 ## 🆕 What's new in v2.6.0-alpha.8 — the AI chat, cloned to the ChatGPT / Claude design language
 

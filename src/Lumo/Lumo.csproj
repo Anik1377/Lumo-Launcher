@@ -10,8 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>2.6.0-alpha.8</Version>
-    <InformationalVersion>Lumo 2.6.0-alpha.8 (ALPHA — unstable build)</InformationalVersion>
+    <Version>3.0.0-alpha.1</Version>
+    <InformationalVersion>Lumo 3.0.0-alpha.1 (ALPHA — unstable build)</InformationalVersion>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -65,6 +65,12 @@
     <PackageReference Include="System.Speech" Version="8.0.0" />
     <PackageReference Include="Whisper.net" Version="1.9.1" />
     <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
+    <!-- v3.0 — the Fluent design library (lepoco/wpfui, MIT): modern implicit styles
+         for the base controls app-wide (buttons, toggles, scrollbars, tooltips), the
+         Segoe Fluent icon set, and navigation primitives for the new hub surfaces.
+         Lumo's own ThemeService stays the palette authority — the Fluent theme
+         dictionaries are kept in sync with the active mode + accent (ThemeService). -->
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
   </ItemGroup>
 
   <!-- UseWindowsForms injects global System.Drawing / System.Windows.Forms usings which

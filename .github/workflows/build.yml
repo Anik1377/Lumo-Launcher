@@ -47,6 +47,22 @@ jobs:
           Compress-Archive -Path 'stage/Lumo' -DestinationPath "Lumo-launcher-$tag.zip"
           Add-Content $env:GITHUB_ENV "ZIP_NAME=Lumo-launcher-$tag.zip"
 
+      - name: Build installer (Inno Setup)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          # v3.0 — a real installer next to the portable zip. Inno Setup compiles
+          # packaging/installer.iss into a per-user setup exe (no admin, installs to
+          # %LOCALAPPDATA%\Programs\Lumo, start-menu + optional desktop shortcuts,
+          # uninstaller included). Only runs on tag builds — dev branches ship the zip.
+          choco install innosetup -y --no-progress
+          $tag = $env:GITHUB_REF_NAME
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "/DAppVersion=$tag" "packaging/installer.iss"
+          $setup = Get-ChildItem 'installer-output' -Filter 'LumoSetup-*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'installer exe was not produced' }
+          Add-Content $env:GITHUB_ENV "SETUP_NAME=$($setup.Name)"
+
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -54,14 +70,24 @@ jobs:
           path: ${{ env.ZIP_NAME }}
           if-no-files-found: error
 
+      - name: Upload installer artifact
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lumo-windows-x64-installer
+          path: installer-output/${{ env.SETUP_NAME }}
+          if-no-files-found: error
+
       - name: Attach to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP_NAME }}
+          files: |
+            ${{ env.ZIP_NAME }}
+            installer-output/${{ env.SETUP_NAME }}
           generate_release_notes: true
           prerelease: true
           name: "Lumo ${{ github.ref_name }} — ALPHA (unstable)"
           body: |
             > ⚠️ **ALPHA BUILD — UNSTABLE.** Lumo is in alpha: expect bugs and
-            breaking changes. Please report issues on the tracker.
+            > breaking changes. Please report issues on the tracker.

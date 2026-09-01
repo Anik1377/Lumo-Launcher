@@ -58,14 +58,8 @@ public partial class LauncherWindow : Window
     private bool _sourceReady;                       // v1.7 — glass needs the HWND, applied on SourceInitialized
     private bool _allowClose;
     private IntPtr _hwnd;
-    private Brush _themeBorderBrush = Brushes.DimGray;
-    // v2.0.2 — the comet is driven by CompositionTarget.Rendering + a Stopwatch: the
-    // position is a pure function of elapsed time (elapsed % lap), so the loop is
-    // seamless BY CONSTRUCTION and can never stall like timeline clocks can.
-    private readonly Stopwatch _glowWatch = Stopwatch.StartNew();
-    private Point[] _glowSamples = Array.Empty<Point>();   // precomputed perimeter samples
-    private bool _glowClockAttached;
-    private bool _glowDimmed;                // window inactive → comet dimmed
+    private Brush _themeBorderBrush = Brushes.DimGray;   // v3.0 — the edge-shine rim stroke
+    private Color _themeBorderColor;                     // plain-hairline fallback when BorderEffect is off
     private int _animGen;                    // invalidates stale hide-completion callbacks
     private bool _staggerNext = true;        // v1.4 — stagger only on show/empty→results, not every keystroke
     private string _prevQuery = "";
@@ -74,8 +68,6 @@ public partial class LauncherWindow : Window
     private bool _previewOpen;
     private int _previewGen;                 // invalidates stale preview reads
     private readonly DispatcherTimer _previewDebounce;   // 120 ms selection debounce
-
-    private const double GlowDimFactor = 0.4;        // dimmed = 40 % of the active brightness
 
     /// <summary>Human-readable description of the hotkey that actually registered.</summary>
     public string? ActiveHotkeyDescription => _hotkey?.ActiveDescription;
@@ -307,14 +299,12 @@ public partial class LauncherWindow : Window
             if (!MotionOk())
             {
                 RestoreVisualState();
-                ResumeGlow();
                 return;
             }
 
             Root.Opacity = 0;
             RootScale.ScaleX = RootScale.ScaleY = 0.94;
             RootShift.Y = 14;
-            GlowClip.Opacity = 0;
             _staggerNext = true;   // v1.4 — cascade the fresh result list on (re)open
 
             var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
@@ -322,15 +312,11 @@ public partial class LauncherWindow : Window
             var fade = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)) { EasingFunction = ease };
             var scale = new DoubleAnimation(0.94, 1, TimeSpan.FromMilliseconds(230)) { EasingFunction = ease };
             var slide = new DoubleAnimation(14, 0, TimeSpan.FromMilliseconds(230)) { EasingFunction = ease };
-            var glow = new DoubleAnimation(0, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(420)) { EasingFunction = ease };
 
             Root.BeginAnimation(UIElement.OpacityProperty, fade);
             RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
             RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
             RootShift.BeginAnimation(TranslateTransform.YProperty, slide);
-            GlowClip.BeginAnimation(UIElement.OpacityProperty, glow);
-
-            ResumeGlow();
         }
         catch
         {
@@ -343,7 +329,6 @@ public partial class LauncherWindow : Window
         Root.Opacity = 1;
         RootScale.ScaleX = RootScale.ScaleY = 1;
         RootShift.Y = 0;
-        GlowClip.Opacity = CurrentGlowOpacity();
     }
 
     /// <summary>
@@ -357,7 +342,6 @@ public partial class LauncherWindow : Window
         try
         {
             if (_previewOpen) ClosePreview();   // v2.2 — fresh open next time
-            PauseGlow();
             if (!MotionOk() || !IsVisible) { Hide(); return; }
 
             int gen = ++_animGen;
@@ -367,7 +351,6 @@ public partial class LauncherWindow : Window
             var fade = new DoubleAnimation(1, 0, dur) { EasingFunction = ease };
             var scale = new DoubleAnimation(1, 0.965, dur) { EasingFunction = ease };
             var slide = new DoubleAnimation(0, 10, dur) { EasingFunction = ease };
-            var glow = new DoubleAnimation(CurrentGlowOpacity(), 0, dur) { EasingFunction = ease };
 
             fade.Completed += (_, _) =>
             {
@@ -379,7 +362,6 @@ public partial class LauncherWindow : Window
                     RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, null);
                     RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, null);
                     RootShift.BeginAnimation(TranslateTransform.YProperty, null);
-                    GlowClip.BeginAnimation(UIElement.OpacityProperty, null);
                     RestoreVisualState();
                     Hide();
                 }
@@ -389,7 +371,6 @@ public partial class LauncherWindow : Window
             RootScale.BeginAnimation(ScaleTransform.ScaleXProperty, scale);
             RootScale.BeginAnimation(ScaleTransform.ScaleYProperty, scale.Clone());
             RootShift.BeginAnimation(TranslateTransform.YProperty, slide);
-            GlowClip.BeginAnimation(UIElement.OpacityProperty, glow);
         }
         catch
         {
@@ -440,38 +421,17 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            if (_settings.HideOnFocusLoss) { Hide(); return; }
-
-            // stays visible → dim the comet + pause the animation (no idle CPU)
-            _glowDimmed = true;
-            PauseGlow();
-            if (_settings.AnimationsEnabled && IsVisible)
-                GlowClip.BeginAnimation(OpacityProperty,
-                    new DoubleAnimation(GlowClip.Opacity, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(300)));
-            else
-                GlowClip.Opacity = CurrentGlowOpacity();
+            if (_settings.HideOnFocusLoss) Hide();
+            // v3.0 — no comet to dim or pause: the edge shine is a static brush, so
+            // deactivation has zero visual upkeep anymore.
         }
         catch { }
     }
 
     private void OnWindowActivated(object sender, EventArgs e)
     {
-        try
-        {
-            _glowDimmed = false;
-            if (_settings.AnimationsEnabled && IsVisible)
-            {
-                GlowClip.BeginAnimation(OpacityProperty,
-                    new DoubleAnimation(GlowClip.Opacity, CurrentGlowOpacity(), TimeSpan.FromMilliseconds(300)));
-                ResumeGlow();
-            }
-            else
-            {
-                GlowClip.Opacity = CurrentGlowOpacity();
-                ResumeGlow();
-            }
-        }
-        catch { }
+        // v3.0 — was the comet resume hook; the shine needs no lifecycle. Kept as an
+        // empty handler because the XAML wires Activated here.
     }
 
     // ---------------------------------------------------------------- input & search
@@ -930,7 +890,6 @@ public partial class LauncherWindow : Window
                 case ResultKind.Tool:
                 case ResultKind.Shortcut:
                 case ResultKind.Plugin:   // v2.5 — Task 4.2 plugin commands run like any launch
-                    PauseGlow();
                     var error = _engine.Execute(item); // launch first, then hide on success
                     if (error is null)
                     {
@@ -949,7 +908,6 @@ public partial class LauncherWindow : Window
                     else
                     {
                         StatusText.Text = error; // stay open and tell the user what failed
-                        ResumeGlow();
                     }
                     break;
             }
@@ -1492,95 +1450,55 @@ public partial class LauncherWindow : Window
     {
         try
         {
-            bool dark = _settings.EffectiveDark();
+            // v3.0 — the shared ThemeService paints every brush token (custom theme >
+            // preset > legacy pair) and syncs the Fluent layer; what's left here is
+            // the launcher's own material work: DWM acrylic, translucent root card,
+            // corner geometry, and the edge-shine rim.
+            var t = ThemeService.Apply(this, _settings);
 
-            // v2.4.0-alpha.2 — Raycast material: frosted-glass acrylic blur-behind for
-            // the launcher (falls back to the solid palette when unsupported); returns
-            // whether the glass is actually live so the surface paints translucent.
             bool glass = false;
             if (_sourceReady)
-                glass = GlassBackdrop.Apply(this, dark, acrylic: _settings.Acrylic);
-
-            var p = Appearance.PaletteFor(dark, _settings.AccentColor);
-
-            Resources["TitleBrush"] = new SolidColorBrush(p.Title);
-            Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
-            Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
-            Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["ChipBrush"] = new SolidColorBrush(dark
-                ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
-            Resources["ChipTextBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["PlaceholderBrush"] = new SolidColorBrush(Appearance.PlaceholderFor(dark));
-            Resources["IconBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["GlyphBoxBrush"] = new SolidColorBrush(p.GlyphBox);
-            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
-
-            // v2.4.0-alpha.3 — bordered raised-card selection: the 1 px outline around
-            // the active row (Palette.SelStroke), also used by the primary footer chip.
-            Resources["SelStrokeBrush"] = new SolidColorBrush(p.SelStroke);
-            // v2.4.0-alpha.3 — top-lit strokes: the rim ring and the preview pane share
-            // the reference material's light-catch border — a vertical gradient that
-            // starts as a bright white edge at the top and settles into the hairline.
-            Resources["PreviewStrokeBrush"] = TopLitStrokeBrush(p.Border, dark, 0x26);
-
-            // v2.2.0-alpha.3 FIX — FieldBrush was never defined in this window, so every
-            // DynamicResource referencing it resolved to NULL. The quick-action menu card
-            // (a WPF popup has no backdrop of its own) rendered completely see-through,
-            // and the search field fill silently fell back to the panel colour. Wire the
-            // palette's OPAQUE Field token — same solid value SettingsWindow already uses.
-            Resources["FieldBrush"] = new SolidColorBrush(p.Field);
+                glass = GlassBackdrop.Apply(this, t.Dark, acrylic: _settings.Acrylic);
 
             // Win11 rounded corners come from DWM on Windows 11; Windows 10 keeps square
             // corners (an unpainted radius would otherwise expose raw window corners).
-            // v2.0.1 — the user can also force square corners from Settings → Appearance.
             bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
             float r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
-            double t = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
 
             // v2.4.0-alpha.2 — when the acrylic glass is live, the card itself becomes
             // translucent so the frosted desktop shows through (Raycast rgba(28,28,30,.9));
             // content-tier surfaces (fields, chips, tiles) stay OPAQUE for readability.
             byte panelAlpha = glass ? (byte)0xB4 : (byte)0xFF;
-            Root.Background = new SolidColorBrush(Color.FromArgb(panelAlpha, p.Panel.R, p.Panel.G, p.Panel.B));
+            Root.Background = new SolidColorBrush(Color.FromArgb(panelAlpha, t.Panel.R, t.Panel.G, t.Panel.B));
             Root.CornerRadius = new CornerRadius(r);
-            _themeBorderBrush = TopLitStrokeBrush(p.Border, dark, 0x30);
+            _themeBorderBrush = ThemeService.TopLitStroke(t.Border, t.Dark, 0x30);
+            _themeBorderColor = t.Border;
 
             // v2.4.0-alpha.3 — the ambient sheen under the top edge is a dark-mode
             // material cue (light pools from the top-lit rim); light stays clean.
-            AmbientLight.Opacity = dark ? 1.0 : 0.0;
+            AmbientLight.Opacity = t.Dark ? 1.0 : 0.0;
 
-            // v2.0.1 — rim comet geometry follows the theme radius: hairline ring for
-            // definition, clipped orbit host, and the cover patch inset by the rim
-            // thickness (painted with the SAME panel fill → the comet shows only
-            // in the outer band). On glass the cover goes slightly more translucent
-            // than the panel so the interior blobs read as light diffusing through
-            // the frost instead of a hard edge-lit band.
             RimLine.CornerRadius = new CornerRadius(r);
             RimLine.BorderBrush = _themeBorderBrush;
-            GlowClip.CornerRadius = new CornerRadius(r);
-            GlowCover.CornerRadius = new CornerRadius(Math.Max(0, r - t));
-            GlowCover.Margin = new Thickness(t);
-            GlowCover.Background = new SolidColorBrush(
-                Color.FromArgb(glass ? (byte)0xC0 : (byte)0xFF, p.Panel.R, p.Panel.G, p.Panel.B));
+
             Resources["ResultRowPad"] = string.Equals(_settings.RowDensity, "compact", StringComparison.OrdinalIgnoreCase)
                 ? new Thickness(14, 4, 14, 4)
                 : new Thickness(14, 7, 14, 7);
             if (ActualWidth >= 40 && ActualHeight >= 40)
-                UpdateGlowGeometry(new Size(ActualWidth, ActualHeight));
-            Input.Foreground = new SolidColorBrush(p.Title);
-            Input.CaretBrush = new SolidColorBrush(p.Accent);
-            Input.SelectionBrush = new SolidColorBrush(Appearance.Tint(p.Accent, 0x55));
-            Input.SelectionTextBrush = new SolidColorBrush(p.Title);
-            Separator.Background = new SolidColorBrush(p.Separator);
-            FooterRule.Background = EdgeFadeBrush(p.Separator);
+                UpdateChromeClips(new Size(ActualWidth, ActualHeight));
+            Input.Foreground = new SolidColorBrush(t.Title);
+            Input.CaretBrush = new SolidColorBrush(t.Accent);
+            Input.SelectionBrush = new SolidColorBrush(Appearance.Tint(t.Accent, 0x55));
+            Input.SelectionTextBrush = new SolidColorBrush(t.Title);
+            Separator.Background = new SolidColorBrush(t.Separator);
+            FooterRule.Background = EdgeFadeBrush(t.Separator);
 
             // Apple craft — the light-catch: a 1 px bright top edge, the way light grazes
             // the top of a material. Dark mode gets a faint sheen; light mode stays clean.
-            TopLight.Background = dark
+            TopLight.Background = t.Dark
                 ? new SolidColorBrush(Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF))
                 : Brushes.Transparent;
-            PrefixBadge.Foreground = new SolidColorBrush(p.Accent);
+            PrefixBadge.Foreground = new SolidColorBrush(t.Accent);
         }
         catch (Exception ex)
         {
@@ -1598,37 +1516,6 @@ public partial class LauncherWindow : Window
     {
         // Intentionally empty — the Raycast header has no focus ring to draw.
     }
-
-    /// <summary>
-    /// v2.4.0-alpha.3 — the top-lit stroke: a vertical gradient border that reads as
-    /// a bright 1 px light edge along the top of a surface and settles into the
-    /// quiet hairline below it (the reference material's glass-card outline).
-    /// Used for the resting rim ring and the Tab preview pane.
-    /// </summary>
-    private static Brush TopLitStrokeBrush(Color hairline, bool dark, byte topAlpha)
-    {
-        var b = new LinearGradientBrush
-        {
-            StartPoint = new Point(0, 0),
-            EndPoint = new Point(0, 1),
-        };
-        if (dark)
-        {
-            b.GradientStops.Add(new GradientStop(Color.FromArgb(topAlpha, 0xFF, 0xFF, 0xFF), 0.0));
-            b.GradientStops.Add(new GradientStop(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF), 0.10));
-            b.GradientStops.Add(new GradientStop(hairline, 0.42));
-        }
-        else
-        {
-            b.GradientStops.Add(new GradientStop(Colors.White, 0.0));
-            b.GradientStops.Add(new GradientStop(hairline, 0.40));
-        }
-        b.GradientStops.Add(new GradientStop(hairline, 1.0));
-        b.Freeze();
-        return b;
-    }
-
-    private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
 
     /// <summary>
     /// Apple §12 — scroll edge effects, not hard dividers: a hairline that fades out at
@@ -1649,56 +1536,20 @@ public partial class LauncherWindow : Window
         return b;
     }
 
-    private double CurrentGlowOpacity()
-    {
-        // v2.0.1 — user-tunable brightness (Settings → Appearance → Glow brightness)
-        double active = Math.Clamp(_settings.GlowOpacity, 0.4, 1.0);
-        return _glowDimmed ? active * GlowDimFactor : active;
-    }
-
     /// <summary>
-    /// v2.0.2 glow engine — the z.ai chat-box comet, rebuilt to CANNOT stop looping.
-    /// The old alpha.2/3 engine used a controllable Storyboard of
-    /// DoubleAnimationUsingPath timelines (negative BeginTime for the tail, in-place
-    /// path mutation on resize) — a fragile combination that can stop after one lap.
-    /// Now: the perimeter is sampled ONCE into a point array, and every composition
-    /// frame the head/tail positions are set from elapsed-time-modulo-lap. The loop is
-    /// seamless by construction, resize-proof (re-sample in place), and costs zero
-    /// idle CPU (the clock detaches when the window hides or deactivates).
-    /// "Solid" style = static accent ring, no motion.
+    /// v3.0 — THE GLOW SYSTEM, FIXED TO MINIMALISM. The orbiting comet engine (two
+    /// blobs, 720 perimeter samples, a CompositionTarget.Rendering clock, opacity
+    /// dimming, style presets, speed/thickness sliders) is deleted. What remains is
+    /// the edge shine: the 1 px top-lit rim stroke while BorderEffect is on, or a
+    /// plain hairline when off. Zero idle CPU, nothing moves — the shine IS the glow.
     /// </summary>
     public void ApplyBorderEffect()
     {
         try
         {
-            StopGlow();
-            RimLine.BorderBrush = _themeBorderBrush;
-
-            if (_settings.BorderEffect)
-            {
-                if (Appearance.IsAnimatedStyle(_settings.BorderStyle))
-                {
-                    Appearance.BuildCometBrushes(_settings.BorderStyle, _settings.AccentColor, out var head, out var tail);
-                    GlowHead.Fill = head;
-                    GlowTail.Fill = tail;
-                    GlowClip.Visibility = Visibility.Visible;
-                    GlowClip.Opacity = CurrentGlowOpacity();
-
-                    if (ActualWidth >= 40 && ActualHeight >= 40)
-                        EnsureGlowSamples(new Size(ActualWidth, ActualHeight));
-                    AttachGlowClock();
-                }
-                else
-                {
-                    // "Solid" — static accent-coloured ring, zero motion
-                    GlowClip.Visibility = Visibility.Collapsed;
-                    RimLine.BorderBrush = Appearance.BuildStaticRimBrush(_settings.BorderStyle, _settings.AccentColor);
-                }
-            }
-            else
-            {
-                GlowClip.Visibility = Visibility.Collapsed;
-            }
+            RimLine.BorderBrush = _settings.BorderEffect
+                ? _themeBorderBrush
+                : new SolidColorBrush(_themeBorderColor);
         }
         catch (Exception ex)
         {
@@ -1706,142 +1557,32 @@ public partial class LauncherWindow : Window
         }
     }
 
-    /// <summary>Number of perimeter samples — dense enough to look continuous, trivial to recompute.</summary>
-    private const int GlowSampleCount = 720;
-
-    /// <summary>
-    /// Samples the rounded-rect perimeter (blob centres travel the band's middle line)
-    /// into a frozen point array. Rebuilt in place on resize/style change — the comet
-    /// continues from its time-based position with no restart and no snap.
-    /// </summary>
-    private void EnsureGlowSamples(Size size)
-    {
-        try
-        {
-            bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
-            double r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
-            double t = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
-
-            var geo = new PathGeometry();
-            geo.Figures.Add(BuildPerimeterFigure(size.Width, size.Height, t / 2, Math.Max(2, r - t / 2)));
-            geo.Freeze();
-
-            var pts = new Point[GlowSampleCount];
-            for (int i = 0; i < GlowSampleCount; i++)
-                geo.GetPointAtFractionLength((double)i / GlowSampleCount, out pts[i], out _);
-            _glowSamples = pts;
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLogger.LogException("Window.GlowSamples", ex);
-        }
-    }
-
-    private void AttachGlowClock()
-    {
-        if (_glowClockAttached) return;
-        CompositionTarget.Rendering += OnGlowFrame;
-        _glowClockAttached = true;
-    }
-
-    private void DetachGlowClock()
-    {
-        if (!_glowClockAttached) return;
-        CompositionTarget.Rendering -= OnGlowFrame;
-        _glowClockAttached = false;
-    }
-
-    /// <summary>
-    /// Per-frame comet update. Setting the transform positions invalidates the visual,
-    /// which schedules the next frame — the loop self-drives while visible and costs
-    /// nothing when paused (handler early-outs, clock detached on hide/deactivate).
-    /// </summary>
-    private void OnGlowFrame(object? sender, EventArgs e)
-    {
-        try
-        {
-            var pts = _glowSamples;
-            if (pts.Length == 0 || !IsVisible) return;
-
-            double sec = _settings.BorderSpeedSec is <= 0 or double.NaN ? 9.0 : Math.Clamp(_settings.BorderSpeedSec, 4.0, 30.0);
-            double frac = (_glowWatch.Elapsed.TotalSeconds % sec) / sec;                 // 0..1, seamless
-            int n = pts.Length;
-            int head = (int)(frac * n) % n;
-            int tail = ((int)(frac * n) - (int)(0.07 * n) + n) % n;                      // trails the head
-
-            GlowHeadPos.X = pts[head].X; GlowHeadPos.Y = pts[head].Y;
-            GlowTailPos.X = pts[tail].X; GlowTailPos.Y = pts[tail].Y;
-        }
-        catch { }
-    }
-
     private void OnRootSizeChanged(object sender, SizeChangedEventArgs e)
     {
         try
         {
             if (e.NewSize.Width >= 40 && e.NewSize.Height >= 40)
-                UpdateGlowGeometry(e.NewSize);
+                UpdateChromeClips(e.NewSize);
         }
         catch { }
     }
 
     /// <summary>
-    /// Keeps the rounded-rect clip and the perimeter samples in sync with the window
-    /// size. The comet position derives from time, so a resize never restarts or snaps
-    /// the animation — the next frame simply uses the new samples.
+    /// Keeps the rounded-rect clip on the top light-catch in sync with the window
+    /// size (v3.0 — the comet clip host is gone; this mask is the only one left).
     /// </summary>
-    private void UpdateGlowGeometry(Size size)
+    private void UpdateChromeClips(Size size)
     {
         bool rounded = !string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase);
         double r = GlassBackdrop.IsWin11 && rounded ? 8f : 0f;
-        GlowClip.Clip = new RectangleGeometry(new Rect(0, 0, size.Width, size.Height), r, r);
-        // The top light-catch must obey the same rounded mask — otherwise the straight
+        // The top light-catch must obey the rounded mask — otherwise the straight
         // line paints across the corner cutouts of the window.
         TopLightHost.Clip = new RectangleGeometry(new Rect(0, 0, size.Width, size.Height), r, r);
-        EnsureGlowSamples(size);
-    }
-
-    /// <summary>Closed rounded-rectangle outline (clockwise from the top-left corner).</summary>
-    private static PathFigure BuildPerimeterFigure(double w, double h, double inset, double radius)
-    {
-        double x0 = inset, y0 = inset, x1 = w - inset, y1 = h - inset;
-        double r = Math.Max(2, Math.Min(radius, Math.Min(x1 - x0, y1 - y0) / 2));
-
-        var fig = new PathFigure { StartPoint = new Point(x0 + r, y0), IsClosed = true };
-        fig.Segments.Add(new LineSegment(new Point(x1 - r, y0), true));
-        fig.Segments.Add(new ArcSegment(new Point(x1, y0 + r), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
-        fig.Segments.Add(new LineSegment(new Point(x1, y1 - r), true));
-        fig.Segments.Add(new ArcSegment(new Point(x1 - r, y1), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
-        fig.Segments.Add(new LineSegment(new Point(x0 + r, y1), true));
-        fig.Segments.Add(new ArcSegment(new Point(x0, y1 - r), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
-        fig.Segments.Add(new LineSegment(new Point(x0, y0 + r), true));
-        fig.Segments.Add(new ArcSegment(new Point(x0 + r, y0), new Size(r, r), 0, false, SweepDirection.Clockwise, true));
-        return fig;
-    }
-
-    private void StopGlow()
-    {
-        DetachGlowClock();
-    }
-
-    private void PauseGlow()
-    {
-        try { DetachGlowClock(); } catch { }
-    }
-
-    private void ResumeGlow()
-    {
-        try
-        {
-            if (_settings.BorderEffect && Appearance.IsAnimatedStyle(_settings.BorderStyle))
-                AttachGlowClock();
-        }
-        catch { }
     }
 
     protected override void OnClosed(EventArgs e)
     {
-        DetachGlowClock();
+        // v3.0 — nothing to detach: the comet clock is gone.
         base.OnClosed(e);
     }
 

@@ -39,6 +39,10 @@ public static class AppPaths
     public static string ChatsFile => Path.Combine(SettingsDir, "chats.json");           // v2.4.0-alpha.5 AI chat history
     public static string PersonasFile => Path.Combine(SettingsDir, "personas.json");     // v2.4.0-alpha.6 custom AI personas
     public static string PluginsDir => Path.Combine(SettingsDir, "plugins");             // v2.5 (Task 4.2) JSON plugins
+    public static string ThemesDir => Path.Combine(SettingsDir, "themes");               // v3.0 imported theme files
+
+    /// <summary>App Deck slot assignments (v3.0 — numpad 1–9 quick launch).</summary>
+    public static string DeckFile => Path.Combine(SettingsDir, "appdeck.json");
 
     /// <summary>Staged update downloads land here (v2.6 — Task 5.1).</summary>
     public static string UpdatesDir => Path.Combine(DataDir, "updates");

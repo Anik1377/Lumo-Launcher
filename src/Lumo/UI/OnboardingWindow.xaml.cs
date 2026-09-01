@@ -47,27 +47,14 @@ public partial class OnboardingWindow : Window
     {
         try
         {
-            bool dark = _settings.EffectiveDark();
-            var p = Appearance.PaletteFor(dark, _settings.AccentColor);
-            Color field = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xF5, 0xF5, 0xF7);
-            Color border = dark ? FromRgb(0x2A, 0x2A, 0x30) : FromRgb(0xD9, 0xD9, 0xDE);
-
-            Resources["TitleBrush"] = new SolidColorBrush(p.Title);
-            Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
-            Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["BorderLineBrush"] = new SolidColorBrush(border);
-            Resources["FieldBrush"] = new SolidColorBrush(field);
-            Resources["ChipBrush"] = new SolidColorBrush(dark
-                ? Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
-
-            Root.Background = new SolidColorBrush(p.Panel);
-            Root.BorderBrush = new SolidColorBrush(border);
+            // v3.0 — the shared ThemeService ladder (Onboarding used to carry its own
+            // field/border constants that drifted from the family; now it can't).
+            var t = ThemeService.Apply(this, _settings);
+            Root.Background = new SolidColorBrush(t.Panel);
+            Root.BorderBrush = new SolidColorBrush(t.Border);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Onboarding.Theme", ex); }
     }
-
-    private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
 
     private void PlayEntrance()
     {

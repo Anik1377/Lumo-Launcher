@@ -615,42 +615,16 @@ public partial class SettingsWindow : Window
     {
         try
         {
-            bool dark = _settings.EffectiveDark();
+            var t = ThemeService.Apply(this, _settings);
 
             // v2.0 — DWM chrome only (rounded corners + dark-mode context); no acrylic.
             if (_sourceReady)
-                GlassBackdrop.Apply(this, dark);
-
-            var p = Appearance.PaletteFor(dark, _settings.AccentColor);
-
-            // v2.4 — Raycast surface ladder: elevated cards one step above the canvas,
-            // sidebar slightly BELOW the canvas (the Raycast settings split), hairline
-            // segmentation everywhere. No saturated fills — quiet, monochrome chrome.
-            Color field    = Appearance.ElevatedFor(dark);
-            Color card     = dark ? FromRgb(0x14, 0x15, 0x1A) : Colors.White;
-            Color sidebar  = dark ? FromRgb(0x0B, 0x0C, 0x0F) : FromRgb(0xF1, 0xF1, 0xF4);
-            Color segTrack = dark ? FromRgb(0x21, 0x23, 0x28) : FromRgb(0xE9, 0xEA, 0xEC);
-            Color segSel   = dark ? FromRgb(0x34, 0x36, 0x3C) : Colors.White;
-
-            Resources["TitleBrush"] = new SolidColorBrush(p.Title);
-            Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
-            Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
-            Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["SeparatorBrush"] = new SolidColorBrush(p.Separator);
-            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
-            Resources["ChipBrush"] = new SolidColorBrush(dark
-                ? Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
-            Resources["FieldBrush"] = new SolidColorBrush(field);
-            Resources["CardBrush"] = new SolidColorBrush(card);
-            Resources["SidebarBrush"] = new SolidColorBrush(sidebar);
-            Resources["SegTrackBrush"] = new SolidColorBrush(segTrack);
-            Resources["SegSelBrush"] = new SolidColorBrush(segSel);
+                GlassBackdrop.Apply(this, t.Dark);
 
             float r = GlassBackdrop.IsWin11 ? 8f : 0f;
-            Root.Background = new SolidColorBrush(p.Panel);
+            Root.Background = new SolidColorBrush(t.Panel);
             Root.CornerRadius = new CornerRadius(r);
-            Root.BorderBrush = new SolidColorBrush(p.Border);
+            Root.BorderBrush = new SolidColorBrush(t.Border);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.ApplySelfTheme", ex); }
     }
@@ -678,20 +652,8 @@ public partial class SettingsWindow : Window
             }
 
             BorderEffectToggle.IsChecked = _settings.BorderEffect;
-            switch (_settings.BorderStyle?.ToLowerInvariant())
-            {
-                case "sunset": StyleSunset.IsChecked = true; break;
-                case "ocean": StyleOcean.IsChecked = true; break;
-                case "ember": StyleEmber.IsChecked = true; break;
-                case "mint": StyleMint.IsChecked = true; break;
-                case "solid": StyleSolid.IsChecked = true; break;
-                default: StyleAurora.IsChecked = true; break;
-            }
-
-            double s = _settings.BorderSpeedSec;
-            if (s <= 7.0) SpeedFast.IsChecked = true;        // v2.0.1 speeds: 6 / 9 / 14
-            else if (s <= 11.0) SpeedNormal.IsChecked = true;
-            else SpeedSlow.IsChecked = true;
+            // v3.0 — the border style pills / comet speed / glow sliders are gone with
+            // the comet engine; the rim is the edge shine now (BorderEffect only).
 
             if (string.Equals(_settings.Theme, "light", StringComparison.OrdinalIgnoreCase))
                 ThemeLight.IsChecked = true;
@@ -703,9 +665,10 @@ public partial class SettingsWindow : Window
             AccentHexBox.Text = _settings.AccentColor;
             MarkSelectedSwatch(_settings.AccentColor);
 
+            // v3.0 — theme gallery (presets + imported files, click to apply live)
+            BuildThemeGallery();
+
             // v2.0.1 — advanced fine-tuning
-            GlowOpacitySlider.Value = Math.Clamp(_settings.GlowOpacity, 0.4, 1.0) * 100.0;
-            RimThicknessSlider.Value = Math.Clamp(_settings.RimThickness, 2.0, 6.0);
             WidthSlider.Value = Math.Clamp(_settings.WindowWidth, 560, 900);
             if (string.Equals(_settings.CornerStyle, "square", StringComparison.OrdinalIgnoreCase))
                 CornerSquare.IsChecked = true;
@@ -791,20 +754,6 @@ public partial class SettingsWindow : Window
             ThemeDark.Checked += (_, _) => SyncLiveAppearance();
             ThemeLight.Checked += (_, _) => SyncLiveAppearance();
             ThemeAuto.Checked += (_, _) => SyncLiveAppearance();
-            StyleAurora.Checked += (_, _) => SyncLiveAppearance();
-            StyleSunset.Checked += (_, _) => SyncLiveAppearance();
-            StyleOcean.Checked += (_, _) => SyncLiveAppearance();
-            StyleEmber.Checked += (_, _) => SyncLiveAppearance();
-            StyleMint.Checked += (_, _) => SyncLiveAppearance();
-            StyleSolid.Checked += (_, _) => SyncLiveAppearance();
-            SpeedFast.Checked += (_, _) => SyncLiveAppearance();
-            SpeedNormal.Checked += (_, _) => SyncLiveAppearance();
-            SpeedSlow.Checked += (_, _) => SyncLiveAppearance();
-
-            // v2.0.1 — advanced fine-tuning wiring (all live)
-            GlowOpacitySlider.ValueChanged += (_, _) => { UpdateAdvLabels(); SyncLiveAppearance(); };
-            RimThicknessSlider.ValueChanged += (_, _) => { UpdateAdvLabels(); SyncLiveAppearance(); };
-            WidthSlider.ValueChanged += (_, _) => { UpdateAdvLabels(); SyncLiveAppearance(); };
             CornerRounded.Checked += (_, _) => SyncLiveAppearance();
             CornerSquare.Checked += (_, _) => SyncLiveAppearance();
             DensityComfortable.Checked += (_, _) => SyncLiveAppearance();
@@ -830,19 +779,6 @@ public partial class SettingsWindow : Window
                 ThemeLight.IsChecked == true ? "light" :
                 ThemeAuto.IsChecked == true ? "auto" : "dark";
             _settings.BorderEffect = BorderEffectToggle.IsChecked == true;
-            _settings.BorderStyle =
-                StyleSunset.IsChecked == true ? "Sunset" :
-                StyleOcean.IsChecked == true ? "Ocean" :
-                StyleEmber.IsChecked == true ? "Ember" :
-                StyleMint.IsChecked == true ? "Mint" :
-                StyleSolid.IsChecked == true ? "Solid" : "Aurora";
-            _settings.BorderSpeedSec =
-                SpeedFast.IsChecked == true ? 6.0 :
-                SpeedSlow.IsChecked == true ? 14.0 : 9.0;
-
-            // v2.0.1 — advanced fine-tuning
-            _settings.GlowOpacity = Math.Clamp(GlowOpacitySlider.Value, 40, 100) / 100.0;
-            _settings.RimThickness = Math.Clamp(RimThicknessSlider.Value, 2.0, 6.0);
             _settings.WindowWidth = Math.Clamp(WidthSlider.Value, 560, 900);
             _settings.CornerStyle = CornerSquare.IsChecked == true ? "square" : "rounded";
             _settings.RowDensity = DensityCompact.IsChecked == true ? "compact" : "comfortable";
@@ -856,13 +792,11 @@ public partial class SettingsWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.SyncLive", ex); }
     }
 
-    /// <summary>v2.0.1 — keeps the value chips next to the advanced sliders honest.</summary>
+    /// <summary>v2.0.1 — keeps the value chip next to the width slider honest.</summary>
     private void UpdateAdvLabels()
     {
         try
         {
-            GlowOpacityValue.Text = $"{(int)Math.Clamp(GlowOpacitySlider.Value, 40, 100)}%";
-            RimThicknessValue.Text = $"{RimThicknessSlider.Value:0.#} px";
             WidthValue.Text = $"{(int)Math.Clamp(WidthSlider.Value, 560, 900)} px";
         }
         catch { }
@@ -874,9 +808,10 @@ public partial class SettingsWindow : Window
         {
             if (_settings.BorderEffect)
             {
-                // v2.0.1 — static palette gradient (head → body → deep body). The real
-                // comet runs live on the launcher window behind the settings app.
-                PreviewCard.BorderBrush = Appearance.BuildPreviewBrush(_settings.BorderStyle, _settings.AccentColor);
+                // v3.0 — the edge shine itself: the same top-lit stroke the rim uses.
+                bool dark = _settings.EffectiveDark();
+                PreviewCard.BorderBrush = ThemeService.TopLitStroke(
+                    dark ? FromRgb(0x26, 0x26, 0x2B) : FromRgb(0xE6, 0xE7, 0xEA), dark, 0x40);
             }
             else
             {
@@ -885,6 +820,198 @@ public partial class SettingsWindow : Window
             }
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.Preview", ex); }
+    }
+
+    // ------------------------------------------------- v3.0 theme gallery + import/export
+
+    /// <summary>One gallery entry: a preset or an imported theme file.</summary>
+    private sealed record ThemeEntry(string Key, string DisplayName, ThemeSelect.ThemeSpec Spec, string? FileName);
+
+    private void BuildThemeGallery()
+    {
+        try
+        {
+            var entries = new List<ThemeEntry>();
+            foreach (var preset in ThemeSelect.Presets)
+                entries.Add(new ThemeEntry(preset.Id, preset.Name,
+                    new ThemeSelect.ThemeSpec(preset.Dark, preset.Accent, preset.Colors, preset.Id, preset.Name), null));
+
+            try
+            {
+                Directory.CreateDirectory(AppPaths.ThemesDir);
+                foreach (var file in Directory.GetFiles(AppPaths.ThemesDir, "*.json").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+                {
+                    var tf = ThemeFile.LoadFile(file);
+                    if (tf is null) continue;
+                    var name = Path.GetFileNameWithoutExtension(file);
+                    entries.Add(new ThemeEntry("user:" + name, tf.Name,
+                        new ThemeSelect.ThemeSpec(tf.Dark, tf.Accent, tf.Colors, "user:" + name, tf.Name), name));
+                }
+            }
+            catch { /* the gallery still shows the presets */ }
+
+            // Which entry is active right now? Custom file wins, then preset.
+            string? activeKey = null;
+            if (!string.IsNullOrWhiteSpace(_settings.CustomThemeFile))
+                activeKey = "user:" + Path.GetFileNameWithoutExtension(_settings.CustomThemeFile);
+            else if (ThemeSelect.FindPreset(_settings.ThemePreset) is { } p)
+                activeKey = p.Id;
+
+            ThemeGallery.Children.Clear();
+            foreach (var entry in entries)
+                ThemeGallery.Children.Add(BuildThemeCard(entry, entry.Key == activeKey));
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.ThemeGallery", ex); }
+    }
+
+    private UIElement BuildThemeCard(ThemeEntry entry, bool active)
+    {
+        var c = ThemeService.ResolveColors(entry.Spec);
+        var brush = new SolidColorBrush(Color.FromRgb(c.Panel.R, c.Panel.G, c.Panel.B));
+        brush.Freeze();
+        var fieldBrush = new SolidColorBrush(c.Field); fieldBrush.Freeze();
+        var titleBrush = new SolidColorBrush(c.Title); titleBrush.Freeze();
+        var subBrush = new SolidColorBrush(c.Subtitle); subBrush.Freeze();
+        var accentBrush = new SolidColorBrush(c.Accent); accentBrush.Freeze();
+        var lineBrush = new SolidColorBrush(c.Border); lineBrush.Freeze();
+
+        var card = new Border
+        {
+            Width = 132,
+            Margin = new Thickness(0, 0, 10, 10),
+            CornerRadius = new CornerRadius(10),
+            Background = brush,
+            BorderThickness = new Thickness(active ? 2 : 1),
+            BorderBrush = active ? accentBrush : lineBrush,
+            Cursor = Cursors.Hand,
+            Tag = entry,
+            Padding = new Thickness(10, 9, 10, 8),
+        };
+        PressFeedback.SetIsEnabled(card, true);
+
+        var stack = new StackPanel();
+        stack.Children.Add(new StackPanel // fake launcher mini: title bar + field + accent dot
+        {
+            Orientation = Orientation.Horizontal,
+            Children =
+            {
+                new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = accentBrush },
+                new Border { Width = 46, Height = 4, CornerRadius = new CornerRadius(2), Background = titleBrush, Margin = new Thickness(7, 2, 0, 0), VerticalAlignment = VerticalAlignment.Center },
+            },
+        });
+        stack.Children.Add(new Border
+        {
+            Height = 16, CornerRadius = new CornerRadius(5), Background = fieldBrush,
+            Margin = new Thickness(0, 8, 0, 0),
+            Child = new Border { Width = 30, Height = 3, CornerRadius = new CornerRadius(1.5), Background = subBrush, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) },
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = entry.DisplayName,
+            FontSize = 11.5,
+            FontWeight = FontWeight.FromOpenTypeWeight(600),
+            Foreground = titleBrush,
+            Margin = new Thickness(0, 8, 0, 0),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+        card.Child = stack;
+        card.MouseLeftButtonUp += (_, _) => ApplyThemeEntry(entry);
+        return card;
+    }
+
+    private void ApplyThemeEntry(ThemeEntry entry)
+    {
+        try
+        {
+            _settings.CustomThemeFile = entry.FileName ?? "";
+            _settings.ThemePreset = entry.FileName is null ? entry.Key : "";
+            _suppress = true;
+            try
+            {
+                // mirror the resolved mode into the legacy segmented control so the
+                // radio row never contradicts the active theme
+                if (entry.Spec.Dark) ThemeDark.IsChecked = true;
+                else ThemeLight.IsChecked = true;
+            }
+            finally { _suppress = false; }
+
+            ApplySelfTheme();
+            UpdatePreview();
+            _applyAppearance();
+            _settings.Save();   // theme choice is instant-persist (like personas), not Save/Cancel
+            BuildThemeGallery();
+            FooterHint.Text = $"Theme '{entry.DisplayName}' applied";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.ApplyTheme", ex); }
+    }
+
+    private void OnImportTheme(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Import a Lumo theme",
+                Filter = "Lumo theme (*.json)|*.json|All files (*.*)|*.*",
+                CheckFileExists = true,
+            };
+            if (dlg.ShowDialog(this) != true) return;
+
+            var json = File.ReadAllText(dlg.FileName);
+            if (!ThemeFile.TryParse(json, out var tf, out var error) || tf is null)
+            {
+                ThemeStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xE5, 0x48, 0x4D));
+                ThemeStatus.Text = $"Import failed — {error}";
+                return;
+            }
+
+            Directory.CreateDirectory(AppPaths.ThemesDir);
+            var name = Path.GetFileNameWithoutExtension(dlg.FileName);
+            var target = Path.Combine(AppPaths.ThemesDir, ThemeFile.Slug(tf.Name) is { Length: > 0 } slug ? slug : ThemeFile.Slug(name) is { Length: > 0 } s2 ? s2 : "theme" ) + ".json";
+            tf.Save(target);
+
+            _settings.CustomThemeFile = Path.GetFileName(target);
+            _settings.ThemePreset = "";
+            ApplySelfTheme();
+            UpdatePreview();
+            _applyAppearance();
+            _settings.Save();
+            BuildThemeGallery();
+
+            ThemeStatus.Foreground = (SolidColorBrush)Resources["SubtitleBrush"];
+            ThemeStatus.Text = $"Imported '{tf.Name}' — applied and saved to {target}";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.ImportTheme", ex);
+            ThemeStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xE5, 0x48, 0x4D));
+            ThemeStatus.Text = "Import failed — see the log for details.";
+        }
+    }
+
+    private void OnExportTheme(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var theme = ThemeService.ExportFile(_settings);
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Export the current theme",
+                Filter = "Lumo theme (*.json)|*.json",
+                FileName = ThemeFile.Slug(theme.Name) + ".json",
+            };
+            if (dlg.ShowDialog(this) != true) return;
+
+            theme.Save(dlg.FileName);
+            ThemeStatus.Foreground = (SolidColorBrush)Resources["SubtitleBrush"];
+            ThemeStatus.Text = $"Exported '{theme.Name}' → {dlg.FileName}";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.ExportTheme", ex);
+            ThemeStatus.Foreground = new SolidColorBrush(Color.FromRgb(0xE5, 0x48, 0x4D));
+            ThemeStatus.Text = "Export failed — see the log for details.";
+        }
     }
 
     // ---------------------------------------------------------------- accent swatches

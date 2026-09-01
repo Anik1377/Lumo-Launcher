@@ -153,7 +153,9 @@ public partial class AiChatWindow : Window
         try
         {
             if (!_settings.AnimationsEnabled) return;
-            var wave = new System.Windows.Media.Animation.DoubleAnimation(0.55, 0.95, TimeSpan.FromMilliseconds(2200))
+            // v3.0 — glow fix: the halo breathes a QUIET whisper now (0.22→0.42, was
+            // 0.55→0.95) so the orb reads as presence, not a lighthouse.
+            var wave = new System.Windows.Media.Animation.DoubleAnimation(0.22, 0.42, TimeSpan.FromMilliseconds(2600))
             {
                 AutoReverse = true,
                 RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever,
@@ -206,93 +208,18 @@ public partial class AiChatWindow : Window
         try { ApplySelfTheme(); } catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Theme", ex); }
     }
 
-    /// <summary>Same Fluent token set as SettingsWindow — the chat belongs to the launcher family.</summary>
+    /// <summary>Same Fluent token set as SettingsWindow — the chat belongs to the launcher family.
+    /// v3.0 — the brush set comes from the shared ThemeService; this method keeps only
+    /// the chat's own extras (DWM chrome, corner sync, scrim).</summary>
     private void ApplySelfTheme()
     {
         try
         {
-            bool dark = _settings.EffectiveDark();
+            var t = ThemeService.Apply(this, _settings);
             if (_sourceReady)
-                GlassBackdrop.Apply(this, dark);
+                GlassBackdrop.Apply(this, t.Dark);
 
-            var p = Appearance.PaletteFor(dark, _settings.AccentColor);
-            Resources["TitleBrush"] = new SolidColorBrush(p.Title);
-            Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
-            Resources["SelectedBrush"] = new SolidColorBrush(p.Selected);
-            Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["SeparatorBrush"] = new SolidColorBrush(p.Separator);
-            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
-            Resources["PanelBrush"] = new SolidColorBrush(p.Panel);
-            Resources["FieldBrush"] = new SolidColorBrush(p.Field);
-            // v2.4 — Raycast ladder surfaces: elevated cards, caption band, and a
-            // code-block tier that sits between the two.
-            Resources["CardBrush"] = new SolidColorBrush(Appearance.ElevatedFor(dark));
-            // v2.4.0-alpha.4 — neutral zinc caption band (was the bluer sidebar tier).
-            Resources["CaptionBrush"] = new SolidColorBrush(dark
-                ? Color.FromRgb(0x0B, 0x0B, 0x0D) : Color.FromRgb(0xF1, 0xF1, 0xF4));
-            Resources["ChipBrush"] = new SolidColorBrush(dark
-                ? Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
-            // v2.6.0-alpha.8 — ChatGPT-clone user pill: a QUIET elevated gray with
-            // near-white ink in dark mode (the old inverted near-white pill shouted;
-            // chatgpt.com's own bubble is the soft #2F2F2F), soft light-gray in
-            // light mode. The words carry the contrast, not the fill.
-            Resources["UserBubbleBrush"] = new SolidColorBrush(dark
-                ? Color.FromRgb(0x2F, 0x2F, 0x33) : Color.FromRgb(0xE9, 0xE9, 0xEC));
-            Resources["UserBubbleTextBrush"] = new SolidColorBrush(dark
-                ? Color.FromRgb(0xF3, 0xF3, 0xF4) : Color.FromRgb(0x16, 0x16, 0x1A));
-            // v2.6.0-alpha.8 — the ChatGPT send cap: solid face with an INVERTED
-            // glyph (black on white in dark, white on near-black in light) — no
-            // glow, no gradient; the primary affordance reads by shape alone.
-            Resources["SendButtonFaceBrush"] = new SolidColorBrush(dark
-                ? System.Windows.Media.Colors.White : Color.FromRgb(0x0D, 0x0D, 0x0D));
-            Resources["SendButtonGlyphBrush"] = new SolidColorBrush(dark
-                ? Color.FromRgb(0x0D, 0x0D, 0x0D) : System.Windows.Media.Colors.White);
-            Resources["AvatarBrush"] = new SolidColorBrush(Appearance.Tint(p.Accent, 0x2A));
-            Resources["CodeBrush"] = new SolidColorBrush(dark ? Color.FromRgb(0x12, 0x12, 0x15) : Color.FromRgb(0xF6, 0xF6, 0xF8));
-            Resources["WarnBrush"] = new SolidColorBrush(Color.FromArgb(0x2A, 0xCA, 0x50, 0x10));
-            // v2.4.0-alpha.4 — raised-card strokes for the picker menu, suggestion
-            // pills and the model chip hover (same token the launcher rows use).
-            Resources["SelStrokeBrush"] = new SolidColorBrush(p.SelStroke);
-            // v2.4.0-alpha.6 — the suggestion pills got a touch more fill so they read
-            // at a glance on the dark card (the text ink is the real fix: TitleBrush).
-            Resources["ChipBrush"] = new SolidColorBrush(dark
-                ? Color.FromArgb(0x1F, 0xFF, 0xFF, 0xFF) : Color.FromArgb(0x0D, 0x00, 0x00, 0x00));
-            // v2.4.0-alpha.4 — top-lit card stroke: the window edge now catches light
-            // along the top and settles into the hairline, matching the launcher rim.
-            Resources["CardStrokeBrush"] = TopLitStrokeBrush(p.Border, dark, 0x30);
-
-            // v2.3.0-alpha.4 polish — gradient tokens (send cap, logo orb, orb halo).
-            // Built from the accent so every accent choice keeps a coherent system.
-            var accent = p.Accent;
-            var sendGrad = new LinearGradientBrush
-            {
-                StartPoint = new System.Windows.Point(0, 0),
-                EndPoint = new System.Windows.Point(0.2, 1),
-            };
-            sendGrad.GradientStops.Add(new GradientStop(Light(accent, 0.22), 0.0));
-            sendGrad.GradientStops.Add(new GradientStop(accent, 1.0));
-            sendGrad.Freeze();
-            Resources["SendBrush"] = sendGrad;
-
-            var orbGrad = new LinearGradientBrush
-            {
-                StartPoint = new System.Windows.Point(0, 0),
-                EndPoint = new System.Windows.Point(0.3, 1),
-            };
-            orbGrad.GradientStops.Add(new GradientStop(Light(accent, 0.35), 0.0));
-            orbGrad.GradientStops.Add(new GradientStop(accent, 1.0));
-            orbGrad.Freeze();
-            Resources["OrbBrush"] = orbGrad;
-
-            var halo = new RadialGradientBrush();
-            halo.GradientStops.Add(new GradientStop(Appearance.Tint(accent, 0x42), 0.0));
-            halo.GradientStops.Add(new GradientStop(Appearance.Tint(accent, 0x14), 0.62));
-            halo.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.Transparent, 1.0));
-            halo.Freeze();
-            Resources["GlowBrush"] = halo;
-
-            _focusRingBrush = new SolidColorBrush(Appearance.Tint(accent, 0x66));
+            _focusRingBrush = new SolidColorBrush(Appearance.Tint(t.Accent, 0x66));
 
             // the card edge IS the window edge now — sync the corner radius to what DWM
             // actually rounds (Win11 8 px, Win10 square), so the shadow hugs the card.
@@ -305,7 +232,7 @@ public partial class AiChatWindow : Window
                 CaptionBar.CornerRadius = new CornerRadius(r, r, 0, 0);
                 SidebarPanel.CornerRadius = new CornerRadius(0, r, r, 0);
             }
-            SidebarScrim.Background = new SolidColorBrush(dark
+            SidebarScrim.Background = new SolidColorBrush(t.Dark
                 ? Color.FromArgb(0x73, 0x00, 0x00, 0x00)
                 : Color.FromArgb(0x3D, 0x00, 0x00, 0x00));
         }
@@ -313,40 +240,6 @@ public partial class AiChatWindow : Window
     }
 
     private SolidColorBrush? _focusRingBrush;
-
-    /// <summary>accent lifted toward white — gradient light ends for caps/orbs.</summary>
-    private static Color Light(Color c, double f) => System.Windows.Media.Color.FromRgb(
-        (byte)(c.R + (255 - c.R) * f),
-        (byte)(c.G + (255 - c.G) * f),
-        (byte)(c.B + (255 - c.B) * f));
-
-    /// <summary>
-    /// v2.4.0-alpha.4 — the top-lit stroke (launcher family material): a vertical
-    /// gradient border that reads as a bright 1 px light edge along the top and
-    /// settles into the quiet hairline below.
-    /// </summary>
-    private static Brush TopLitStrokeBrush(Color hairline, bool dark, byte topAlpha)
-    {
-        var b = new LinearGradientBrush
-        {
-            StartPoint = new System.Windows.Point(0, 0),
-            EndPoint = new System.Windows.Point(0, 1),
-        };
-        if (dark)
-        {
-            b.GradientStops.Add(new GradientStop(Color.FromArgb(topAlpha, 0xFF, 0xFF, 0xFF), 0.0));
-            b.GradientStops.Add(new GradientStop(Color.FromArgb(0x55, 0xFF, 0xFF, 0xFF), 0.10));
-            b.GradientStops.Add(new GradientStop(hairline, 0.42));
-        }
-        else
-        {
-            b.GradientStops.Add(new GradientStop(System.Windows.Media.Colors.White, 0.0));
-            b.GradientStops.Add(new GradientStop(hairline, 0.40));
-        }
-        b.GradientStops.Add(new GradientStop(hairline, 1.0));
-        b.Freeze();
-        return b;
-    }
 
     // ---------------------------------------------------------------- chrome
 

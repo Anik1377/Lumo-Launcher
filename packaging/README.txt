@@ -1,7 +1,31 @@
 ======================================================
-  LUMO v2.6.0-alpha.8  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.1  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.1 (the v3 foundation)
+---------------------------------------------------------------
+1. REAL INSTALLER. Releases now ship LumoSetup-<version>.exe
+   next to the portable zip: per-user install (no admin
+   prompt) to %LOCALAPPDATA%\Programs\Lumo, start-menu +
+   optional desktop shortcut, optional start-with-Windows,
+   and a real uninstaller. Prefer portable? The zip still
+   works exactly as before - keep every file and folder
+   together (Lumo.exe + runtimes\).
+2. A REAL DESIGN SYSTEM. Lumo now builds on the WPF-UI
+   Fluent library, and every window paints from one shared
+   theme engine (ThemeService) instead of four drifting
+   hand-rolled copies.
+3. THEMES YOU CAN SHARE. Settings -> Appearance has a theme
+   gallery: Lumo Dark/Light, Claude Dusk, Parchment, Nord,
+   Matcha, Graphite. Import/export as .json - send a look
+   to a friend, drop theirs in. Applies live.
+4. THE GLOW, FIXED TO MINIMALISM. The orbiting rim comet is
+   gone (no more idle CPU). What remains is the edge shine:
+   a 1 px light catch along the top edge settling into the
+   hairline. Nothing moves; the shine is the glow.
+5. SMOOTH SCROLLING. Settings panels, the AI chat log and
+   long lists glide instead of jumping in hard wheel steps.
 
 WHAT'S NEW IN v2.6.0-alpha.8 (the ChatGPT / Claude look)
 ---------------------------------------------------------------

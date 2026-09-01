@@ -60,6 +60,9 @@ public partial class App : Application
             }
 
             _settings = Settings.Load();
+            // v3.0 — the smooth-scroll behavior reads the motion gate through this hook.
+            SmoothScroll.MotionAllowed = () =>
+                _settings.AnimationsEnabled && SystemParameters.ClientAreaAnimation;
             _shortcuts = new ShortcutStore();
             _recorder = new MacroRecorder();
             _clips = new ClipboardHistory();          // v1.6 — clipboard history (UI-thread timer)

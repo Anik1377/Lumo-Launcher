@@ -43,6 +43,14 @@ public sealed class Settings
     // the solid palette on unsupported builds / remote sessions / failed calls.
     public bool Acrylic { get; set; } = true;
 
+    // ---- v3.0 — the theme system ---------------------------------------------
+    // ThemePreset is a Core/ThemeSelect catalog id ("lumo-dark", "dusk", "nord", …);
+    // "" keeps the legacy v2 pair (Theme + AccentColor) so upgrades render exactly
+    // as before. CustomThemeFile is a file NAME inside AppPaths.ThemesDir (imported
+    // themes); when it resolves and parses, it outranks the preset entirely.
+    public string ThemePreset { get; set; } = "";
+    public string CustomThemeFile { get; set; } = "";
+
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -122,6 +130,8 @@ public sealed class Settings
         s.CornerStyle       = GetStr(root, nameof(CornerStyle), s.CornerStyle);
         s.RowDensity        = GetStr(root, nameof(RowDensity), s.RowDensity);
         s.Acrylic           = GetBool(root, nameof(Acrylic), s.Acrylic);
+        s.ThemePreset       = GetStr(root, nameof(ThemePreset), s.ThemePreset);             // v3.0
+        s.CustomThemeFile   = GetStr(root, nameof(CustomThemeFile), s.CustomThemeFile);     // v3.0
         s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
         s.DisabledPlugins  = GetStrList(root, nameof(DisabledPlugins), s.DisabledPlugins);   // v2.5 — Task 4.2
         s.AiEnabled         = GetBool(root, nameof(AiEnabled), s.AiEnabled);
@@ -263,6 +273,8 @@ public sealed class Settings
         CornerStyle = o.CornerStyle;
         RowDensity = o.RowDensity;
         Acrylic = o.Acrylic;
+        ThemePreset = o.ThemePreset;           // v3.0
+        CustomThemeFile = o.CustomThemeFile;   // v3.0
         CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
         DisabledPlugins = new List<string>(o.DisabledPlugins);   // v2.5 — Task 4.2
         AiEnabled = o.AiEnabled;

@@ -1,6 +1,7 @@
 <Window x:Class="Lumo.UI.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:Lumo.UI"
         Title="Lumo Settings"
         Width="1200" Height="800"
         MinWidth="920" MinHeight="620"
@@ -424,7 +425,7 @@
                     <Grid Grid.Column="1">
 
                         <!-- ================= GENERAL ================= -->
-                        <ScrollViewer x:Name="PanelGeneral" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelGeneral" behaviors:SmoothScroll.Enabled="True" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="General" Style="{StaticResource SectionTitle}"/>
                                 <Border Style="{StaticResource Card}">
@@ -477,9 +478,35 @@
                         </ScrollViewer>
 
                         <!-- ================= APPEARANCE ================= -->
-                        <ScrollViewer x:Name="PanelAppearance" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelAppearance" Visibility="Collapsed" VerticalScrollBarVisibility="Auto"
+                                      behaviors:SmoothScroll.Enabled="True">
                             <StackPanel>
                                 <TextBlock Text="Appearance" Style="{StaticResource SectionTitle}"/>
+
+                                <!-- v3.0 — the theme gallery: built-in presets + imported themes,
+                                     each a live miniature of the palette. Import/export below. -->
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Themes" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}"
+                                                           Text="One click applies live. Import a .json theme file to add your own — or export the current look and share it."/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                                                <Button x:Name="ImportThemeButton" Content="Import…" Style="{StaticResource GhostButton}" Click="OnImportTheme"/>
+                                                <Button x:Name="ExportThemeButton" Content="Export…" Style="{StaticResource GhostButton}" Margin="8,0,0,0" Click="OnExportTheme"/>
+                                            </StackPanel>
+                                        </Grid>
+                                        <WrapPanel x:Name="ThemeGallery" Margin="0,12,0,0"/>
+                                        <TextBlock x:Name="ThemeStatus" Margin="0,10,0,0" FontSize="11.5" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource SubtitleBrush}"/>
+                                    </StackPanel>
+                                </Border>
 
                                 <Border Style="{StaticResource Card}">
                                     <StackPanel>
@@ -489,7 +516,7 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Text="Theme" Style="{StaticResource SettingName}" VerticalAlignment="Center" Margin="0,0,20,0"/>
+                                            <TextBlock Text="Theme mode" Style="{StaticResource SettingName}" VerticalAlignment="Center" Margin="0,0,20,0"/>
                                             <Border Grid.Column="2" Background="{DynamicResource SegTrackBrush}" CornerRadius="9" Padding="3">
                                                 <StackPanel Orientation="Horizontal">
                                                     <RadioButton x:Name="ThemeLight" Content="Light" Style="{StaticResource SegRadio}" GroupName="Theme"/>
@@ -499,7 +526,7 @@
                                             </Border>
                                         </Grid>
                                         <TextBlock Style="{StaticResource SettingDesc}" Margin="0,7,0,0"
-                                                   Text="Auto follows the Windows personalization colour mode and switches live."/>
+                                                   Text="Fallback for the stock Lumo look when no gallery theme is selected — Auto follows the Windows colour mode and switches live."/>
                                     </StackPanel>
                                 </Border>
 
@@ -523,67 +550,10 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0">
-                                                <TextBlock Text="Glow border effect" Style="{StaticResource SettingName}"/>
-                                                <TextBlock Style="{StaticResource SettingDesc}" Text="A minimal accent light that orbits the rim of the launcher window — inside the border, never outside. Changes apply live."/>
+                                                <TextBlock Text="Edge shine" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}" Text="The v3 glow — a minimal 1 px light catch along the launcher's top edge, settling into the hairline. Nothing orbits, nothing pulses."/>
                                             </StackPanel>
                                             <ToggleButton x:Name="BorderEffectToggle" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Center"/>
-                                        </Grid>
-
-                                        <Grid Margin="0,14,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0">
-                                                <TextBlock Text="Border style" Style="{StaticResource SettingName}"/>
-                                                <WrapPanel Margin="0,8,0,0">
-                                                    <RadioButton x:Name="StyleAurora" Content="Aurora" Style="{StaticResource PillRadio}" GroupName="BStyle"/>
-                                                    <RadioButton x:Name="StyleSunset" Content="Sunset" Style="{StaticResource PillRadio}" GroupName="BStyle"/>
-                                                    <RadioButton x:Name="StyleOcean" Content="Ocean" Style="{StaticResource PillRadio}" GroupName="BStyle"/>
-                                                    <RadioButton x:Name="StyleEmber" Content="Ember" Style="{StaticResource PillRadio}" GroupName="BStyle"/>
-                                                    <RadioButton x:Name="StyleMint" Content="Mint" Style="{StaticResource PillRadio}" GroupName="BStyle"/>
-                                                    <RadioButton x:Name="StyleSolid" Content="Solid accent" Style="{StaticResource PillRadio}" GroupName="BStyle"/>
-                                                </WrapPanel>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1">
-                                                <TextBlock Text="Speed" Style="{StaticResource SettingName}"/>
-                                                <Border Grid.Column="1" Background="{DynamicResource SegTrackBrush}" CornerRadius="9"
-                                                        Padding="3" Margin="0,8,0,0" HorizontalAlignment="Right">
-                                                    <StackPanel Orientation="Horizontal">
-                                                        <RadioButton x:Name="SpeedFast" Content="Fast" Style="{StaticResource SegRadio}" GroupName="BSpeed"/>
-                                                        <RadioButton x:Name="SpeedNormal" Content="Normal" Style="{StaticResource SegRadio}" GroupName="BSpeed"/>
-                                                        <RadioButton x:Name="SpeedSlow" Content="Slow" Style="{StaticResource SegRadio}" GroupName="BSpeed"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                        </Grid>
-
-                                        <!-- v2.0.1 — advanced fine-tuning -->
-                                        <Grid Margin="0,14,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel Grid.Column="0">
-                                                <Grid>
-                                                    <TextBlock Text="Glow brightness" Style="{StaticResource SettingName}"/>
-                                                    <TextBlock x:Name="GlowOpacityValue" Text="90%" HorizontalAlignment="Right"
-                                                               FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
-                                                </Grid>
-                                                <Slider x:Name="GlowOpacitySlider" Minimum="40" Maximum="100" TickFrequency="5"
-                                                        IsSnapToTickEnabled="True" Margin="0,8,14,0"
-                                                        Foreground="{DynamicResource AccentBrush}"/>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1" MinWidth="220" Margin="24,0,0,0">
-                                                <Grid>
-                                                    <TextBlock Text="Rim thickness" Style="{StaticResource SettingName}"/>
-                                                    <TextBlock x:Name="RimThicknessValue" Text="3 px" HorizontalAlignment="Right"
-                                                               FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}"/>
-                                                </Grid>
-                                                <Slider x:Name="RimThicknessSlider" Minimum="2" Maximum="6" TickFrequency="0.5"
-                                                        IsSnapToTickEnabled="True" Margin="0,8,0,0"
-                                                        Foreground="{DynamicResource AccentBrush}"/>
-                                            </StackPanel>
                                         </Grid>
 
                                         <Grid Margin="0,14,0,0">
@@ -676,7 +646,7 @@
                         </ScrollViewer>
 
                         <!-- ================= HOTKEY ================= -->
-                        <ScrollViewer x:Name="PanelHotkey" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelHotkey" behaviors:SmoothScroll.Enabled="True" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="Hotkey" Style="{StaticResource SectionTitle}"/>
                                 <Border Style="{StaticResource Card}">
@@ -714,7 +684,7 @@
                         </ScrollViewer>
 
                         <!-- ================= SEARCH & INDEX ================= -->
-                        <ScrollViewer x:Name="PanelSearch" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelSearch" behaviors:SmoothScroll.Enabled="True" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="Search &amp; Index" Style="{StaticResource SectionTitle}"/>
                                 <Border Style="{StaticResource Card}">
@@ -755,7 +725,7 @@
                         </ScrollViewer>
 
                         <!-- ================= SHORTCUTS (v1.4) ================= -->
-                        <ScrollViewer x:Name="PanelShortcuts" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelShortcuts" behaviors:SmoothScroll.Enabled="True" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="Shortcuts &amp; Macros" Style="{StaticResource SectionTitle}"/>
 
@@ -822,7 +792,7 @@
                         </ScrollViewer>
 
                         <!-- ================= PLUGINS (v2.5, DEV_PLAN Task 4.2) ================= -->
-                        <ScrollViewer x:Name="PanelPlugins" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelPlugins" behaviors:SmoothScroll.Enabled="True" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="Plugins" Style="{StaticResource SectionTitle}"/>
 
@@ -964,7 +934,7 @@
                         </ScrollViewer>
 
                         <!-- ================= AI (v2.3, DEV_PLAN Task 3.1) ================= -->
-                        <ScrollViewer x:Name="PanelAI" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelAI" behaviors:SmoothScroll.Enabled="True" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="AI" Style="{StaticResource SectionTitle}"/>
                                 <Border Style="{StaticResource Card}">
@@ -1142,7 +1112,7 @@
                         </ScrollViewer>
 
                         <!-- ================= ABOUT ================= -->
-                        <ScrollViewer x:Name="PanelAbout" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer x:Name="PanelAbout" behaviors:SmoothScroll.Enabled="True" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="About" Style="{StaticResource SectionTitle}"/>
                                 <Border Style="{StaticResource Card}">

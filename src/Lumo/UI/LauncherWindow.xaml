@@ -259,36 +259,14 @@
 
         <Grid>
             <!-- ============================================================
-                 v2.0.1 rim comet (z.ai chat-box style), layers bottom → top:
-                   RimLine  — static hairline ring; always present for definition
-                   GlowClip — the orbiting light; CLIPPED to the rounded window
-                              rect in code so the blobs can only glow INSIDE
-                   GlowCover— opaque surface patch inset by the rim thickness;
-                              hides everything of the blobs but the outer band
-                 The content grid below paints over the rest. No outer bleed,
-                 no halo, no spinning gradient — just light chasing the rim.
+                 v3.0 rim — THE EDGE SHINE (minimalism pass): the orbiting comet
+                   (two soft blobs chasing the perimeter, 720-point sampling, a
+                   rendering clock) is gone. What remains is one static 1 px ring
+                   whose brush is the top-lit gradient — a light catch along the
+                   top edge settling into the quiet hairline. Nothing orbits,
+                   nothing pulses, zero idle CPU; the shine is the glow now.
             ============================================================== -->
             <Border x:Name="RimLine" CornerRadius="8" BorderThickness="1" IsHitTestVisible="False"/>
-            <Border x:Name="GlowClip" CornerRadius="8" IsHitTestVisible="False" Opacity="0">
-                <Grid>
-                    <!-- head: bright core; negative margins put each blob's CENTRE at (0,0),
-                         so the path animation just targets the perimeter coordinates -->
-                    <Ellipse x:Name="GlowHead" Width="300" Height="300"
-                             HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-150,-150,0,0">
-                        <Ellipse.RenderTransform>
-                            <TranslateTransform x:Name="GlowHeadPos" X="0" Y="0"/>
-                        </Ellipse.RenderTransform>
-                    </Ellipse>
-                    <!-- tail: larger + fainter, lagging behind the head (BeginTime set in code) -->
-                    <Ellipse x:Name="GlowTail" Width="460" Height="460"
-                             HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-230,-230,0,0">
-                        <Ellipse.RenderTransform>
-                            <TranslateTransform x:Name="GlowTailPos" X="0" Y="0"/>
-                        </Ellipse.RenderTransform>
-                    </Ellipse>
-                </Grid>
-            </Border>
-            <Border x:Name="GlowCover" CornerRadius="5" Margin="3" IsHitTestVisible="False"/>
 
             <!-- v2.4.0-alpha.3 — ambient sheen: a soft, static pool of light just under
                  the top edge (the reference material's glow). Clipped by the window clip

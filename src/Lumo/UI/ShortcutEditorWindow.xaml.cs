@@ -83,27 +83,13 @@ public partial class ShortcutEditorWindow : Window
     {
         try
         {
-            bool dark = _settings.EffectiveDark();
-            var p = Appearance.PaletteFor(dark, _settings.AccentColor);
-            Color field = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xF5, 0xF5, 0xF7);
-            Color segTrack = dark ? FromRgb(0x2C, 0x2C, 0x2E) : FromRgb(0xE9, 0xE9, 0xEB);
-            Color segSel = dark ? FromRgb(0x48, 0x48, 0x4A) : Colors.White;
-
-            Resources["TitleBrush"] = new SolidColorBrush(p.Title);
-            Resources["SubtitleBrush"] = new SolidColorBrush(p.Subtitle);
-            Resources["HoverBrush"] = new SolidColorBrush(p.Hover);
-            Resources["AccentBrush"] = new SolidColorBrush(p.Accent);
-            Resources["BorderLineBrush"] = new SolidColorBrush(p.Border);
-            Resources["FieldBrush"] = new SolidColorBrush(field);
-            Resources["SegTrackBrush"] = new SolidColorBrush(segTrack);
-            Resources["SegSelBrush"] = new SolidColorBrush(segSel);
-
-            Root.Background = new SolidColorBrush(p.Panel);
+            // v3.0 — the shared ThemeService ladder (the old local field values sat a
+            // step off the family ladder; now every surface shares one source).
+            var t = ThemeService.Apply(this, _settings);
+            Root.Background = new SolidColorBrush(t.Panel);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("ShortcutEditor.Theme", ex); }
     }
-
-    private static Color FromRgb(byte r, byte g, byte b) => Color.FromRgb(r, g, b);
 
     /// <summary>Fade + gentle scale-in, matching the settings window.</summary>
     private void PlayEntrance()
