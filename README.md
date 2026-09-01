@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.0--alpha.2-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-3.0.0--alpha.3-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -213,6 +213,28 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v3.0.0-alpha.3 — persona faces + the animated mascot (the AI experience)
+
+v3 phase 3 of 3 — the AI tab gets a soul:
+
+1. **🎭 Personas have faces now.** Eight hand-drawn vector characters — Spark,
+   Blob, Bot, Ghost, Star, Cat, Moon and Sprout — each tinted with the
+   persona's own color (or your theme accent). The persona chip in the chat's
+   top bar, the persona flyout, and every assistant message avatar wear the
+   active persona's face, so you always know who's answering.
+2. **🐻 The Lumo mascot.** The chat's empty state greets you with an animated
+   character that **wears the active persona's face and color**: it bobs and
+   breathes, blinks on its own schedule, leans in eagerly while your voice is
+   being recorded, and its eyes wander off while a reply streams. It obeys the
+   animations master switch and stops the moment it's off-screen.
+3. **🎨 Persona editor, redesigned.** Settings → AI personas: a face picker
+   (every character as a live mini preview), a color picker (theme accent or
+   ten tints), and a big live preview. Faces and colors persist in
+   personas.json alongside the prompt; old persona files load unchanged.
+4. **✨ Chat polish.** The old gradient-orb avatars are gone in favor of the
+   faces; the halo behind the mascot breathes a quiet whisper instead of a
+   lighthouse pulse.
 
 ## 🆕 What's new in v3.0.0-alpha.2 — the Lumo hub: an App Deck bound to your numpad
 

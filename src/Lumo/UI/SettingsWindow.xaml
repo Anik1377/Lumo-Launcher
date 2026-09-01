@@ -1041,11 +1041,27 @@
                                                              Background="{DynamicResource FieldBrush}" Foreground="{DynamicResource TitleBrush}"
                                                              BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"/>
                                                 </StackPanel>
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="Glyph (emoji ok)" Style="{StaticResource SettingDesc}" Margin="0,0,0,2"/>
-                                                    <TextBox x:Name="PersonaGlyphBox" FontSize="12.5" Padding="8,6" MaxLength="4" TextAlignment="Center"
-                                                             Background="{DynamicResource FieldBrush}" Foreground="{DynamicResource TitleBrush}"
-                                                             BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"/>
+                                            </Grid>
+                                            <!-- v3.0 — persona face + color: the character that
+                                                 represents this persona in the chat, plus its tint -->
+                                            <Grid Margin="0,10,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Face" Style="{StaticResource SettingDesc}" Margin="0,0,0,4"/>
+                                                    <WrapPanel x:Name="PersonaFacePicker"/>
+                                                    <TextBlock Text="Color" Style="{StaticResource SettingDesc}" Margin="0,10,0,4"/>
+                                                    <WrapPanel x:Name="PersonaColorPicker"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1" Margin="16,0,0,0">
+                                                    <TextBlock Text="Preview" Style="{StaticResource SettingDesc}" Margin="0,0,0,4"/>
+                                                    <Border Width="76" Height="76" CornerRadius="18"
+                                                            Background="{DynamicResource FieldBrush}"
+                                                            BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+                                                        <behaviors:PersonaFaceView x:Name="PersonaFacePreview" Width="54" Height="54"/>
+                                                    </Border>
                                                 </StackPanel>
                                             </Grid>
                                             <TextBlock Text="System prompt" Style="{StaticResource SettingDesc}" Margin="0,10,0,2"/>
@@ -1063,8 +1079,7 @@
 
                                         <ItemsControl x:Name="PersonaList" Margin="0,10,0,0"/>
                                         <TextBlock x:Name="PersonaEmpty" Style="{StaticResource SettingDesc}" Margin="0,6,0,0" TextWrapping="Wrap"
-                                                   Text="No custom personas yet — the six built-ins are always available in the chat's persona chip."/>
-                                    </StackPanel>
+                                                   Text="No custom personas yet — the six built-ins are always available in the chat's persona chip."/>                                    </StackPanel>
                                 </Border>
 
                                 <!-- ============ Local models (Ollama) — v2.3.0-alpha.2 ============ -->

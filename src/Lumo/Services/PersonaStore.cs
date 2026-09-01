@@ -70,7 +70,7 @@ public sealed class PersonaStore
         try
         {
             if (el.ValueKind != JsonValueKind.Object) return null;
-            string id = "", name = "", glyph = "", prompt = "", blurb = "";
+            string id = "", name = "", glyph = "", prompt = "", blurb = "", face = "", color = "";
             if (el.TryGetProperty(nameof(ChatPersona.Id), out var v) && v.ValueKind == JsonValueKind.String)
                 id = v.GetString() ?? "";
             if (el.TryGetProperty(nameof(ChatPersona.Name), out v) && v.ValueKind == JsonValueKind.String)
@@ -81,8 +81,12 @@ public sealed class PersonaStore
                 prompt = v.GetString() ?? "";
             if (el.TryGetProperty(nameof(ChatPersona.Blurb), out v) && v.ValueKind == JsonValueKind.String)
                 blurb = v.GetString() ?? "";
+            if (el.TryGetProperty("Face", out v) && v.ValueKind == JsonValueKind.String)
+                face = PersonaFaces.NormalizeId(v.GetString());
+            if (el.TryGetProperty("Color", out v) && v.ValueKind == JsonValueKind.String)
+                color = PersonaFaces.NormalizeColor(v.GetString());
             if (id.Length == 0 || name.Length == 0 || prompt.Length == 0) return null;
-            return new ChatPersona(id, name, glyph.Length == 0 ? "\uE77B" : glyph, prompt, blurb);
+            return new ChatPersona(id, name, glyph.Length == 0 ? "\uE77B" : glyph, prompt, blurb, face, color);
         }
         catch { return null; }
     }
@@ -108,10 +112,12 @@ public sealed class PersonaStore
 
     /// <summary>
     /// Creates a persona from user input. Trims every field; an empty glyph gets
-    /// the contact default. Returns the stored persona, or null when the input
+    /// the contact default; face/color normalize (unknown face or junk hex persist
+    /// as "" = default). Returns the stored persona, or null when the input
     /// cannot make a valid persona (no name / no prompt / store full).
     /// </summary>
-    public ChatPersona? Add(string name, string glyph, string prompt, string blurb)
+    public ChatPersona? Add(string name, string glyph, string prompt, string blurb,
+                            string face = "", string color = "")
     {
         try
         {
@@ -127,7 +133,9 @@ public sealed class PersonaStore
                     Name: Trunc(name, 40),
                     Glyph: Trunc((glyph ?? "").Trim(), 4) is { Length: > 0 } g ? g : "\uE77B",
                     Prompt: Trunc(prompt, 4000),
-                    Blurb: Trunc((blurb ?? "").Trim(), 80));
+                    Blurb: Trunc((blurb ?? "").Trim(), 80),
+                    Face: PersonaFaces.NormalizeId(face),
+                    Color: PersonaFaces.NormalizeColor(color));
                 _personas.Add(p);
                 ScheduleSave();
                 return p;
@@ -136,8 +144,10 @@ public sealed class PersonaStore
         catch (Exception ex) { DiagnosticLogger.LogException("PersonaStore.Add", ex); return null; }
     }
 
-    /// <summary>Updates name/glyph/prompt/blurb on an existing persona. False when the id is unknown.</summary>
-    public bool Update(string id, string name, string glyph, string prompt, string blurb)
+    /// <summary>Updates name/glyph/prompt/blurb (+ optional face/color) on an existing persona.
+    /// False when the id is unknown.</summary>
+    public bool Update(string id, string name, string glyph, string prompt, string blurb,
+                       string face = "", string color = "")
     {
         try
         {
@@ -154,6 +164,8 @@ public sealed class PersonaStore
                     Glyph = Trunc((glyph ?? "").Trim(), 4) is { Length: > 0 } g ? g : "\uE77B",
                     Prompt = Trunc(prompt, 4000),
                     Blurb = Trunc((blurb ?? "").Trim(), 80),
+                    Face = PersonaFaces.NormalizeId(face),
+                    Color = PersonaFaces.NormalizeColor(color),
                 };
                 ScheduleSave();
                 return true;

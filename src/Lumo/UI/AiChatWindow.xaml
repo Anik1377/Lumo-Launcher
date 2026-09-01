@@ -688,13 +688,14 @@
                             </StackPanel>
                         </Button>
                         <!-- v2.4.0-alpha.5 — persona chip: the system prompt that shapes
-                             every reply in this chat; click = persona flyout -->
+                             every reply in this chat; click = persona flyout.
+                             v3.0 — the chip shows the persona's FACE, not a glyph. -->
                         <Button x:Name="PersonaChip" Style="{StaticResource TopPickerButton}" Margin="4,0,0,0"
                                 VerticalAlignment="Center" Click="OnPersonaChipClick"
                                 ToolTip="Persona — the system prompt shaping every reply">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock x:Name="PersonaGlyph" FontFamily="Segoe MDL2 Assets" FontSize="11"
-                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                <behaviors:PersonaFaceView x:Name="PersonaFaceGlyph" Width="17" Height="17"
+                                                           VerticalAlignment="Center"/>
                                 <TextBlock x:Name="PersonaChipText" FontSize="12.5" FontWeight="SemiBold" Margin="6,0,0,0"
                                            Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text=" &#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="8"
@@ -776,20 +777,13 @@
                     </Grid>
                 </ScrollViewer>
 
-                <!-- empty state: gradient logo orb with a breathing halo -->
+                <!-- empty state: the v3 mascot (it adopts the active persona's face
+                     and color), with the quiet breathing halo behind it -->
                 <StackPanel x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center"
                             MaxWidth="560" TextBlock.TextAlignment="Center">
-                    <Grid Width="86" Height="86" HorizontalAlignment="Center" IsHitTestVisible="False">
-                        <Ellipse x:Name="OrbGlow" Width="86" Height="86" Fill="{DynamicResource GlowBrush}" Opacity="0.7"/>
-                        <Ellipse x:Name="OrbDisc" Width="52" Height="52" Fill="{DynamicResource OrbBrush}">
-                            <Ellipse.Effect>
-                                <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270"
-                                                  Opacity="0.35" Color="#FF101418"/>
-                            </Ellipse.Effect>
-                        </Ellipse>
-                        <Path Data="M12,2 C12.7,7.3 16.7,11.3 22,12 C16.7,12.7 12.7,16.7 12,22 C11.3,16.7 7.3,12.7 2,12 C7.3,11.3 11.3,7.3 12,2 Z"
-                              Fill="White" Stretch="Uniform" Width="24" Height="24"
-                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Grid Width="120" Height="118" HorizontalAlignment="Center" IsHitTestVisible="False">
+                        <Ellipse x:Name="OrbGlow" Width="120" Height="120" Fill="{DynamicResource GlowBrush}" Opacity="0.7"/>
+                        <behaviors:MascotView x:Name="Mascot" Width="112" Height="106" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Grid>
                     <TextBlock Text="What can I help with?" FontSize="25" FontWeight="SemiBold" Margin="0,16,0,0"
                                Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center"/>

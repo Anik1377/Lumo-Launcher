@@ -1457,6 +1457,9 @@ public partial class SettingsWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.VoiceStatus", ex); return "Voice input status unavailable."; }
     }
 
+    private string _editingPersonaFace = "";   // v3.0 — face/color being edited
+    private string _editingPersonaColor = "";
+
     private void RebuildPersonaList()
     {
         try
@@ -1479,15 +1482,16 @@ public partial class SettingsWindow : Window
 
         var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         var nameRow = new StackPanel { Orientation = Orientation.Horizontal };
-        var glyph = new TextBlock
+        // v3.0 — the row shows the persona's FACE (the glyph field is legacy now)
+        var face = new PersonaFaceView
         {
-            Text = p.Glyph,
-            FontSize = 12.5,
+            Width = 20,
+            Height = 20,
             Margin = new Thickness(0, 0, 7, 0),
             VerticalAlignment = VerticalAlignment.Center,
+            FaceId = PersonaFaces.NormalizeId(p.Face),
+            PersonaColor = PersonaFaces.NormalizeColor(p.Color),
         };
-        if (p.Glyph.Length > 0 && p.Glyph[0] >= '\uE000' && p.Glyph[0] <= '\uF8FF')
-            glyph.FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets");
         var name = new TextBlock
         {
             Text = p.Name,
@@ -1497,7 +1501,7 @@ public partial class SettingsWindow : Window
             TextTrimming = TextTrimming.CharacterEllipsis,
         };
         name.SetResourceReference(TextBlock.ForegroundProperty, "TitleBrush");
-        nameRow.Children.Add(glyph);
+        nameRow.Children.Add(face);
         nameRow.Children.Add(name);
         text.Children.Add(nameRow);
 
@@ -1528,8 +1532,12 @@ public partial class SettingsWindow : Window
         {
             _editingPersonaId = null;
             PersonaNameBox.Text = "";
-            PersonaGlyphBox.Text = "";
             PersonaPromptBox.Text = "";
+            _editingPersonaFace = PersonaFaces.DefaultFace;
+            _editingPersonaColor = "";
+            BuildPersonaFacePicker();
+            BuildPersonaColorPicker();
+            UpdatePersonaFacePreview();
             PersonaEditor.Visibility = Visibility.Visible;
             PersonaNameBox.Focus();
         }
@@ -1543,8 +1551,12 @@ public partial class SettingsWindow : Window
             if (sender is not Button { Tag: string id } || PersonaStore.Current.Find(id) is not { } p) return;
             _editingPersonaId = p.Id;
             PersonaNameBox.Text = p.Name;
-            PersonaGlyphBox.Text = p.Glyph;
             PersonaPromptBox.Text = p.Prompt;
+            _editingPersonaFace = PersonaFaces.NormalizeId(p.Face) is { Length: > 0 } f ? f : PersonaFaces.DefaultFace;
+            _editingPersonaColor = PersonaFaces.NormalizeColor(p.Color);
+            BuildPersonaFacePicker();
+            BuildPersonaColorPicker();
+            UpdatePersonaFacePreview();
             PersonaEditor.Visibility = Visibility.Visible;
             PersonaNameBox.Focus();
         }
@@ -1578,10 +1590,13 @@ public partial class SettingsWindow : Window
                 FooterHint.Text = "A persona needs at least a name and a system prompt";
                 return;
             }
-            string glyph = PersonaGlyphBox.Text.Trim();
+            // v3.0 — face/color ride along; the legacy glyph stays whatever it was
+            string glyph = _editingPersonaId is { } existingId
+                ? PersonaStore.Current.Find(existingId)?.Glyph ?? ""
+                : "";
             bool ok = _editingPersonaId is { } id
-                ? PersonaStore.Current.Update(id, name, glyph, prompt, "")
-                : PersonaStore.Current.Add(name, glyph, prompt, "") is not null;
+                ? PersonaStore.Current.Update(id, name, glyph, prompt, "", _editingPersonaFace, _editingPersonaColor)
+                : PersonaStore.Current.Add(name, glyph, prompt, "", _editingPersonaFace, _editingPersonaColor) is not null;
             if (!ok && _editingPersonaId is null)
             {
                 FooterHint.Text = $"Persona list is full ({PersonaStore.MaxPersonas}) — delete one first";
@@ -1592,6 +1607,96 @@ public partial class SettingsWindow : Window
             FooterHint.Text = "Persona saved — pick it from the chat's persona chip";
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Settings.PersonaSave", ex); }
+    }
+
+    // ------------------------------------------------- v3.0 — persona face picker
+
+    private void BuildPersonaFacePicker()
+    {
+        PersonaFacePicker.Children.Clear();
+        foreach (var f in PersonaFaces.All)
+        {
+            var id = f.Id;
+            var card = new Border
+            {
+                Width = 44,
+                Height = 44,
+                Margin = new Thickness(0, 0, 8, 8),
+                CornerRadius = new CornerRadius(11),
+                Background = (System.Windows.Media.Brush)FindResource("FieldBrush"),
+                BorderThickness = new Thickness(id == _editingPersonaFace ? 2 : 1),
+                BorderBrush = id == _editingPersonaFace
+                    ? (System.Windows.Media.Brush)FindResource("AccentBrush")
+                    : (System.Windows.Media.Brush)FindResource("BorderLineBrush"),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = f.Name,
+                Child = new PersonaFaceView { FaceId = id, PersonaColor = _editingPersonaColor },
+            };
+            PressFeedback.SetIsEnabled(card, true);
+            card.MouseLeftButtonUp += (_, _) =>
+            {
+                _editingPersonaFace = id;
+                BuildPersonaFacePicker();
+                UpdatePersonaFacePreview();
+            };
+            PersonaFacePicker.Children.Add(card);
+        }
+    }
+
+    private void BuildPersonaColorPicker()
+    {
+        PersonaColorPicker.Children.Clear();
+        var choices = new List<string> { "" };
+        choices.AddRange(Appearance.AccentPresets.Where(h => !string.Equals(h, "#FF6363", StringComparison.OrdinalIgnoreCase)));
+        foreach (var hex in choices)
+        {
+            var color = hex;
+            System.Windows.Media.Color rgb;
+            try { rgb = (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(hex.Length == 0 ? "#808088" : hex); }
+            catch { rgb = System.Windows.Media.Colors.Gray; }
+
+            var swatch = new Border
+            {
+                Width = 30,
+                Height = 30,
+                Margin = new Thickness(0, 0, 8, 8),
+                CornerRadius = new CornerRadius(15),
+                Background = new System.Windows.Media.SolidColorBrush(rgb),
+                BorderThickness = new Thickness(hex == _editingPersonaColor ? 3 : 1),
+                BorderBrush = hex == _editingPersonaColor
+                    ? (System.Windows.Media.Brush)FindResource("TitleBrush")
+                    : (System.Windows.Media.Brush)FindResource("BorderLineBrush"),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = hex.Length == 0 ? "Follow the theme accent" : hex,
+            };
+            if (hex.Length == 0)
+            {
+                swatch.Child = new TextBlock
+                {
+                    Text = "A",
+                    Foreground = System.Windows.Media.Brushes.White,
+                    FontWeight = FontWeights.Bold,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                swatch.Background = (System.Windows.Media.Brush)FindResource("SubtitleBrush");
+            }
+            PressFeedback.SetIsEnabled(swatch, true);
+            swatch.MouseLeftButtonUp += (_, _) =>
+            {
+                _editingPersonaColor = color;
+                BuildPersonaColorPicker();
+                BuildPersonaFacePicker();   // re-tint the face chips
+                UpdatePersonaFacePreview();
+            };
+            PersonaColorPicker.Children.Add(swatch);
+        }
+    }
+
+    private void UpdatePersonaFacePreview()
+    {
+        PersonaFacePreview.FaceId = _editingPersonaFace;
+        PersonaFacePreview.PersonaColor = _editingPersonaColor;
     }
 
     private void OnPersonaCancel(object sender, RoutedEventArgs e)

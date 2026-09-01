@@ -63,6 +63,7 @@ public partial class App : Application
             // v3.0 — the smooth-scroll behavior reads the motion gate through this hook.
             SmoothScroll.MotionAllowed = () =>
                 _settings.AnimationsEnabled && SystemParameters.ClientAreaAnimation;
+            UI.MascotView.MotionAllowed = SmoothScroll.MotionAllowed;   // v3.0 — the mascot obeys the same gate
             _shortcuts = new ShortcutStore();
             _recorder = new MacroRecorder();
             _clips = new ClipboardHistory();          // v1.6 — clipboard history (UI-thread timer)

@@ -1,7 +1,26 @@
 ======================================================
-  LUMO v3.0.0-alpha.2  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.3  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.3 (persona faces + mascot)
+---------------------------------------------------------------
+1. PERSONAS HAVE FACES. Eight little vector characters
+   (Spark, Blob, Bot, Ghost, Star, Cat, Moon, Sprout), each
+   in the persona's own color. The persona chip, the picker
+   flyout and every assistant reply now wear the persona's
+   face - you always know who is answering.
+2. THE MASCOT. The chat's welcome screen is an animated
+   character that wears the active persona's face: it bobs
+   and breathes, blinks by itself, leans in while your voice
+   is recorded, and looks away thoughtfully while a reply
+   streams. It stops when animations are off or the window
+   is hidden.
+3. PERSONA EDITOR. Settings -> AI personas now has a face
+   picker, a color picker and a live preview. Old persona
+   files load unchanged.
+4. Everything still runs 100% local - faces are vector
+   drawings, not downloads.
 
 WHAT'S NEW IN v3.0.0-alpha.2 (the Lumo hub + App Deck)
 ---------------------------------------------------------------

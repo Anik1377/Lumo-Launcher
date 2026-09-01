@@ -400,6 +400,10 @@ public partial class AiChatWindow : Window
     {
         try
         {
+            // v3.0 — the mascot wears the active persona's face and color
+            var _personaForMascot = ResolvePersona(_session?.Persona ?? _settings.AiPersona);
+            Mascot.FaceId = PersonaFaces.NormalizeId(_personaForMascot.Face);
+            Mascot.PersonaColor = PersonaFaces.NormalizeColor(_personaForMascot.Color);
             EmptyState.Visibility = MessagesHost.Children.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             bool anthropic = AiProviders.IsAnthropic(_settings.AiStyle, _settings.AiEndpoint);
             EmptySub.Text = _settings.AiEnabled
@@ -606,6 +610,7 @@ public partial class AiChatWindow : Window
 
     private void OnVoiceStarted()
     {
+        Mascot.Mood = MascotView.Moods.Listening;   // v3.0 — the mascot leans in while you speak
         if (!_voice.IsRecording) return;   // stale queued event after an instant cancel — drop
         try
         {
@@ -663,6 +668,7 @@ public partial class AiChatWindow : Window
     /// <summary>Restore the idle voice UI — after show, after failure, and after Esc cancels.</summary>
     private void OnVoiceStopped()
     {
+        Mascot.Mood = MascotView.Moods.Idle;   // v3.0
         try
         {
             MicButton.Tag = "";
@@ -1066,13 +1072,9 @@ public partial class AiChatWindow : Window
         try
         {
             var persona = ResolvePersona(_session?.Persona ?? _settings.AiPersona);
-            PersonaGlyph.Text = persona.Glyph;
-            // custom personas may carry an emoji — those need the default font
-            // (WPF falls back to Segoe UI Emoji), not the MDL2 symbol face.
-            if (IsMdl2Glyph(persona.Glyph))
-                PersonaGlyph.FontFamily = new FontFamily("Segoe MDL2 Assets");
-            else
-                PersonaGlyph.ClearValue(FontFamilyProperty);   // inherit the Inter family
+            // v3.0 — the chip shows the persona's FACE; color "" follows the theme accent
+            PersonaFaceGlyph.FaceId = PersonaFaces.NormalizeId(persona.Face);
+            PersonaFaceGlyph.PersonaColor = PersonaFaces.NormalizeColor(persona.Color);
             PersonaChipText.Text = persona.Name;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PersonaChip", ex); }
@@ -1098,6 +1100,7 @@ public partial class AiChatWindow : Window
                     Header = (active ? "\u2713  " : "") + $"{p.Name}  \u00b7  {p.Blurb}",
                     FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
                     Tag = p.Id,
+                    Icon = FaceIcon(p),   // v3.0 — the persona's own face in the flyout
                 };
                 item.Click += OnPersonaMenuItemClick;
                 menu.Items.Add(item);
@@ -1115,6 +1118,7 @@ public partial class AiChatWindow : Window
                         Header = (active ? "\u2713  " : "") + $"{p.Name}  \u00b7  {p.Blurb}",
                         FontWeight = active ? FontWeights.SemiBold : FontWeights.Normal,
                         Tag = p.Id,
+                        Icon = FaceIcon(p),   // v3.0
                     };
                     item.Click += OnPersonaMenuItemClick;
                     menu.Items.Add(item);
@@ -1136,6 +1140,18 @@ public partial class AiChatWindow : Window
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.PersonaPick", ex); }
     }
+
+    /// <summary>v3.0 — a tiny face for a persona flyout row (MenuItem.Icon takes any UIElement).</summary>
+    private static System.Windows.Controls.Border FaceIcon(ChatPersona p) => new()
+    {
+        Width = 20,
+        Height = 20,
+        Child = new PersonaFaceView
+        {
+            FaceId = PersonaFaces.NormalizeId(p.Face),
+            PersonaColor = PersonaFaces.NormalizeColor(p.Color),
+        },
+    };
 
     private void OnPersonaMenuItemClick(object sender, RoutedEventArgs e)
     {
@@ -1770,6 +1786,7 @@ public partial class AiChatWindow : Window
     /// </summary>
     private void BeginAssistantTurn(string prompt, AiProviders.ImagePayload? image = null)
     {
+        Mascot.Mood = MascotView.Moods.Thinking;   // v3.0 — eyes wander while the reply streams
         try
         {
             // assistant placeholder: avatar + plain-text live line + typing dots
@@ -1870,6 +1887,7 @@ public partial class AiChatWindow : Window
     /// <summary>Ends a turn: finalize markdown, record history, restore the send button. UI thread.</summary>
     private void FinishTurn(AiService.AiStreamResult result)
     {
+        Mascot.Mood = MascotView.Moods.Idle;   // v3.0
         try
         {
             _flushTimer?.Stop();
@@ -2081,31 +2099,18 @@ public partial class AiChatWindow : Window
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
         // v2.3.0-alpha.4 — prompt-kit avatar: a gradient disc with a white sparkle
-        // mark (replaces the literal "?" glyph — the single cheapest look in the old build).
-        var avatar = new Grid
+        // mark. v3.0 — the disc is gone: the avatar is the ACTIVE PERSONA'S FACE
+        // (its own character + color), so every persona reads at a glance.
+        var persona = ResolvePersona(_session?.Persona ?? _settings.AiPersona);
+        var avatar = new PersonaFaceView
         {
             Width = 26,
             Height = 26,
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(0, 1, 12, 0),
+            FaceId = PersonaFaces.NormalizeId(persona.Face),
+            PersonaColor = PersonaFaces.NormalizeColor(persona.Color),
         };
-        var disc = new System.Windows.Shapes.Ellipse
-        {
-            Fill = (Brush)Resources["OrbBrush"],
-        };
-        var spark = new System.Windows.Shapes.Path
-        {
-            Data = System.Windows.Media.Geometry.Parse(
-                "M12,2 C12.7,7.3 16.7,11.3 22,12 C16.7,12.7 12.7,16.7 12,22 C11.3,16.7 7.3,12.7 2,12 C7.3,11.3 11.3,7.3 12,2 Z"),
-            Fill = System.Windows.Media.Brushes.White,
-            Stretch = Stretch.Uniform,
-            Width = 13,
-            Height = 13,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        avatar.Children.Add(disc);
-        avatar.Children.Add(spark);
         Grid.SetColumn(avatar, 0);
 
         var host = new StackPanel();
