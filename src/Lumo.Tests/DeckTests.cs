@@ -112,8 +112,9 @@ public class DeckTests
             store.Assign(DeckSlots.Normalize(0, "Editor", @"C:\Tools\edit.exe", "-n", "")!);
             store.Assign(DeckSlots.Normalize(8, "Terminal", @"C:\Tools\term.exe", "", @"C:\Tools")!);
 
-            // the single-flight save is async — the test path calls SaveSnapshot directly
-            DeckStore.SaveSnapshot(store.Slots(), file);
+            // v3.0.0-alpha.4 — synchronous flush that joins the generation ledger:
+            // no in-flight background save can overwrite this state with something older
+            store.SaveNow();
 
             var reloaded = new DeckStore(file);
             Assert.Equal(2, reloaded.AssignedCount);
@@ -123,7 +124,7 @@ public class DeckTests
             Assert.False(reloaded.Slot(5).IsAssigned);
 
             reloaded.Clear(0);
-            DeckStore.SaveSnapshot(reloaded.Slots(), file);
+            reloaded.SaveNow();
             Assert.Equal(1, new DeckStore(file).AssignedCount);
         }
         finally

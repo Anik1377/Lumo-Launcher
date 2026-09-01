@@ -81,7 +81,7 @@ public sealed class ChatStore
             string path = file ?? AppPaths.ChatsFile;
             if (File.Exists(path))
             {
-                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                using var doc = JsonDocument.Parse(AtomicIo.ReadWithRetry(path));
                 if (doc.RootElement.ValueKind == JsonValueKind.Array)
                 {
                     var loaded = doc.RootElement.EnumerateArray()
@@ -261,18 +261,15 @@ public sealed class ChatStore
                 Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
                 string tmp = _file + "." + Guid.NewGuid().ToString("N") + ".tmp";
                 File.WriteAllText(tmp, json);
-                File.Move(tmp, _file, overwrite: true);
+                AtomicIo.Swap(tmp, _file);   // v3.0.0-alpha.4 — atomic replace: a concurrent Load can never see the file absent (read as "empty")
             }
         }
         catch (Exception ex) { DiagnosticLogger.LogException("ChatStore.Save", ex); }
         try
         {
-            // orphan-tmp cleanup: sweeps any tmp left behind by a killed process
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is null) return;
-            string name = Path.GetFileName(_file);
-            foreach (var orphan in Directory.GetFiles(dir, name + ".*.tmp"))
-            { try { File.Delete(orphan); } catch { } }
+            // orphan-tmp cleanup: sweeps any tmp left behind by a killed process —
+            // v3.0.0-alpha.4: STALE ones only (a live tmp from a concurrent save dies mid-write otherwise)
+            AtomicIo.SweepStaleTmps(_file);
         }
         catch { /* best-effort */ }
     }

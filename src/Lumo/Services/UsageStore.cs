@@ -91,7 +91,7 @@ public sealed class UsageStore
                 try
                 {
                     File.WriteAllText(tmp, json);
-                    File.Move(tmp, _file, overwrite: true);
+                    AtomicIo.Swap(tmp, _file);   // v3.0.0-alpha.4 — atomic replace
                 }
                 finally
                 {

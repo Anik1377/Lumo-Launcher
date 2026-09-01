@@ -144,7 +144,7 @@ public sealed class Favourites
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             var tmp = _file + ".tmp";
             File.WriteAllText(tmp, json);
-            File.Move(tmp, _file, overwrite: true);
+            AtomicIo.Swap(tmp, _file);   // v3.0.0-alpha.4 — atomic replace
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Favourites.Save", ex); }
     }

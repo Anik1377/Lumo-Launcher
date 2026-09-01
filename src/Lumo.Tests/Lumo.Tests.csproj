@@ -74,6 +74,8 @@
     <!-- v3.0 — App Deck slot model + store -->
     <Compile Include="../Lumo/Core/DeckSlots.cs" Link="Core/DeckSlots.cs" />
     <Compile Include="../Lumo/Services/DeckStore.cs" Link="Services/DeckStore.cs" />
+    <!-- v3.0.0-alpha.4 — the shared atomic tmp→file swap + read retry + stale sweep -->
+    <Compile Include="../Lumo/Core/AtomicIo.cs" Link="Core/AtomicIo.cs" />
     <!-- v3.0 — persona face catalog (pure) -->
     <Compile Include="../Lumo/Core/PersonaFaces.cs" Link="Core/PersonaFaces.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />

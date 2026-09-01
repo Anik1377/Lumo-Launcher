@@ -48,7 +48,7 @@ public sealed class PersonaStore
             string path = file ?? AppPaths.PersonasFile;
             if (File.Exists(path))
             {
-                using var doc = JsonDocument.Parse(File.ReadAllText(path));
+                using var doc = JsonDocument.Parse(AtomicIo.ReadWithRetry(path));
                 if (doc.RootElement.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var el in doc.RootElement.EnumerateArray())
@@ -226,7 +226,7 @@ public sealed class PersonaStore
                 Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
                 string tmp = _file + "." + Guid.NewGuid().ToString("N") + ".tmp";
                 File.WriteAllText(tmp, json);
-                File.Move(tmp, _file, overwrite: true);
+                AtomicIo.Swap(tmp, _file);   // v3.0.0-alpha.4 — atomic replace
             }
         }
         catch (Exception ex) { DiagnosticLogger.LogException("PersonaStore.Save", ex); }

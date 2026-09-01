@@ -17,6 +17,7 @@ public sealed class DeckStore
     private readonly string _file;
     private readonly DeckSlots.Slot[] _slots = new DeckSlots.Slot[DeckSlots.Count];
     private int _saving;
+    private readonly object _saveGate = new();   // v3.0.0-alpha.4 — spans claim + swap, so writes are strictly ordered
     // v3.0.0-alpha.4 — save generations: the disk can never regress to an older
     // snapshot. Every mutation bumps _gen (under the _slots lock); a save claims a
     // generation and writes it, so a STALE background save can no longer overwrite
@@ -72,6 +73,24 @@ public sealed class DeckStore
         }
     }
 
+    /// <summary>v3.0.0-alpha.4 — synchronous save that PARTICIPATES in the generation
+    /// ledger: any in-flight or later background save can never overwrite this state
+    /// with something older. Used by tests and any "flush before exit" path.</summary>
+    public void SaveNow()
+    {
+        lock (_saveGate)
+        {
+            DeckSlots.Slot[] snapshot;
+            lock (_slots)
+            {
+                _gen++;
+                _writtenGen = _gen;
+                snapshot = (DeckSlots.Slot[])_slots.Clone();
+            }
+            SaveSnapshot(snapshot, _file);
+        }
+    }
+
     public int AssignedCount
     {
         get { lock (_slots) return _slots.Count(s => s.IsAssigned); }
@@ -117,7 +136,7 @@ public sealed class DeckStore
         try
         {
             if (!File.Exists(file)) return;
-            using var doc = JsonDocument.Parse(File.ReadAllText(file));
+            using var doc = JsonDocument.Parse(AtomicIo.ReadWithRetry(file));
             if (doc.RootElement.ValueKind != JsonValueKind.Array) return;
 
             foreach (var el in doc.RootElement.EnumerateArray())
@@ -150,21 +169,27 @@ public sealed class DeckStore
             {
                 while (true)
                 {
-                    long gen;
-                    DeckSlots.Slot[] snapshot;
-                    lock (_slots)
+                    lock (_saveGate)
                     {
-                        gen = _gen;
-                        if (gen <= _writtenGen) return;   // disk already holds this state or newer
-                        _writtenGen = gen;                // we own writing this generation
-                        snapshot = (DeckSlots.Slot[])_slots.Clone();
+                        DeckSlots.Slot[] snapshot;
+                        lock (_slots)
+                        {
+                            if (_gen <= _writtenGen) return;   // disk already holds this state or newer
+                            _writtenGen = _gen;                // claim + swap are ONE serialized step,
+                            snapshot = (DeckSlots.Slot[])_slots.Clone();
+                        }
+                        SaveSnapshot(snapshot, _file);         // so an older claimed write can never land last
                     }
-                    SaveSnapshot(snapshot, _file);
-                    // a mutation during the write? go around once more with the newer state
                 }
             }
             catch (Exception ex) { DiagnosticLogger.LogException("DeckStore.Save", ex); }
-            finally { Interlocked.Exchange(ref _saving, 0); }
+            finally
+            {
+                Interlocked.Exchange(ref _saving, 0);
+                bool dirty;
+                lock (_slots) dirty = _gen > _writtenGen;      // a mutation slipped past the final check
+                if (dirty) ScheduleSave();                     // — re-arm so the newest state always lands
+            }
         });
     }
 
@@ -192,34 +217,7 @@ public sealed class DeckStore
         Directory.CreateDirectory(Path.GetDirectoryName(file) ?? ".");
         var tmp = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
         File.WriteAllBytes(tmp, stream.ToArray());
-
-        // Windows truth (the alpha.6 lesson, now doctrine): a fresh write can be
-        // briefly held by an antivirus scan, and MoveFileEx(REPLACE_EXISTING) then
-        // fails with Access Denied. Retry a few times before giving up.
-        for (int attempt = 1; ; attempt++)
-        {
-            try
-            {
-                File.Move(tmp, file, overwrite: true);
-                break;
-            }
-            catch (Exception ex) when (attempt < 4 && ex is IOException or UnauthorizedAccessException)
-            {
-                Thread.Sleep(120 * attempt);
-            }
-        }
-
-        // Sweep orphan tmps — but only STALE ones (older than 10 s). A tmp from a
-        // concurrent in-flight save is live; deleting it mid-write causes exactly the
-        // "Could not find file …tmp" the sweep exists to prevent.
-        foreach (var stale in Directory.GetFiles(Path.GetDirectoryName(file) ?? ".", Path.GetFileName(file) + ".*.tmp"))
-        {
-            try
-            {
-                if (DateTime.UtcNow - File.GetLastWriteTimeUtc(stale) > TimeSpan.FromSeconds(10))
-                    File.Delete(stale);
-            }
-            catch { /* best-effort sweep */ }
-        }
+        AtomicIo.Swap(tmp, file);   // v3.0.0-alpha.4 — atomic replace + AV-race retries
+        AtomicIo.SweepStaleTmps(file);
     }
 }
