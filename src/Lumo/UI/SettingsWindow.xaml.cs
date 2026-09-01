@@ -743,15 +743,11 @@ public partial class SettingsWindow : Window
             // v2.6.0-alpha.3 — voice typing: toggle lives with the AI settings; the status
             // line surfaces what dictation will actually use on this PC (live-edited like
             // every AI setting, Cancel restores via RestoreFrom(_snapshot)).
+            // v2.6.0-alpha.5 — engine-aware: Whisper (downloaded on demand from the
+            // chat's mic button) vs the built-in Windows recognizer fallback.
             VoiceEnabledToggle.IsChecked = _settings.VoiceEnabled;
             VoiceEnabledToggle.Click += (_, _) => { if (!_suppress) _settings.VoiceEnabled = VoiceEnabledToggle.IsChecked == true; };
-            int recognizers = 0;
-            try { recognizers = VoiceInputService.Installed().Count; } catch { }
-            VoiceStatusText.Text = !VoiceInputService.IsSupported
-                ? "No speech recognizer found on this PC — install one under Windows Settings → Time & Language → Speech."
-                : recognizers <= 1
-                    ? "Dictation follows the Windows display language and runs entirely offline."
-                    : $"{recognizers} speech recognizers installed — dictation follows the Windows display language; set \"VoiceLanguage\" in settings.json (e.g. \"en-GB\") to pin one.";
+            VoiceStatusText.Text = BuildVoiceStatus();
 
             // v2.4.0-alpha.6 — custom personas: their own store (personas.json, saved
             // immediately on edit — independent of this window's Save/Cancel cycle)
@@ -1289,6 +1285,38 @@ public partial class SettingsWindow : Window
     // --------------------------- v2.4.0-alpha.6 — custom personas (personas.json)
 
     private string? _editingPersonaId;   // null = creating a new persona
+
+    /// <summary>
+    /// v2.6.0-alpha.5 — the voice card's status line, engine-aware: what the chat's
+    /// mic button will actually use, and the one-time Whisper download state.
+    /// </summary>
+    private string BuildVoiceStatus()
+    {
+        try
+        {
+            bool engineWhisper = !string.Equals(_settings.VoiceEngine, VoiceInputService.EngineWindows, StringComparison.OrdinalIgnoreCase);
+            if (!engineWhisper)
+            {
+                int recognizers = 0;
+                try { recognizers = VoiceInputService.Installed().Count; } catch { }
+                if (!VoiceInputService.IsSupported)
+                    return "Windows speech selected, but no recognizer is installed — add one under Windows Settings → Time & Language → Speech, or switch back to Whisper.";
+                return recognizers <= 1
+                    ? "Windows built-in speech (offline, follows the display language). For much better accuracy set \"VoiceEngine\": \"whisper\" in settings.json."
+                    : $"Windows built-in speech · {recognizers} recognizers installed (offline). For much better accuracy set \"VoiceEngine\": \"whisper\" in settings.json.";
+            }
+
+            var model = VoiceWhisper.FromId(_settings.VoiceModel);
+            if (!WhisperEngine.IsDownloaded(model))
+            {
+                return $"Whisper · {model.Name} ({model.SizeLabel}) — not downloaded yet. Click the mic in the AI chat to install it " +
+                       "(one-time download; Windows speech stays available as the fallback).";
+            }
+            return $"Whisper · {model.Name} ({model.SizeLabel}) ready — offline transcription, nothing leaves the PC. " +
+                   $"Switch engines with \"VoiceEngine\": \"windows\" in settings.json.";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.VoiceStatus", ex); return "Voice input status unavailable."; }
+    }
 
     private void RebuildPersonaList()
     {

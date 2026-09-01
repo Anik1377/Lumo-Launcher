@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.6.0--alpha.4-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.6.0--alpha.5-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -68,10 +68,10 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | | Feature | Detail |
 |---|---------|--------|
 | 🤖 | **Quick AI answers** | `?` + a question — the answer lands right on the result row; Enter copies it. Requests fire off the UI thread, deduped in-flight, stale replies discarded, 8-entry scratchpad cache |
-| 💬 | **AI chat** | `AI/` (or the bare word `AI`) opens a dedicated chat tab — streaming replies, markdown rendering, multi-line input |
+| 💬 | **AI chat** | `AI/` (or the bare word `AI`) opens a dedicated chat tab — streaming replies, markdown rendering, multi-line input, polished to the prompt-kit design language (gradient avatars, typing dots, collapsible reasoning blocks for thinking models, image attachments for vision models, timestamps, one-click code copy) |
 | 🗂️ | **Chat sessions** | Full history (`chats.json`, 40 sessions / 200 messages) with a Raycast-style slide-over sidebar, pin/rename/delete curation, `Ctrl+N` new chat, last-answer-only regenerate |
 | 🎭 | **Personas** | 6 built-in system-prompt personas + your own (`personas.json`, edited in Settings → AI) — pick per chat from the persona chip flyout |
-| 🎤 | **Voice typing** | The chat's mic button (or `Ctrl+M`): click, speak the whole thought, click again — the clip is recorded in full, recognized as **one batch** offline (Windows SAPI), and the text shows in the prompt ready to edit or send. Silence is trimmed before recognition for accuracy. No cloud, no key, no setup; recognizer follows the Windows display language (`"VoiceLanguage"` in settings.json pins one) |
+| 🎤 | **Voice typing (Whisper)** | The chat's mic button (or `Ctrl+M`): click, speak the whole thought, click again — the clip is recorded in full and transcribed as **one batch** by **OpenAI Whisper** (whisper.cpp, fully offline) for dramatically better accuracy than the Windows recognizer; a one-time guided download sets the model up from the chat itself (the built-in Windows speech stays available as the fallback). A live waveform + elapsed clock prove the mic is really rendering, a **prominent pulsing red stop cap** finishes the clip, and pause/resume records one continuous sentence across interruptions. Silence is trimmed before recognition; nothing ever leaves the PC |
 | 🔌 | **Providers** | **Ollama** (local, no key — one-click setup incl. model pull) or **Anthropic** Messages API (key stored only in `settings.json`, redacted from every log line) |
 
 ### Plugins (extensible keywords)
@@ -182,7 +182,7 @@ expansion is never recursive.
 | `Tab` | open the preview pane for the selection |
 | `Ctrl+→` | open the quick-action menu (again closes) |
 | `Ctrl+N` (in AI chat) | new chat session |
-| `Ctrl+M` (in AI chat) | start / stop voice recording — text shows after the batch transcribe; `Enter` finishes the clip, `Esc` cancels |
+| `Ctrl+M` (in AI chat) | start / stop voice recording — the overlay shows a live waveform; the red cap finishes & transcribes (Whisper, offline), pause/resume holds mid-recording, `Esc` cancels |
 | `F11` | fullscreen / window toggle (AI chat) |
 
 ### Plugins in one minute
@@ -211,6 +211,49 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v2.6.0-alpha.5 — Whisper voice + the prompt-kit AI chat
+
+The two headline asks at once: a genuinely better transcription engine, and an
+AI chat page rebuilt to the [prompt-kit](https://www.prompt-kit.com) design
+language.
+
+1. **🥇 OpenAI Whisper is now the default voice engine.** The chat's mic no
+   longer leans on the Windows desktop recognizer — clips are transcribed by
+   **Whisper via whisper.cpp** (the same weights, fully offline, no cloud, no
+   key), which is dramatically more accurate on real speech. It is
+   **install-on-demand**: the first mic click offers a one-time guided setup
+   card — pick the model (Tiny 78 MB / Base 148 MB / Base multi / Small 488 MB
+   — official whisper.cpp ggml checkpoints), watch the progress bar, and
+   recording starts the moment it lands. The Windows recognizer stays one click
+   away as the fallback ("Use Windows speech" on the card, or
+   `"VoiceEngine": "windows"` in settings.json; `"VoiceModel"` picks a model).
+2. **📈 Proof-of-life recording UI.** While you speak, the prompt row is
+   replaced by a recording overlay: a **live scrolling waveform** driven by the
+   actual capture buffers (10 Hz metering, silence rests flat), a **recording
+   red dot**, and an elapsed clock that excludes paused time. Transcribing
+   freezes the waveform — you can always tell which stage is running.
+3. **🔴 The stop button is impossible to miss.** Finishing a clip is a **46 px
+   pulsing red cap with a soft glow**, flanked by pause/resume (the mic keeps
+   running but the paused stretch is really discarded from the clip) and
+   cancel. The mic / `Ctrl+M` / `Enter` shortcuts still finish too.
+4. **🎨 The AI chat gets the full prompt-kit treatment** (rebuilt natively in
+   WPF — still no WebView): right-aligned accent **chat bubbles** with the
+   sharp-tail corner, **gradient message avatars** with a sparkle mark, sine
+   -wave **typing dots**, **message timestamps**, one-click **code copy**
+   buttons, collapsible **Reasoning blocks** that stream live for thinking
+   models (`deepseek-r1` & friends — the `<think>` half is split out of the
+   visible answer and out of the API history), **image attachments** for vision
+   models (paste a screenshot or use the attach button — Ollama and Anthropic
+   vision shapes are both wired, with a payload budget that stops old turns
+   from re-uploading), and the polished **prompt input** with focus ring and
+   gradient send cap.
+5. **🧪 +33 tests → 349.** The Whisper model catalog (https-only URLs, unique
+   ids/files, junk-name rejection), language mapping (English-only pins, junk
+   pins fall back to auto), the waveform meter math (silence floor, loudness
+   saturation), the reasoning splitter (closed blocks, streaming partials,
+   case/tag variants, preface text), the image payload guard rails (media
+   types, size cap, byte counts) and both providers' image JSON shapes.
 
 ## 🆕 What's new in v2.6.0-alpha.4 — voice typing rebuilt: record → transcribe → show
 
@@ -791,6 +834,8 @@ The Settings window writes this file for you; every key can still be edited by h
   "AiModel": "llama3.2",
   "VoiceEnabled": true,
   "VoiceLanguage": "",
+  "VoiceEngine": "whisper",
+  "VoiceModel": "base.en",
   "UpdatesEnabled": true,
   "FirstRunDone": true
 }
@@ -800,7 +845,11 @@ The Settings window writes this file for you; every key can still be edited by h
 `Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24`, `Space` or `` ` ``.
 `WebEngine` accepts `google`, `bing` or `duckduckgo`.
 `VoiceLanguage` (AI chat voice typing) is empty by default — it follows the Windows
-display language; set a culture like `"en-GB"` to pin one specific recognizer.
+display language; set a culture like `"en-GB"` to pin one.
+`VoiceEngine` picks the transcription brain: `"whisper"` (default — whisper.cpp,
+offline, model downloaded once on demand from the chat's mic) or `"windows"` (the
+built-in SAPI recognizer). `VoiceModel` is one of `tiny.en`, `base.en` (default),
+`base` (multilingual) or `small` — bigger models are more accurate and slower.
 
 ## ⚡ Shortcuts & macros — `%APPDATA%\Lumo\shortcuts.json`
 

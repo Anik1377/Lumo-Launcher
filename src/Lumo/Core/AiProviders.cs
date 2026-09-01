@@ -28,8 +28,41 @@ public static class AiProviders
     /// <summary>A fully-built HTTP request: URL, JSON body and the headers to set.</summary>
     public sealed record AiRequestSpec(string Url, string Json, IReadOnlyDictionary<string, string> Headers);
 
-    /// <summary>v2.3.0-alpha.3 — one conversation turn for the AI chat tab ("user" | "assistant").</summary>
-    public sealed record AiTurn(string Role, string Content);
+    /// <summary>v2.3.0-alpha.3 — one conversation turn for the AI chat tab ("user" | "assistant").
+    /// v2.6.0-alpha.5 — <see cref="Image"/> optionally carries one attached image
+    /// (prompt-kit's ImageAttachment) for vision models; null = text-only turn.</summary>
+    public sealed record AiTurn(string Role, string Content, ImagePayload? Image = null);
+
+    /// <summary>
+    /// v2.6.0-alpha.5 — one image attached to a chat turn. The base64 payload is
+    /// the RAW base64 (no "data:" prefix — Ollama wants the bare string and the
+    /// Anthropic media_type field carries the mime separately). Only the formats
+    /// and sizes the two providers actually accept get through Create();
+    /// everything else is rejected before it can burn a request.
+    /// </summary>
+    public sealed record ImagePayload(string Base64, string MediaType)
+    {
+        public const long MaxBytes = 4 * 1024 * 1024;   // 4 MB — Ollama's per-image cap
+        public static readonly string[] SupportedMediaTypes = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+
+        public static bool IsSupportedMediaType(string? mediaType) =>
+            SupportedMediaTypes.Contains((mediaType ?? "").Trim().ToLowerInvariant());
+
+        /// <summary>Validates + strips a data-URI prefix if present; null when the payload is unusable.</summary>
+        public static ImagePayload? Create(byte[]? bytes, string? mediaType)
+        {
+            try
+            {
+                if (bytes is not { Length: > 0 } || bytes.Length > MaxBytes) return null;
+                if (!IsSupportedMediaType(mediaType)) return null;
+                return new ImagePayload(Convert.ToBase64String(bytes), mediaType!.Trim().ToLowerInvariant());
+            }
+            catch { return null; }
+        }
+
+        /// <summary>Decoded byte size (base64 → bytes), for the attachment chip caption.</summary>
+        public long ByteCount => Base64.Length * 3 / 4 - (Base64.Length > 0 && Base64[^1] == '=' ? (Base64.Length % 4 == 0 ? 2 : 1) : 0);
+    }
 
     /// <summary>
     /// One decoded streaming chunk. Delta is the text to append; Done ends the
@@ -130,11 +163,25 @@ public static class AiProviders
             if (anthropic && string.IsNullOrWhiteSpace(apiKey))
                 return (false, null, "no API key set — add your Anthropic key in Settings");
 
-            var turnsList = turns
-                .Where(t => !string.IsNullOrWhiteSpace(t.Content) &&
-                            (t.Role == "user" || t.Role == "assistant"))
-                .Select(t => (object)new { role = t.Role, content = t.Content })
-                .ToList();
+            // v2.6.0-alpha.5 — images ride only on the last few turns: a long
+            // conversation must not re-upload every screenshot ever attached on
+            // every request (MaxImageTurns bounds the payload from the end).
+            int imageBudget = MaxImageTurns;
+            var turnsList = new List<object>();
+            for (int i = turns.Count - 1; i >= 0; i--)
+            {
+                var t = turns[i];
+                if (string.IsNullOrWhiteSpace(t.Content) ||
+                    (t.Role != "user" && t.Role != "assistant")) continue;
+                var img = t.Image;
+                if (img is not null)
+                {
+                    if (imageBudget <= 0) img = null;   // older than the budget — text only
+                    else imageBudget--;
+                }
+                turnsList.Add(SerializeTurn(t.Role, t.Content, img, anthropic));
+            }
+            turnsList.Reverse();
             string sys = (systemPrompt ?? "").Trim();
             if (sys.Length > 0 && !anthropic)
                 turnsList.Insert(0, new { role = "system", content = sys });   // Ollama: leading system message
@@ -174,6 +221,38 @@ public static class AiProviders
         {
             return (false, null, Redact(apiKey, ex.Message));
         }
+    }
+
+    /// <summary>How many of the most recent turns keep their attached images on the wire.</summary>
+    public const int MaxImageTurns = 2;
+
+    /// <summary>
+    /// v2.6.0-alpha.5 — one turn as the provider's message JSON. Text-only turns
+    /// keep the flat {role, content} shape both providers accept; an image turn
+    /// becomes:
+    ///   · ollama    → { role, content, images: [ "&lt;base64&gt;" ] }  (bare base64,
+    ///                 the shape /api/chat documents for vision models);
+    ///   · anthropic → { role, content: [ {type:"image", source:{type:"base64",
+    ///                 media_type, data}}, {type:"text", text} ] } — image block
+    ///                 first, the order Claude's vision guide recommends.
+    /// </summary>
+    private static object SerializeTurn(string role, string content, ImagePayload? image, bool anthropic)
+    {
+        if (image is null)
+            return new { role, content };
+        if (anthropic)
+        {
+            return new
+            {
+                role,
+                content = new object[]
+                {
+                    new { type = "image", source = new { type = "base64", media_type = image.MediaType, data = image.Base64 } },
+                    new { type = "text", text = content },
+                },
+            };
+        }
+        return new { role, content, images = new[] { image.Base64 } };
     }
 
     // ---------------------------------------------------------------- v2.3.0-alpha.3 — streaming parsers

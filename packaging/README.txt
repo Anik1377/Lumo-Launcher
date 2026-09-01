@@ -1,7 +1,43 @@
 ======================================================
-  LUMO v2.6.0-alpha.4  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.5  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.5 (Whisper voice + the prompt-kit
+AI chat)
+---------------------------------------------------------------
+1. WHISPER IS NOW THE VOICE ENGINE. The chat's mic no longer
+   leans on the Windows recognizer - clips are transcribed by
+   OpenAI Whisper via whisper.cpp, fully offline (no cloud, no
+   key), dramatically more accurate on real speech. Install on
+   demand: the first mic click offers a one-time setup card -
+   pick a model (Tiny 78 MB / Base 148 MB / Base multi / Small
+   488 MB), watch the progress bar, and recording starts the
+   moment it lands. "Use Windows speech" on that card keeps the
+   old recognizer one click away ("VoiceEngine": "windows" in
+   settings.json; "VoiceModel" picks tiny.en / base.en / base /
+   small).
+2. PROOF-OF-LIFE RECORDING UI. While you speak, the prompt row
+   becomes a recording overlay: a live scrolling waveform fed
+   by the real capture buffers, a recording red dot, and an
+   elapsed clock that excludes paused time. Transcribing
+   freezes the waveform - you always know which stage runs.
+3. THE STOP BUTTON IS IMPOSSIBLE TO MISS. Finishing a clip is
+   a 46 px pulsing red cap with a soft glow, flanked by
+   pause/resume (the paused stretch is really discarded from
+   the clip) and cancel. Mic / Ctrl+M / Enter still finish too.
+4. THE AI CHAT GETS THE FULL PROMPT-KIT TREATMENT (rebuilt
+   natively in WPF, still no WebView): right-aligned accent
+   chat bubbles with the sharp-tail corner, gradient message
+   avatars, sine-wave typing dots, message timestamps, one-
+   click code copy, collapsible Reasoning blocks that stream
+   live for thinking models (deepseek-r1 and friends), image
+   attachments for vision models (paste a screenshot or use
+   the attach button - Ollama and Anthropic shapes both
+   wired), and the polished prompt input with focus ring.
+5. +33 TESTS -> 349. Model catalog, language mapping, meter
+   math, the reasoning splitter, image payload guard rails and
+   both providers' image JSON shapes are under test.
 
 WHAT'S NEW IN v2.6.0-alpha.4 (voice typing rebuilt: record,
 transcribe, show)

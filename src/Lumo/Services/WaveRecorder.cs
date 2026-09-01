@@ -7,9 +7,17 @@ namespace Lumo.Services;
 /// straight on the winmm waveIn API that has shipped in Windows since forever:
 /// no NAudio, no MediaFoundation, no extra byte in the single exe. Records
 /// 16 kHz / 16-bit / mono PCM (the desktop recognizer's home format) into
-/// memory via four rotating 250 ms buffers, hands the raw PCM back when the
+/// memory via rotating 100 ms buffers, hands the raw PCM back when the
 /// clip is finished, and refuses to grow past <see cref="MaxSeconds"/> so a
 /// forgotten mic can't balloon memory.
+///
+/// v2.6.0-alpha.5 — two additions for the live recording UI: <see cref="LevelAvailable"/>
+/// fires per drained buffer with a 0..1 loudness reading (10 Hz — the sample
+/// rate the waveform visualizer scrolls at; buffers shrank 250→100 ms purely to
+/// feed it), and <see cref="Pause"/>/<see cref="Resume"/> turn capture into a
+/// live scratchpad — while paused the buffers keep cycling but their content is
+/// DISCARDED, so a paused stretch leaves a real gap in the clip instead of
+/// recording over the user's silence.
 ///
 /// Threading: Start/StopAndRead run on the caller (UI) thread; a background
 /// pump thread drains the CALLBACK_EVENT signal and copies finished buffers
@@ -24,8 +32,8 @@ internal sealed class WaveRecorder : IDisposable
     public const int Channels = 1;
     public const int BitsPerSample = 16;
 
-    private const int BufferMs = 250;
-    private const int BufferCount = 4;
+    private const int BufferMs = 100;    // v2.6.0-alpha.5 — 10 Hz metering for the live waveform
+    private const int BufferCount = 10;  // (was 4 × 250 ms — the same 1 s of queued audio, finer slices)
 
     /// <summary>Recording hard stop — a dictation prompt does not need more than this.</summary>
     public const int MaxSeconds = 60;
@@ -57,6 +65,16 @@ internal sealed class WaveRecorder : IDisposable
     private readonly long _limitBytes = (long)SampleRate * (BitsPerSample / 8) * Channels * MaxSeconds;
 
     public bool IsRecording { get; private set; }
+
+    /// <summary>v2.6.0-alpha.5 — paused capture: buffers cycle but their audio is discarded.</summary>
+    public bool IsPaused { get; private set; }
+
+    /// <summary>
+    /// v2.6.0-alpha.5 — raised from the pump thread for every drained buffer with
+    /// a normalized 0..1 loudness reading (0 while paused, 0 for silence). The UI
+    /// marshals this onto its dispatcher and pushes it into the waveform.
+    /// </summary>
+    public event Action<double>? LevelAvailable;
 
     /// <summary>Raised once, from the pump thread, when MaxSeconds of audio has been captured.</summary>
     public event Action? LimitReached;
@@ -150,8 +168,26 @@ internal sealed class WaveRecorder : IDisposable
         }
     }
 
+    /// <summary>
+    /// v2.6.0-alpha.5 — pause the session: the device keeps running and buffers
+    /// keep cycling, but every finished buffer's audio is thrown away, so the
+    /// clip gains a real gap for the paused stretch. Idempotent; a no-op when
+    /// not recording.
+    /// </summary>
+    public void Pause()
+    {
+        if (IsRecording) IsPaused = true;
+    }
+
+    /// <summary>Resumes after <see cref="Pause"/> — new audio lands in the clip again.</summary>
+    public void Resume()
+    {
+        if (IsRecording) IsPaused = false;
+    }
+
     private void Drain(bool requeue = false)
     {
+        double level = -1;
         lock (_gate)
         {
             for (int i = 0; i < BufferCount; i++)
@@ -161,12 +197,17 @@ internal sealed class WaveRecorder : IDisposable
                 if ((hdr.dwFlags & WhdrDone) == 0) continue;
 
                 int recorded = (int)hdr.dwBytesRecorded;
-                if (recorded > 0)
+                if (recorded > 0 && !IsPaused)   // v2.6.0-alpha.5 — paused: discard, the gap is the point
                 {
                     var buf = new byte[recorded];
                     Marshal.Copy(_datas[i], buf, 0, recorded);
                     _chunks.Add(buf);
                     _totalBytes += recorded;
+                    level = Core.VoiceAudio.RmsToLevel(Core.VoiceAudio.Rms(buf));
+                }
+                else if (recorded > 0)
+                {
+                    level = 0;   // paused — the meter rests at zero
                 }
                 _owned[i] = false;
 
@@ -182,6 +223,11 @@ internal sealed class WaveRecorder : IDisposable
                 _limitHit = true;
                 try { LimitReached?.Invoke(); } catch { }
             }
+        }
+
+        if (level >= 0)
+        {
+            try { LevelAvailable?.Invoke(level); } catch { }
         }
     }
 

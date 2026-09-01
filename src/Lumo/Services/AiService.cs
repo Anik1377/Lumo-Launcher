@@ -172,7 +172,8 @@ public sealed class AiService
     /// </summary>
     public async Task<AiStreamResult> StreamChatAsync(
         Settings settings, IReadOnlyList<AiProviders.AiTurn> history, string prompt,
-        Action<string> onDelta, CancellationToken ct, string? systemPrompt = null)
+        Action<string> onDelta, CancellationToken ct, string? systemPrompt = null,
+        AiProviders.ImagePayload? image = null)
     {
         string style = settings.AiStyle;
         try
@@ -184,7 +185,7 @@ public sealed class AiService
             var turns = history.Skip(Math.Max(0, history.Count - 16))
                 .Select(t => new AiProviders.AiTurn(t.Role, t.Content))
                 .ToList();
-            turns.Add(new AiProviders.AiTurn("user", prompt ?? ""));
+            turns.Add(new AiProviders.AiTurn("user", prompt ?? "", image));   // v2.6.0-alpha.5 — image rides on the prompt turn
 
             var (ok, spec, err) = AiProviders.BuildChat(style, settings.AiEndpoint, settings.AiModel, settings.AiApiKey, turns, systemPrompt);
             if (!ok || spec is null)

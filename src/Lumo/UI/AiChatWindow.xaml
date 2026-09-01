@@ -276,6 +276,144 @@
             </Setter>
         </Style>
 
+        <!-- v2.6.0-alpha.5 — the recording overlay's PROMINENT stop cap: a 46 px red
+             disc with a soft red glow and a slow heartbeat scale while a session is
+             live (Tag == "recording"). The overlay is built around this one button —
+             finishing the clip must be impossible to miss. -->
+        <Style x:Key="VoiceStopButton" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <ScaleTransform x:Name="Sc" ScaleX="1" ScaleY="1"/>
+                            </Grid.RenderTransform>
+                            <Ellipse x:Name="Cap" Fill="#FFE5484D">
+                                <Ellipse.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="0" Opacity="0.5" Color="#FFE5484D"/>
+                                </Ellipse.Effect>
+                            </Ellipse>
+                            <TextBlock x:Name="Glyph" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="16" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}" Value="recording">
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX"
+                                                             To="1.06" Duration="0:0:0.55" AutoReverse="True" RepeatBehavior="Forever">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY"
+                                                             To="1.06" Duration="0:0:0.55" AutoReverse="True" RepeatBehavior="Forever">
+                                                <DoubleAnimation.EasingFunction>
+                                                    <SineEase EasingMode="EaseInOut"/>
+                                                </DoubleAnimation.EasingFunction>
+                                            </DoubleAnimation>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                                <DataTrigger.ExitActions>
+                                    <BeginStoryboard>
+                                        <Storyboard>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleX"
+                                                             To="1" Duration="0:0:0.15"/>
+                                            <DoubleAnimation Storyboard.TargetName="Sc" Storyboard.TargetProperty="ScaleY"
+                                                             To="1" Duration="0:0:0.15"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.ExitActions>
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Cap" Property="Fill" Value="#FFF2564F"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Cap" Property="Fill" Value="#FFC0383C"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Cap" Property="Opacity" Value="0.35"/>
+                                <Setter TargetName="Glyph" Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- v2.6.0-alpha.5 — ghost round cap for the overlay's secondary actions
+             (pause/resume, cancel): the same quiet ring language as the mic button. -->
+        <Style x:Key="VoiceRoundButton" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Ellipse x:Name="Cap" Fill="Transparent"
+                                     Stroke="{DynamicResource BorderLineBrush}" StrokeThickness="1"/>
+                            <TextBlock x:Name="Glyph" Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                       FontFamily="Segoe MDL2 Assets" FontSize="12.5"
+                                       Foreground="{DynamicResource SubtitleBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Cap" Property="Fill" Value="{DynamicResource ChipBrush}"/>
+                                <Setter TargetName="Glyph" Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Cap" Property="Fill" Value="{DynamicResource SelectedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Cap" Property="Opacity" Value="0.35"/>
+                                <Setter TargetName="Glyph" Property="Opacity" Value="0.35"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- v2.6.0-alpha.5 — accent pill for the model setup card's primary action. -->
+        <Style x:Key="VoiceAccentButton" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="{DynamicResource AccentBrush}" CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextBlock.Foreground="White" TextBlock.FontSize="12"
+                                              TextBlock.FontWeight="SemiBold"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Opacity" Value="0.88"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bg" Property="Opacity" Value="0.75"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Bg" Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- ghost caption buttons (New chat / minimize / close) -->
         <Style x:Key="CaptionButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
@@ -555,11 +693,19 @@
                 </StackPanel>
             </Grid>
 
-            <!-- ============ prompt input (prompt-kit PromptInput, focus ring in code) ============ -->
+            <!-- ============ prompt input (prompt-kit PromptInput, focus ring in code).
+                 v2.6.0-alpha.5 — the border now hosts the attachment strip above the
+                 prompt row (prompt-kit ImageAttachment: thumbnail + remove cap). ============ -->
             <Border Grid.Row="3" x:Name="PromptShell" Margin="20,10,20,4" CornerRadius="18"
                     Background="{DynamicResource FieldBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
-                <Grid Margin="13,8">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <WrapPanel x:Name="AttachHost" Grid.Row="0" Margin="13,10,13,0" Visibility="Collapsed"/>
+                    <Grid Grid.Row="1" Margin="13,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
@@ -589,14 +735,99 @@
                     </Grid>
                     <!-- v2.6.0-alpha.3 — voice typing: mic between the prompt and send; hidden
                          entirely when disabled in Settings or the PC has no speech recognizer. -->
-                    <Button x:Name="MicButton" Grid.Column="1" Style="{StaticResource MicButton}"
+                    <Button x:Name="AttachButton" Grid.Column="1" Style="{StaticResource MicButton}"
+                            Content="&#xE723;" VerticalAlignment="Bottom" Margin="8,0,0,3" Click="OnAttachClick"
+                            ToolTip="Attach an image (vision models) — or paste one" Visibility="Collapsed"/>
+                    <Button x:Name="MicButton" Grid.Column="2" Style="{StaticResource MicButton}"
                             Content="&#xE720;" VerticalAlignment="Bottom" Margin="8,0,0,3" Click="OnMicClick"
                             ToolTip="Voice input (Ctrl+M)" Visibility="Collapsed"/>
-                    <Button x:Name="SendButton" Grid.Column="2" Style="{StaticResource SendButton}"
+                    <Button x:Name="SendButton" Grid.Column="3" Style="{StaticResource SendButton}"
                             VerticalAlignment="Bottom" Margin="10,0,0,2" Click="OnSendClick"/>
-                    <Button x:Name="StopButton" Grid.Column="2" Style="{StaticResource SendButton}" Tag="&#xE71A;"
+                    <Button x:Name="StopButton" Grid.Column="3" Style="{StaticResource SendButton}" Tag="&#xE71A;"
                             VerticalAlignment="Bottom" Margin="10,0,0,2" Visibility="Collapsed" Click="OnStopClick"
                             ToolTip="Stop generating"/>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <!-- ============ v2.6.0-alpha.5 — the voice overlay: live waveform proof-of-life,
+                 elapsed clock, and the one PROMINENT red stop cap. It takes the prompt
+                 row's place while a voice session is live (code collapses PromptShell so
+                 exactly one of the two shows). It also hosts the one-time Whisper model
+                 setup card — shown BEFORE recording starts when the engine is whisper and
+                 the model isn't installed yet. ============ -->
+            <Border x:Name="VoiceOverlay" Grid.Row="3" Margin="20,10,20,4" CornerRadius="18"
+                    Background="{DynamicResource FieldBrush}"
+                    BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1" Visibility="Collapsed">
+                <Grid Margin="14,9">
+                    <!-- live recording / transcribing -->
+                    <Grid x:Name="VoiceLivePanel" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="2,0,10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse x:Name="VoiceDot" Width="9" Height="9" VerticalAlignment="Center" Fill="#FFE5484D"/>
+                                <TextBlock x:Name="VoiceStatusText" Margin="9,0,0,0" FontSize="12.5" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center" Text="Listening…"/>
+                                <TextBlock x:Name="VoiceTimerText" Margin="10,0,0,0" FontSize="12"
+                                           FontFamily="Cascadia Mono, Consolas, Courier New"
+                                           Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center" Text="0:00"/>
+                            </StackPanel>
+                            <ui:VoiceWaveform x:Name="Waveform" Height="42" Margin="1,8,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="VoicePauseButton" Style="{StaticResource VoiceRoundButton}"
+                                    Content="&#xE769;" Click="OnVoicePauseClick" ToolTip="Pause recording"/>
+                            <Button x:Name="VoiceStopButton" Style="{StaticResource VoiceStopButton}"
+                                    Content="&#xE71A;" Margin="10,0,0,0" Click="OnVoiceStopClick"
+                                    ToolTip="Finish &amp; transcribe (Enter)"/>
+                            <Button x:Name="VoiceCancelButton" Style="{StaticResource VoiceRoundButton}"
+                                    Content="&#xE8BB;" Margin="10,0,0,0" Click="OnVoiceCancelClick" ToolTip="Cancel (Esc)"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- one-time model setup card (Whisper chosen, model not installed) -->
+                    <Grid x:Name="VoiceSetupPanel" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="2,0,12,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="&#xE896;" FontFamily="Segoe MDL2 Assets" FontSize="14"
+                                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                <TextBlock Text="Better speech recognition — Whisper" FontSize="12.5" FontWeight="SemiBold" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="VoiceSetupDesc" Margin="0,5,0,0" FontSize="11.5" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource SubtitleBrush}"
+                                       Text="Whisper runs fully offline and is far more accurate than Windows speech — one-time download, then the mic just works."/>
+                            <StackPanel x:Name="VoiceDownloadPanel" Visibility="Collapsed" Margin="0,8,0,0">
+                                <ProgressBar x:Name="VoiceDownloadBar" Height="4" Minimum="0" Maximum="1"
+                                             Background="{DynamicResource ChipBrush}" Foreground="{DynamicResource AccentBrush}"
+                                             BorderThickness="0"/>
+                                <TextBlock x:Name="VoiceDownloadText" Margin="0,5,0,0" FontSize="10.5"
+                                           Foreground="{DynamicResource SubtitleBrush}" Text="Downloading…"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="VoiceDownloadButton" Style="{StaticResource VoiceAccentButton}"
+                                    Click="OnVoiceDownloadClick">
+                                <TextBlock Text="Download"/>
+                            </Button>
+                            <Button x:Name="VoiceWindowsButton" Style="{StaticResource GhostChip}" Margin="10,0,0,0"
+                                    VerticalAlignment="Center" Click="OnVoiceUseWindowsClick">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="&#xE720;" FontFamily="Segoe MDL2 Assets" FontSize="11"
+                                               Foreground="{DynamicResource SubtitleBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Use Windows speech" FontSize="11" Margin="6,0,0,0"
+                                               Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </Border>
 

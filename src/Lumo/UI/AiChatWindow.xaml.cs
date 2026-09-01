@@ -1,9 +1,11 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using Lumo.Core;
 using Lumo.Native;
@@ -56,6 +58,26 @@ public partial class AiChatWindow : Window
     private System.Windows.Threading.DispatcherTimer? _voiceErrTimer;
     private System.Windows.Media.Animation.Storyboard? _micPulse;
 
+    // ---- v2.6.0-alpha.5 — the recording overlay (waveform + prominent stop cap):
+    private System.Windows.Threading.DispatcherTimer? _voiceClock;
+    private DateTime _voiceClockStart;
+    private DateTime? _voicePauseStarted;
+    private TimeSpan _voicePausedTotal;
+    private bool _voiceSetupOpen;                                   // the Whisper setup card is up
+    private VoiceWhisper.WhisperModel? _setupModel;                 // the model the card offers
+    private CancellationTokenSource? _voiceDlCts;                   // active model download
+
+    // ---- v2.6.0-alpha.5 — prompt-kit Reasoning block (streaming live view):
+    private System.Windows.Controls.Border? _thinkCard;
+    private System.Windows.Controls.TextBlock? _thinkBody;
+    private System.Windows.Controls.TextBlock? _thinkHeader;
+    private System.Windows.Controls.TextBlock? _thinkChevron;
+    private bool _thinkOpen;
+
+    // ---- v2.6.0-alpha.5 — prompt-kit ImageAttachment (one image per turn):
+    private AiProviders.ImagePayload? _pendingImage;
+    private AiProviders.ImagePayload? _turnImage;                   // the image whose answer is streaming
+
     /// <summary>v2.3.0-alpha.4 — the banner's "Open AI settings" link asks App to open Settings → AI (page 6).</summary>
     public event Action? SettingsRequested;
 
@@ -69,12 +91,12 @@ public partial class AiChatWindow : Window
     private StackPanel? _liveHost;               // markdown host, filled on completion
     private StackPanel? _dotsPanel;              // the three-dot "thinking" row
 
-    private static readonly string[] Chips =
+    private static readonly (string Glyph, string Text)[] Chips =
     {
-        "Explain quantum computing like I'm five",
-        "Draft a polite follow-up email",
-        "PowerShell: list files bigger than 1 GB",
-        "Brainstorm 5 name ideas for a side project",
+        ("\uE945", "Explain quantum computing like I'm five"),      // bolt
+        ("\uE715", "Draft a polite follow-up email"),               // mail
+        ("\uE943", "PowerShell: list files bigger than 1 GB"),      // code
+        ("\uE8A5", "Brainstorm 5 name ideas for a side project"),   // document
     };
 
     public AiChatWindow(Settings settings, AiService ai)
@@ -94,6 +116,7 @@ public partial class AiChatWindow : Window
         Closed += (_, _) =>
         {
             try { _genCts?.Cancel(); } catch { }
+            try { _voiceDlCts?.Cancel(); } catch { }
             try { _voice.Dispose(); } catch { }   // v2.6.0-alpha.4 — never leave a recording or transcription dangling after the window dies
         };
         Loaded += (_, _) =>
@@ -110,6 +133,10 @@ public partial class AiChatWindow : Window
         _voice.TranscribingStarted += () => Dispatcher.InvokeAsync(OnVoiceTranscribing);
         _voice.Final += t => Dispatcher.InvokeAsync(() => OnVoiceFinal(t));
         _voice.Failed += m => Dispatcher.InvokeAsync(() => OnVoiceFailed(m));
+        // v2.6.0-alpha.5 — 10 Hz mic loudness → the waveform; a missing whisper
+        // model opens the one-time setup card instead of recording.
+        _voice.Level += l => Dispatcher.InvokeAsync(() => Waveform.Push(l));
+        _voice.ModelNeeded += id => Dispatcher.InvokeAsync(() => OnVoiceModelNeeded(id));
     }
 
     // ---------------------------------------------------------------- polish motion
@@ -370,9 +397,21 @@ public partial class AiChatWindow : Window
         try
         {
             ChipHost.Children.Clear();
-            foreach (var chip in Chips)
+            foreach (var (glyph, chip) in Chips)
             {
-                var b = new Button { Style = (Style)FindResource("ChipButton"), Content = MakeChipText(chip) };
+                // prompt-kit suggestion rows carry a small icon ahead of the text
+                var panel = new StackPanel { Orientation = Orientation.Horizontal };
+                panel.Children.Add(new TextBlock
+                {
+                    Text = glyph,
+                    FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                    FontSize = 11,
+                    Foreground = (Brush)Resources["AccentBrush"],
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 7, 0),
+                });
+                panel.Children.Add(MakeChipText(chip));
+                var b = new Button { Style = (Style)FindResource("ChipButton"), Content = panel };
                 b.Click += (_, _) => SendUserMessage(chip);
                 ChipHost.Children.Add(b);
             }
@@ -442,6 +481,9 @@ public partial class AiChatWindow : Window
     /// v2.3.0-alpha.4 — Esc closes the chat from anywhere in the window (the hint
     /// chips promise it, so it must be true). v2.4.0-alpha.5 — Esc closes the
     /// history sidebar first when it is open, and Ctrl+N starts a new chat.
+    /// v2.6.0-alpha.5 — Esc also backs out of the Whisper setup card (cancelling a
+    /// running download), and Enter finishes a recording even though the prompt
+    /// box is collapsed while the overlay is up.
     /// </summary>
     private void OnWindowPreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -451,11 +493,29 @@ public partial class AiChatWindow : Window
             {
                 e.Handled = true;
                 if (_voice.IsListening) { _voice.Cancel(); OnVoiceStopped(); return; }   // v2.6.0-alpha.4 — first Esc cancels voice (clip or pending text), not the window
+                if (_voiceSetupOpen)                                                     // v2.6.0-alpha.5 — back out of the setup card / model download
+                {
+                    try { _voiceDlCts?.Cancel(); } catch { }
+                    HideVoiceOverlay();
+                    PromptBox.Focus();
+                    return;
+                }
                 if (_sidebarOpen) { CloseSidebar(); return; }
                 // v2.4.0-alpha.6 — while a generation is running, Esc stops it first
                 // (the hint line says "esc stop / hide"); a second Esc then hides.
                 if (_generating) { _genCts?.Cancel(); return; }
                 Close();
+            }
+            else if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && _voice.IsRecording)
+            {
+                e.Handled = true;
+                StopVoice();   // v2.6.0-alpha.5 — Enter finishes the clip while the overlay holds the input row
+            }
+            else if (e.Key == Key.V && Keyboard.Modifiers == ModifierKeys.Control && !_voice.IsListening)
+            {
+                // v2.6.0-alpha.5 — pasting a screenshot attaches it (prompt-kit
+                // ImageAttachment) instead of letting the TextBox swallow it
+                if (TryAttachFromClipboard()) e.Handled = true;
             }
             else if (e.Key == Key.F11)
             {
@@ -478,8 +538,14 @@ public partial class AiChatWindow : Window
 
     private void OnPromptTextChanged(object sender, TextChangedEventArgs e)
     {
-        try { SendButton.IsEnabled = !string.IsNullOrWhiteSpace(PromptBox.Text); }
+        try { UpdateSendEnabled(); }
         catch { }
+    }
+
+    /// <summary>v2.6.0-alpha.5 — send is live when there is text OR an attached image.</summary>
+    private void UpdateSendEnabled()
+    {
+        SendButton.IsEnabled = !string.IsNullOrWhiteSpace(PromptBox.Text) || _pendingImage is not null;
     }
 
     /// <summary>
@@ -498,15 +564,22 @@ public partial class AiChatWindow : Window
         catch { }
     }
 
-    // ---------------------------------------------------------------- voice typing (v2.6.0-alpha.4 — record → transcribe → show)
+    // ---------------------------------------------------------------- voice typing (v2.6.0-alpha.5 — record → transcribe → show, with the live overlay)
 
-    /// <summary>Show the mic only when voice is enabled AND the machine ships a recognizer.</summary>
+    /// <summary>
+    /// Mic visibility: voice enabled AND the configured engine is usable. Whisper
+    /// needs no SAPI recognizers (the model download is its own setup path), so
+    /// the mic shows even on machines Windows speech never supported. The attach
+    /// button rides along whenever AI can answer (vision models consume images).
+    /// </summary>
     private void UpdateMicState()
     {
         try
         {
-            bool usable = _settings.VoiceEnabled && VoiceInputService.IsSupported;
+            bool engineWhisper = !string.Equals(_settings.VoiceEngine, VoiceInputService.EngineWindows, StringComparison.OrdinalIgnoreCase);
+            bool usable = _settings.VoiceEnabled && (engineWhisper || VoiceInputService.IsSupported);
             MicButton.Visibility = usable ? Visibility.Visible : Visibility.Collapsed;
+            AttachButton.Visibility = _settings.AiEnabled ? Visibility.Visible : Visibility.Collapsed;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.MicState", ex); }
     }
@@ -524,9 +597,14 @@ public partial class AiChatWindow : Window
     {
         try
         {
-            if (_voice.IsListening || _generating || !VoiceInputService.IsSupported || !_settings.VoiceEnabled) return;
+            if (_voice.IsListening || _voiceSetupOpen || _generating || !_settings.VoiceEnabled) return;
             _voiceBase = PromptBox.Text;   // transcription joins whatever is already typed
-            _voice.Start(_settings.VoiceLanguage);
+            bool engineWhisper = !string.Equals(_settings.VoiceEngine, VoiceInputService.EngineWindows, StringComparison.OrdinalIgnoreCase);
+            string model = string.IsNullOrWhiteSpace(_settings.VoiceModel)
+                ? VoiceWhisper.DefaultModelId : _settings.VoiceModel.Trim();
+            _voice.Start(_settings.VoiceLanguage,
+                engineWhisper ? VoiceInputService.EngineWhisper : VoiceInputService.EngineWindows,
+                model);   // a missing whisper model raises ModelNeeded → the setup card
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceStart", ex); }
     }
@@ -546,14 +624,13 @@ public partial class AiChatWindow : Window
             MicButton.Tag = "listening";
             MicButton.Content = "\uE71A";   // mic cap becomes a stop cap: click again to finish
             MicButton.ToolTip = "Finish & transcribe (Ctrl+M or Enter) · Esc cancels";
-            PromptPlaceholder.Text = "Recording… click again when done speaking";
-            PromptShell.BorderBrush = _focusRingBrush ?? (Brush)FindResource("AccentBrush");
+            ShowVoiceOverlay();
             StartMicPulse();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceStarted", ex); }
     }
 
-    /// <summary>Clip captured, recognition running — keep the ring busy, touch nothing until the text lands.</summary>
+    /// <summary>Clip captured, recognition running — freeze the waveform, only cancel stays alive.</summary>
     private void OnVoiceTranscribing()
     {
         if (!_voice.IsTranscribing) return;   // stale queued event — drop
@@ -562,7 +639,15 @@ public partial class AiChatWindow : Window
             MicButton.Tag = "transcribing";
             MicButton.IsEnabled = false;      // nothing to click while the batch runs
             MicButton.ToolTip = "Transcribing…";
-            PromptPlaceholder.Text = "Transcribing…";
+
+            VoiceStatusText.Text = "Transcribing…";
+            VoiceDot.Fill = (Brush)Resources["AccentBrush"];
+            VoiceTimerText.Visibility = Visibility.Collapsed;
+            Waveform.Freeze();
+            VoiceStopButton.Tag = "";         // heartbeat scale off
+            VoiceStopButton.IsEnabled = false;
+            VoiceStopButton.Opacity = 0.45;
+            VoicePauseButton.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceTranscribing", ex); }
     }
@@ -596,7 +681,7 @@ public partial class AiChatWindow : Window
             MicButton.Content = "\uE720";   // back to the mic glyph
             MicButton.IsEnabled = true;
             MicButton.ToolTip = "Voice input (Ctrl+M)";
-            PromptPlaceholder.Text = "Ask anything…";
+            HideVoiceOverlay();
             StopMicPulse();
             if (PromptBox.IsKeyboardFocusWithin)
                 PromptShell.BorderBrush = (Brush)FindResource("BorderLineBrush");
@@ -657,6 +742,231 @@ public partial class AiChatWindow : Window
         _micPulse = null;
     }
 
+    // ------------------------------------------- v2.6.0-alpha.5 — the voice overlay
+
+    /// <summary>
+    /// The overlay takes the prompt row's place while a session is live: waveform
+    /// proof-of-life, elapsed clock, pause / PROMINENT red stop / cancel caps.
+    /// PromptShell collapses so exactly one of the two shows.
+    /// </summary>
+    private void ShowVoiceOverlay()
+    {
+        _voiceSetupOpen = false;
+        PromptShell.Visibility = Visibility.Collapsed;
+        VoiceOverlay.Visibility = Visibility.Visible;
+        VoiceSetupPanel.Visibility = Visibility.Collapsed;
+        VoiceLivePanel.Visibility = Visibility.Visible;
+
+        VoiceDot.Fill = new SolidColorBrush(Color.FromRgb(0xE5, 0x48, 0x4D));   // recording red
+        VoiceStatusText.Text = "Listening…";
+        VoiceTimerText.Visibility = Visibility.Visible;
+        VoiceTimerText.Text = "0:00";
+        VoiceStopButton.Tag = "recording";      // heartbeat + glow on the PROMINENT cap
+        VoiceStopButton.IsEnabled = true;
+        VoiceStopButton.Opacity = 1;
+        VoicePauseButton.Visibility = Visibility.Visible;
+        VoicePauseButton.Content = "\uE769";    // pause glyph
+        VoicePauseButton.ToolTip = "Pause recording";
+
+        Waveform.Reset();
+        Waveform.BarColor = Color.FromRgb(0xE5, 0x48, 0x4D);
+        Waveform.Start();
+        StartVoiceClock();
+    }
+
+    /// <summary>Back to the prompt row; the overlay (and its clock) fully stops.</summary>
+    private void HideVoiceOverlay()
+    {
+        _voiceSetupOpen = false;
+        VoiceOverlay.Visibility = Visibility.Collapsed;
+        VoiceLivePanel.Visibility = Visibility.Collapsed;
+        VoiceSetupPanel.Visibility = Visibility.Collapsed;
+        VoiceDownloadPanel.Visibility = Visibility.Collapsed;
+        PromptShell.Visibility = Visibility.Visible;
+        Waveform.Reset();
+        StopVoiceClock();
+    }
+
+    private void OnVoiceStopClick(object sender, RoutedEventArgs e) => StopVoice();
+
+    private void OnVoiceCancelClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _voice.Cancel();
+            OnVoiceStopped();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceCancel", ex); }
+    }
+
+    // ------------------------------------------- pause / resume
+
+    private void OnVoicePauseClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_voice.IsPaused)
+            {
+                _voice.Resume();
+                if (_voicePauseStarted is { } at) { _voicePausedTotal += DateTime.UtcNow - at; _voicePauseStarted = null; }
+                VoiceStatusText.Text = "Listening…";
+                VoicePauseButton.Content = "\uE769";
+                VoicePauseButton.ToolTip = "Pause recording";
+                VoiceDot.Opacity = 1;
+            }
+            else
+            {
+                _voice.Pause();
+                _voicePauseStarted = DateTime.UtcNow;
+                VoiceStatusText.Text = "Paused — click to resume";
+                VoicePauseButton.Content = "\uE768";   // play
+                VoicePauseButton.ToolTip = "Resume recording";
+                VoiceDot.Opacity = 0.35;
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoicePause", ex); }
+    }
+
+    // ------------------------------------------- elapsed clock (paused time excluded)
+
+    private void StartVoiceClock()
+    {
+        _voiceClockStart = DateTime.UtcNow;
+        _voicePauseStarted = null;
+        _voicePausedTotal = TimeSpan.Zero;
+        _voiceClock ??= CreateVoiceClock();
+        _voiceClock.Start();
+    }
+
+    private void StopVoiceClock()
+    {
+        try { _voiceClock?.Stop(); } catch { }
+    }
+
+    private DispatcherTimer CreateVoiceClock()
+    {
+        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        t.Tick += (_, _) =>
+        {
+            try
+            {
+                if (!_voice.IsRecording) return;
+                var end = _voicePauseStarted ?? DateTime.UtcNow;
+                var elapsed = end - _voiceClockStart - _voicePausedTotal;
+                if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
+                VoiceTimerText.Text = $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:00}";
+            }
+            catch { }
+        };
+        return t;
+    }
+
+    // ------------------------------------------- v2.6.0-alpha.5 — the Whisper setup card
+
+    /// <summary>
+    /// Raised BEFORE recording when the engine is whisper but the model isn't
+    /// installed: the overlay becomes a one-time setup card — what the download
+    /// is, how big, and a one-click path. "Use Windows speech" records right
+    /// away with the SAPI fallback instead.
+    /// </summary>
+    private void OnVoiceModelNeeded(string modelId)
+    {
+        try
+        {
+            if (_voice.IsListening || _voiceDlCts is not null) return;
+            _setupModel = VoiceWhisper.FromId(modelId);
+            var m = _setupModel;
+
+            _voiceSetupOpen = true;
+            PromptShell.Visibility = Visibility.Collapsed;
+            VoiceOverlay.Visibility = Visibility.Visible;
+            VoiceLivePanel.Visibility = Visibility.Collapsed;
+            VoiceSetupPanel.Visibility = Visibility.Visible;
+            VoiceDownloadPanel.Visibility = Visibility.Collapsed;
+
+            VoiceSetupDesc.Text = $"Whisper runs fully offline and is far more accurate than Windows speech. " +
+                                  $"One-time download: {m.Name} · {m.SizeLabel} — then the mic just works, no connection needed.";
+            VoiceDownloadButton.Content = new TextBlock { Text = $"Download · {m.SizeLabel}" };
+            VoiceDownloadButton.IsEnabled = true;
+            VoiceWindowsButton.IsEnabled = VoiceInputService.IsSupported;
+            VoiceWindowsButton.ToolTip = VoiceInputService.IsSupported
+                ? "Skip the download — record with the built-in Windows recognizer"
+                : "Windows speech is not installed on this PC";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceSetup", ex); }
+    }
+
+    private void OnVoiceDownloadClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_setupModel is not { } m || _voiceDlCts is not null) return;
+            _voiceDlCts = new CancellationTokenSource();
+            VoiceDownloadPanel.Visibility = Visibility.Visible;
+            VoiceDownloadBar.Value = 0;
+            VoiceDownloadText.Text = "Starting…";
+            VoiceDownloadButton.IsEnabled = false;
+            VoiceWindowsButton.IsEnabled = false;
+
+            var progress = new Progress<double>(v =>
+            {
+                VoiceDownloadBar.Value = Math.Clamp(v, 0, 1);
+                VoiceDownloadText.Text = v < 0.995
+                    ? $"Downloading… {v:P0} of {m.SizeLabel}"
+                    : "Finishing…";
+            });
+            var ct = _voiceDlCts.Token;
+
+            _ = Task.Run(async () =>
+            {
+                string? err = await WhisperEngine.DownloadAsync(m, progress, ct).ConfigureAwait(true);
+                await Dispatcher.InvokeAsync(() => OnVoiceDownloadDone(m, err));
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceDownload", ex); }
+    }
+
+    private void OnVoiceDownloadDone(VoiceWhisper.WhisperModel m, string? error)
+    {
+        try
+        {
+            _voiceDlCts = null;
+            if (error is null)
+            {
+                _settings.VoiceEngine = VoiceInputService.EngineWhisper;
+                _settings.VoiceModel = m.Id;
+                _settings.Save();
+                HideVoiceOverlay();
+                UpdateMicState();
+                StartVoice();   // the download is the setup — recording starts immediately
+                return;
+            }
+            if (error == "cancelled")
+            {
+                HideVoiceOverlay();
+                return;
+            }
+            VoiceDownloadText.Text = error;   // the card stays up with the reason
+            VoiceDownloadButton.IsEnabled = true;
+            VoiceWindowsButton.IsEnabled = VoiceInputService.IsSupported;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceDownloadDone", ex); }
+    }
+
+    private void OnVoiceUseWindowsClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _settings.VoiceEngine = VoiceInputService.EngineWindows;
+            _settings.Save();
+            _setupModel = null;
+            HideVoiceOverlay();
+            UpdateMicState();
+            StartVoice();   // SAPI fallback — records right away
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceUseWindows", ex); }
+    }
+
     private void OnSendClick(object sender, RoutedEventArgs e) => SendFromInput();
 
     private void SendFromInput()
@@ -667,11 +977,13 @@ public partial class AiChatWindow : Window
             // Enter / send click finishes the clip and shows the text instead of sending;
             // while transcribing there is nothing to send yet, wait for it.
             if (_voice.IsRecording) { StopVoice(); return; }
-            if (_voice.IsTranscribing) return;
+            if (_voice.IsTranscribing || _voiceSetupOpen) return;
             string t = PromptBox.Text.Trim();
-            if (t.Length == 0 || _generating) return;
+            if ((t.Length == 0 && _pendingImage is null) || _generating) return;
             PromptBox.Clear();
-            SendUserMessage(t);
+            var img = _pendingImage;
+            ClearPendingImage();
+            SendUserMessage(t, img);   // v2.6.0-alpha.5 — an attached image rides along
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SendInput", ex); }
     }
@@ -1182,7 +1494,13 @@ public partial class AiChatWindow : Window
                     else if (m.Role == "assistant")
                     {
                         var (host, _) = AppendAssistantBubble();
-                        RenderMarkdownInto(host, m.Content, null, allowRegenerate: i == lastAssistantIdx);
+                        // v2.6.0-alpha.5 — reasoning models persist raw <think> text;
+                        // restored transcripts render it as the collapsible Reasoning
+                        // block ahead of the visible answer.
+                        var parts = ThinkSplit.Split(m.Content);
+                        if (parts.HasReasoning) AddReasoningBlock(host, parts.Reasoning);
+                        string stats = m.At.ToLocalTime().ToString("t", CultureInfo.CurrentCulture);
+                        RenderMarkdownInto(host, parts.Answer, stats, allowRegenerate: i == lastAssistantIdx);
                     }
                 }
             }
@@ -1209,10 +1527,13 @@ public partial class AiChatWindow : Window
         foreach (var m in _session.Messages)
         {
             if (m.Role is not ("user" or "assistant")) continue;
+            // v2.6.0-alpha.5 — reasoning text stays out of the API context: the
+            // transcript keeps it for display, the request keeps only the answer.
+            string content = m.Role == "assistant" ? ThinkSplit.Split(m.Content).Answer : m.Content;
             if (_history.Count > 0 && _history[^1].Role == m.Role)
-                _history[^1] = new AiProviders.AiTurn(m.Role, _history[^1].Content + "\n\n" + m.Content);
+                _history[^1] = new AiProviders.AiTurn(m.Role, _history[^1].Content + "\n\n" + content);
             else
-                _history.Add(new AiProviders.AiTurn(m.Role, m.Content));
+                _history.Add(new AiProviders.AiTurn(m.Role, content));
         }
         if (_history.Count > HistoryCap)
             _history.RemoveRange(0, _history.Count - HistoryCap);
@@ -1388,18 +1709,20 @@ public partial class AiChatWindow : Window
     // ---------------------------------------------------------------- sending / streaming
 
     /// <summary>Entry point used by both the input box and the launcher's AI/query deep link.</summary>
-    public void SendUserMessage(string text)
+    public void SendUserMessage(string text, AiProviders.ImagePayload? image = null)
     {
         try
         {
             text = (text ?? "").Trim();
+            if (image is not null && text.Length == 0)
+                text = "Describe this image.";   // vision turn with no caption — give the model something to answer
             if (text.Length == 0 || _generating) return;
             if (!_settings.AiEnabled) { UpdateBanner(); }   // the request will fail with the same message — surface it visibly
 
             EnsureSession(text);      // v2.4.0-alpha.5 — first message mints the session (title + persona)
-            AppendUserBubble(text);
+            AppendUserBubble(text, image);
             UpdateEmptyState();
-            BeginAssistantTurn(text);
+            BeginAssistantTurn(text, image);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Send", ex); }
     }
@@ -1432,7 +1755,7 @@ public partial class AiChatWindow : Window
     /// re-run it for the previous prompt without re-appending the user bubble:
     /// builds the assistant placeholder, then starts the streamed request.
     /// </summary>
-    private void BeginAssistantTurn(string prompt)
+    private void BeginAssistantTurn(string prompt, AiProviders.ImagePayload? image = null)
     {
         try
         {
@@ -1440,6 +1763,7 @@ public partial class AiChatWindow : Window
             var (host, live) = AppendAssistantBubble();
             _liveHost = host;
             _liveText = live;
+            _turnImage = image;   // v2.6.0-alpha.5 — the image whose answer is streaming
             StartTypingDots(host);
 
             _streamBuf.Clear();
@@ -1468,7 +1792,7 @@ public partial class AiChatWindow : Window
                 {
                     var result = await _ai.StreamChatAsync(_settings, _history, prompt,
                         delta => { lock (_streamBuf) { _streamBuf.Append(delta); _streamDirty = true; } },
-                        ct, systemPrompt).ConfigureAwait(true);
+                        ct, systemPrompt, image).ConfigureAwait(true);
                     await Dispatcher.InvokeAsync(() => FinishTurn(result));
                 }
                 catch (Exception ex)
@@ -1508,15 +1832,20 @@ public partial class AiChatWindow : Window
                     StopTypingDots();
                 }
 
-                // typewriter reveal — Ollama deltas are naturally small so this stays
-                // caught up (true streaming); Anthropic arrives at once and plays back
-                int gap = partial.Length - _shownLen;
+                // v2.6.0-alpha.5 — reasoning models inline their chain of thought in
+                // <think>…</think>; the live view splits it into the collapsible
+                // Reasoning panel and only types the visible answer.
+                var parts = ThinkSplit.Split(partial);
+                UpdateThinkPanel(partial, parts);
+
+                string answer = parts.Answer;
+                int gap = answer.Length - _shownLen;
                 int step = gap > 400 ? 48 : gap > 120 ? 20 : 9;
-                _shownLen = Math.Min(partial.Length, _shownLen + step);
+                _shownLen = Math.Min(answer.Length, _shownLen + step);
 
                 if (_liveText is { } live)
                 {
-                    live.Text = partial[.._shownLen];
+                    live.Text = answer[.._shownLen];
                     ScrollIfAtBottom();
                 }
             }
@@ -1539,25 +1868,32 @@ public partial class AiChatWindow : Window
             if (result.Ok)
             {
                 string full = typed.Length > 0 ? typed : result.Text;
-                _history.Add(new AiProviders.AiTurn("user", _pendingUserPrompt));
-                _history.Add(new AiProviders.AiTurn("assistant", full));
-                PersistAssistant(full, "");
+                var parts = ThinkSplit.Split(full);   // v2.6.0-alpha.5 — keep reasoning out of the API history
+                _history.Add(new AiProviders.AiTurn("user", _pendingUserPrompt, _turnImage));
+                _history.Add(new AiProviders.AiTurn("assistant", parts.Answer));
+                PersistAssistant(full, "");           // the raw text (think tags included) is what persists
                 if (_liveHost is { } host)
                 {
                     if (_liveText is { } lt) lt.Visibility = Visibility.Collapsed;
-                    // v2.4.0-alpha.4 — quiet per-answer stats: wall time + answer length
-                    string stats = $"{_turnStart.Elapsed.TotalSeconds:0.0}s \u00b7 {full.Length:N0} chars";
-                    RenderMarkdownInto(host, full, stats);
+                    TeardownThinkCard();
+                    // v2.4.0-alpha.4 — quiet per-answer stats: time · wall time · answer length
+                    string stats = $"{DateTime.Now.ToString("t", CultureInfo.CurrentCulture)} \u00b7 " +
+                                   $"{_turnStart.Elapsed.TotalSeconds:0.0}s \u00b7 {full.Length:N0} chars";
+                    if (parts.HasReasoning) AddReasoningBlock(host, parts.Reasoning);
+                    RenderMarkdownInto(host, parts.Answer, stats);
                 }
             }
             else if (result.Cancelled)
             {
                 string partial = typed.Length > 0 ? typed : result.Text;
-                _history.Add(new AiProviders.AiTurn("user", _pendingUserPrompt));
+                _history.Add(new AiProviders.AiTurn("user", _pendingUserPrompt, _turnImage));
                 if (partial.Length > 0 && _liveHost is { } h)
                 {
                     if (_liveText is { } lt) lt.Visibility = Visibility.Collapsed;
-                    RenderMarkdownInto(h, partial);
+                    var stopped = ThinkSplit.Split(partial);
+                    TeardownThinkCard();
+                    if (stopped.HasReasoning) AddReasoningBlock(h, stopped.Reasoning);
+                    RenderMarkdownInto(h, stopped.Answer);
                     AddFootnote(h, "stopped");
                     PersistAssistant(partial, " (stopped)");
                 }
@@ -1572,7 +1908,10 @@ public partial class AiChatWindow : Window
                 if (typed.Length > 0 && _liveHost is { } h2)
                 {
                     if (_liveText is { } lt2) lt2.Visibility = Visibility.Collapsed;
-                    RenderMarkdownInto(h2, typed);
+                    var failed = ThinkSplit.Split(typed);
+                    TeardownThinkCard();
+                    if (failed.HasReasoning) AddReasoningBlock(h2, failed.Reasoning);
+                    RenderMarkdownInto(h2, failed.Answer);
                 }
                 else
                 {
@@ -1588,9 +1927,14 @@ public partial class AiChatWindow : Window
             _liveHost = null;
             _liveText = null;
             _dotsPanel = null;
+            _turnImage = null;
+            _thinkCard = null;
+            _thinkBody = null;
+            _thinkHeader = null;
+            _thinkChevron = null;
             SendButton.Visibility = Visibility.Visible;
             StopButton.Visibility = Visibility.Collapsed;
-            SendButton.IsEnabled = !string.IsNullOrWhiteSpace(PromptBox.Text);
+            UpdateSendEnabled();
             UpdateEmptyState();
             ScrollIfAtBottom();
         }
@@ -1617,7 +1961,7 @@ public partial class AiChatWindow : Window
 
     // ---------------------------------------------------------------- bubbles
 
-    private void AppendUserBubble(string text)
+    private void AppendUserBubble(string text, AiProviders.ImagePayload? image = null)
     {
         try
         {
@@ -1625,6 +1969,8 @@ public partial class AiChatWindow : Window
             var grid = new Grid { Margin = new Thickness(0, 4, 0, 12) };
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             // v2.4.0-alpha.4 — MAXIMUM CONTRAST, no chrome: a flat inverted pill
             // (near-white on dark / near-black on light) with no border and no tint.
@@ -1638,22 +1984,78 @@ public partial class AiChatWindow : Window
                 MaxWidth = 560,
                 HorizontalAlignment = HorizontalAlignment.Right,
             };
-            var tb = new TextBlock
+
+            // v2.6.0-alpha.5 — prompt-kit ImageAttachment: a rounded thumbnail rides
+            // INSIDE the bubble, above the caption text (when there is one).
+            StackPanel content = new() { Orientation = Orientation.Vertical };
+            if (image is not null)
             {
-                Text = text,
-                TextWrapping = TextWrapping.Wrap,
-                FontSize = 13.5,
-                LineHeight = 19.5,
-                Foreground = (Brush)Resources["UserBubbleTextBrush"],
-            };
-            bubble.Child = tb;
+                var thumb = MakeImageThumb(image, 132);
+                thumb.Margin = new Thickness(0, 0, 0, text.Length > 0 ? 8 : 0);
+                content.Children.Add(thumb);
+            }
+            if (text.Length > 0)
+            {
+                content.Children.Add(new TextBlock
+                {
+                    Text = text,
+                    TextWrapping = TextWrapping.Wrap,
+                    FontSize = 13.5,
+                    LineHeight = 19.5,
+                    Foreground = (Brush)Resources["UserBubbleTextBrush"],
+                });
+            }
+            bubble.Child = content;
             Grid.SetColumn(bubble, 1);
+            Grid.SetRow(bubble, 0);
             grid.Children.Add(bubble);
+
+            // v2.6.0-alpha.5 — prompt-kit ChatBubbleTimestamp: a quiet clock under
+            // the bubble, the color of a footnote.
+            var stamp = new TextBlock
+            {
+                Text = DateTime.Now.ToString("t", CultureInfo.CurrentCulture),
+                FontSize = 10,
+                Opacity = 0.45,
+                Foreground = (Brush)Resources["SubtitleBrush"],
+                Margin = new Thickness(0, 3, 6, 0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+            };
+            Grid.SetColumn(stamp, 1);
+            Grid.SetRow(stamp, 1);
+            grid.Children.Add(stamp);
+
             MessagesHost.Children.Add(grid);
             AnimateIn(grid);
             ScrollIfAtBottom();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.UserBubble", ex); }
+    }
+
+    /// <summary>v2.6.0-alpha.5 — decodes an attached image into a rounded, height-capped thumbnail.</summary>
+    private static System.Windows.Controls.Image MakeImageThumb(AiProviders.ImagePayload image, double maxHeight)
+    {
+        var bmp = new BitmapImage();
+        try
+        {
+            var bytes = Convert.FromBase64String(image.Base64);
+            using var ms = new MemoryStream(bytes);
+            bmp.BeginInit();
+            bmp.CacheOption = BitmapCacheOption.OnLoad;
+            bmp.StreamSource = ms;
+            bmp.EndInit();
+            bmp.Freeze();
+        }
+        catch { /* a broken image still shows the bubble text */ }
+
+        return new System.Windows.Controls.Image
+        {
+            Source = bmp,
+            MaxHeight = maxHeight,
+            MaxWidth = 320,
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
     }
 
     /// <summary>Assistant placeholder: gradient sparkle avatar + plain live text + (caller adds) typing dots.</summary>
@@ -1831,6 +2233,300 @@ public partial class AiChatWindow : Window
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.DotsStop", ex); }
     }
 
+    // ------------------------------------------- v2.6.0-alpha.5 — prompt-kit Reasoning block
+
+    /// <summary>
+    /// The live reasoning panel while a reasoning model streams: a collapsible
+    /// card above the answer that auto-EXPANDS while the model is inside
+    /// &lt;think&gt;…&lt;/think&gt; and auto-collapses the moment the visible
+    /// answer starts (prompt-kit's Reasoning, which stays open while thinking
+    /// and folds away when the reply lands).
+    /// </summary>
+    private void UpdateThinkPanel(string raw, ThinkSplit.Parts parts)
+    {
+        try
+        {
+            if (!parts.HasReasoning)
+            {
+                TeardownThinkCard();
+                return;
+            }
+
+            if (_thinkCard is null)
+            {
+                var (card, body, header, chevron) = BuildThinkCard();
+                _thinkCard = card;
+                _thinkBody = body;
+                _thinkHeader = header;
+                _thinkChevron = chevron;
+                if (_liveHost is { } host && host.Children.Count > 0)
+                    host.Children.Insert(0, card);   // the panel sits above the live answer line
+                else if (_liveHost is { } h2)
+                    h2.Children.Add(card);
+            }
+
+            // bound the layout: a 4k-token chain of thought must not grow the
+            // window forever — show the tail (the part closest to the answer)
+            _thinkBody!.Text = parts.Reasoning.Length > 3500
+                ? "\u2026" + parts.Reasoning[^3500..]
+                : parts.Reasoning;
+
+            bool thinkingNow = ThinkSplit.IsThinking(raw);
+            _thinkHeader!.Text = thinkingNow ? "Reasoning\u2026" : "Reasoning";
+            SetThinkOpen(thinkingNow, animate: false);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ThinkPanel", ex); }
+    }
+
+    /// <summary>Removes the live reasoning card from its host (turn finished — the final block replaces it).</summary>
+    private void TeardownThinkCard()
+    {
+        try
+        {
+            if (_thinkCard?.Parent is Panel p)
+                p.Children.Remove(_thinkCard);
+            _thinkCard = null;
+            _thinkBody = null;
+            _thinkHeader = null;
+            _thinkChevron = null;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ThinkTeardown", ex); }
+    }
+
+    /// <summary>Builds the collapsible reasoning card: header button + chevron + muted body.</summary>
+    private (Border Card, TextBlock Body, TextBlock Header, TextBlock Chevron) BuildThinkCard()
+    {
+        var header = new TextBlock
+        {
+            Text = "Reasoning\u2026",
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = (Brush)Resources["SubtitleBrush"],
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var chevron = new TextBlock
+        {
+            Text = "\uE70E",   // chevron down (open)
+            FontFamily = new FontFamily("Segoe MDL2 Assets"),
+            FontSize = 9.5,
+            Foreground = (Brush)Resources["SubtitleBrush"],
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var headerRow = new Button
+        {
+            Style = null,
+            Background = System.Windows.Media.Brushes.Transparent,
+            BorderThickness = new Thickness(0),
+            Cursor = Cursors.Hand,
+            Focusable = false,
+            Padding = new Thickness(0),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            Content = MakeLeftRightRow(header, chevron),
+        };
+        headerRow.Click += (_, _) => SetThinkOpen(!_thinkOpen, animate: true);
+
+        var body = new TextBlock
+        {
+            TextWrapping = TextWrapping.Wrap,
+            FontSize = 12,
+            FontStyle = FontStyles.Italic,
+            LineHeight = 17,
+            Foreground = (Brush)Resources["SubtitleBrush"],
+        };
+        var bodyHost = new ScrollViewer
+        {
+            Content = body,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            MaxHeight = 150,
+            Margin = new Thickness(0, 7, 0, 0),
+        };
+
+        var stack = new StackPanel();
+        stack.Children.Add(headerRow);
+        stack.Children.Add(bodyHost);
+
+        var card = new Border
+        {
+            Background = (Brush)Resources["CodeBrush"],
+            BorderBrush = (Brush)Resources["BorderLineBrush"],
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(11, 8, 11, 10),
+            Margin = new Thickness(0, 2, 0, 8),
+            MaxWidth = 640,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Child = stack,
+        };
+        return (card, body, header, chevron);
+    }
+
+    /// <summary>Shows/hides the reasoning body; the chevron follows (down = open, right = folded).</summary>
+    private void SetThinkOpen(bool open, bool animate)
+    {
+        _thinkOpen = open;
+        try
+        {
+            if (_thinkBody?.Parent is ScrollViewer sv)
+                sv.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
+            if (_thinkChevron is { } ch)
+                ch.Text = open ? "\uE70E" : "\uE70D";
+        }
+        catch { }
+    }
+
+    /// <summary>The static reasoning block for a FINISHED answer (history + completed turns).</summary>
+    private void AddReasoningBlock(StackPanel host, string reasoning)
+    {
+        try
+        {
+            var (card, body, header, chevron) = BuildThinkCard();
+            bool longThink = reasoning.Length > 400;
+            body.Text = reasoning.Length > 6000 ? "\u2026" + reasoning[^6000..] : reasoning;
+            header.Text = $"Reasoning \u00b7 {(reasoning.Length / 5.0):0} words";
+            chevron.Text = "\uE70D";   // folded by default once the answer is in
+            if (body.Parent is ScrollViewer sv) sv.Visibility = Visibility.Collapsed;
+            if (longThink) { /* already folded — the header words count is the hook */ }
+            host.Children.Insert(0, card);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.ReasoningBlock", ex); }
+    }
+
+    /// <summary>One row with a left-aligned and a right-aligned child (the think header's layout).</summary>
+    private static Grid MakeLeftRightRow(System.Windows.UIElement left, System.Windows.UIElement right)
+    {
+        var g = new Grid();
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(left, 0);
+        Grid.SetColumn(right, 1);
+        g.Children.Add(left);
+        g.Children.Add(right);
+        return g;
+    }
+
+    // ------------------------------------------- v2.6.0-alpha.5 — prompt-kit ImageAttachment
+
+    private void OnAttachClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_generating || _voice.IsListening) return;
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Attach an image",
+                Filter = "Images|*.png;*.jpg;*.jpeg;*.webp;*.gif|All files|*.*",
+                CheckFileExists = true,
+            };
+            if (dlg.ShowDialog(this) is not true) return;
+            var img = AiProviders.ImagePayload.Create(File.ReadAllBytes(dlg.FileName), GuessMediaType(dlg.FileName));
+            if (img is null)
+            {
+                PromptPlaceholder.Text = "That image is too large (over 4 MB) or not a supported format.";
+                return;
+            }
+            SetPendingImage(img);
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.Attach", ex); }
+    }
+
+    /// <summary>Ctrl+V with a screenshot on the clipboard — attach it instead of pasting text.</summary>
+    private bool TryAttachFromClipboard()
+    {
+        try
+        {
+            if (_generating || !PromptBox.IsKeyboardFocusWithin) return false;
+            if (!System.Windows.Clipboard.ContainsImage()) return false;
+            var src = System.Windows.Clipboard.GetImage();
+            if (src is null) return false;
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(src));
+            using var ms = new MemoryStream();
+            encoder.Save(ms);
+            var img = AiProviders.ImagePayload.Create(ms.ToArray(), "image/png");
+            if (img is null) return false;
+            SetPendingImage(img);
+            return true;
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.AttachPaste", ex); return false; }
+    }
+
+    private static string GuessMediaType(string path)
+    {
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        return ext switch
+        {
+            ".jpg" or ".jpeg" => "image/jpeg",
+            ".webp" => "image/webp",
+            ".gif" => "image/gif",
+            _ => "image/png",
+        };
+    }
+
+    /// <summary>Shows the attachment chip above the prompt (thumbnail + remove cap + size caption).</summary>
+    private void SetPendingImage(AiProviders.ImagePayload img)
+    {
+        try
+        {
+            _pendingImage = img;
+            AttachHost.Children.Clear();
+
+            var chip = new Grid { Margin = new Thickness(0, 0, 8, 8) };
+            var thumb = MakeImageThumb(img, 56);
+            var thumbHost = new Border
+            {
+                Child = thumb,
+                Width = 88,
+                Height = 56,
+                CornerRadius = new CornerRadius(9),
+                Background = (Brush)Resources["CodeBrush"],
+                BorderBrush = (Brush)Resources["BorderLineBrush"],
+                BorderThickness = new Thickness(1),
+                ClipToBounds = true,
+            };
+            chip.Children.Add(thumbHost);
+
+            // the remove cap, pinned to the chip's top-right corner
+            var remove = new Button
+            {
+                Style = null,
+                Content = "\uE711",
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 8,
+                Width = 18,
+                Height = 18,
+                Cursor = Cursors.Hand,
+                Focusable = false,
+                Background = (Brush)Resources["UserBubbleBrush"],
+                Foreground = (Brush)Resources["UserBubbleTextBrush"],
+                BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 2, 2, 0),
+                ToolTip = "Remove attachment",
+            };
+            remove.Click += (_, _) => ClearPendingImage();
+            chip.Children.Add(remove);
+
+            AttachHost.Children.Add(chip);
+            AttachHost.Visibility = Visibility.Visible;
+            UpdateSendEnabled();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.AttachSet", ex); }
+    }
+
+    private void ClearPendingImage()
+    {
+        try
+        {
+            _pendingImage = null;
+            AttachHost.Children.Clear();
+            AttachHost.Visibility = Visibility.Collapsed;
+            UpdateSendEnabled();
+        }
+        catch { }
+    }
+
     // ---------------------------------------------------------------- markdown rendering
 
     /// <summary>Turns markdown-lite blocks into visual children of the bubble host.
@@ -1925,13 +2621,14 @@ public partial class AiChatWindow : Window
 
         var stack = new StackPanel();
 
-        // header: language label + copy
+        // header: language label + line count + copy (prompt-kit CodeBlock)
+        int lines = c.Text.Count(ch => ch == '\n') + (c.Text.Length > 0 && !c.Text.EndsWith('\n') ? 1 : 0);
         var header = new Grid { Margin = new Thickness(0, 0, 0, 5) };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var lang = new TextBlock
         {
-            Text = string.IsNullOrWhiteSpace(c.Lang) ? "code" : c.Lang,
+            Text = (string.IsNullOrWhiteSpace(c.Lang) ? "code" : c.Lang) + (lines > 3 ? $" \u00b7 {lines} lines" : ""),
             FontSize = 10.5,
             Foreground = (Brush)Resources["SubtitleBrush"],
         };

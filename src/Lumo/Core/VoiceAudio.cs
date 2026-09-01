@@ -96,7 +96,7 @@ public static class VoiceAudio
     }
 
     /// <summary>RMS loudness of a run of 16-bit little-endian samples (odd tails tolerated).</summary>
-    private static double Rms(ReadOnlySpan<byte> pcm16Le)
+    public static double Rms(ReadOnlySpan<byte> pcm16Le)
     {
         long sum = 0;
         int samples = pcm16Le.Length / 2;
@@ -107,5 +107,42 @@ public static class VoiceAudio
             sum += (long)s * s;
         }
         return Math.Sqrt((double)sum / samples);
+    }
+
+    /// <summary>
+    /// v2.6.0-alpha.5 — converts 16-bit little-endian mono PCM to the float
+    /// samples whisper expects ([-1, 1), same sample rate). Odd tails tolerated;
+    /// empty input yields an empty array so the engine can bail cleanly.
+    /// </summary>
+    public static float[] ToFloatSamples(ReadOnlySpan<byte> pcm16Le)
+    {
+        int samples = pcm16Le.Length / 2;
+        var floats = new float[samples];
+        for (int i = 0; i < samples; i++)
+        {
+            short s = (short)(pcm16Le[i * 2] | (pcm16Le[i * 2 + 1] << 8));
+            floats[i] = s / 32768f;
+        }
+        return floats;
+    }
+
+    /// <summary>RMS floor under which a meter reading is treated as digital silence.</summary>
+    public const int SilenceRms = 200;
+
+    /// <summary>RMS that already reads as a full-scale meter bar.</summary>
+    public const int LoudRms = 3200;
+
+    /// <summary>
+    /// v2.6.0-alpha.5 — maps a window's RMS loudness onto the 0..1 waveform-meter
+    /// scale: below <see cref="SilenceRms"/> is digital silence (the bars rest at
+    /// zero instead of twitching with room noise), <see cref="LoudRms"/> and above
+    /// saturate. The power curve lifts quiet speech out of the floor so the
+    /// visualizer reacts to normal talking, not just shouting.
+    /// </summary>
+    public static double RmsToLevel(double rms)
+    {
+        if (rms <= SilenceRms) return 0;
+        double x = Math.Min(1.0, (rms - SilenceRms) / (LoudRms - SilenceRms));
+        return Math.Pow(x, 0.6);
     }
 }

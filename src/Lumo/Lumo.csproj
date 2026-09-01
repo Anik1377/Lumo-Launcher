@@ -10,13 +10,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>Lumo</AssemblyName>
     <RootNamespace>Lumo</RootNamespace>
-    <Version>2.6.0-alpha.4</Version>
-    <InformationalVersion>Lumo 2.6.0-alpha.4 (ALPHA — unstable build)</InformationalVersion>
+    <Version>2.6.0-alpha.5</Version>
+    <InformationalVersion>Lumo 2.6.0-alpha.5 (ALPHA — unstable build)</InformationalVersion>
     <AssemblyVersion>2.0.0</AssemblyVersion>
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>false</SelfContained>
+    <!-- v2.6.0-alpha.5 — Whisper.net ships native whisper.dll; without this flag a
+         framework-dependent single-file publish would leave it OUT of the exe and
+         the release zip (exe only) would lose it. Embedded → extracted to temp at
+         first use, so the portable single exe promise holds. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
@@ -44,9 +49,15 @@
 
   <!-- v2.6.0-alpha.3 — voice typing in the AI chat: the managed wrapper over the
        Windows desktop speech stack (SAPI). Offline dictation, ships with the OS,
-       zero cloud, zero setup — the no-heavy-dependency way to add a mic. -->
+       zero cloud, zero setup — kept as the FALLBACK engine.
+       v2.6.0-alpha.5 — Whisper.net (whisper.cpp bindings) is the PRIMARY engine:
+       dramatically better accuracy, still fully offline after the one-time model
+       download (Services/WhisperEngine streams ggml models from the official
+       whisper.cpp Hugging Face repo into DataDir/models). -->
   <ItemGroup>
     <PackageReference Include="System.Speech" Version="8.0.0" />
+    <PackageReference Include="Whisper.net" Version="1.9.1" />
+    <PackageReference Include="Whisper.net.Runtime" Version="1.9.1" />
   </ItemGroup>
 
   <!-- UseWindowsForms injects global System.Drawing / System.Windows.Forms usings which

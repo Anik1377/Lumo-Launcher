@@ -61,6 +61,9 @@
     <Compile Include="../Lumo/Core/VoiceDictation.cs" Link="Core/VoiceDictation.cs" />
     <!-- v2.6.0-alpha.4 — record → transcribe → show: WAV wrap + silence trim policy -->
     <Compile Include="../Lumo/Core/VoiceAudio.cs" Link="Core/VoiceAudio.cs" />
+    <!-- v2.6.0-alpha.5 — Whisper model catalog + language mapping, reasoning splitter -->
+    <Compile Include="../Lumo/Core/VoiceWhisper.cs" Link="Core/VoiceWhisper.cs" />
+    <Compile Include="../Lumo/Core/ThinkSplit.cs" Link="Core/ThinkSplit.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
     <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
     <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />

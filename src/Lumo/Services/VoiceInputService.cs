@@ -14,20 +14,26 @@ public enum VoiceStage
 }
 
 /// <summary>
-/// v2.6.0-alpha.4 — offline voice typing for the AI chat, rebuilt around the
-/// accuracy fix the previous live-dictation build needed: <b>record, then
-/// transcribe, then show</b>. The old build ran RecognizeAsync(Multiple) and
-/// finalized a segment at every 450 ms pause, so half-thoughts were committed
-/// mid-sentence with no acoustic context and every "final" word stuck. Now a
-/// session is a batch job:
+/// v2.6.0-alpha.5 — offline voice typing for the AI chat: <b>record, then
+/// transcribe, then show</b>, now with a two-tier engine.
 ///
 ///   1. RECORD   — Start() opens WaveRecorder and captures the complete clip
 ///                 (16 kHz/16-bit/mono) while the user speaks, no recognition.
+///                 v2.6.0-alpha.5 adds Pause()/Resume() (the paused stretch is
+///                 really discarded from the clip) and a 10 Hz Level feed for
+///                 the live waveform.
 ///   2. TRANSCRIBE — Stop() ends the clip, cuts the room tone off both edges
-///                 (VoiceAudio.TrimSilence — silence makes SAPI hallucinate
-///                 filler words), wraps the PCM as a WAV stream and runs ONE
-///                 blocking Recognize() on a background thread, so the engine
-///                 sees the whole utterance with full context.
+///                 (VoiceAudio.TrimSilence) and hands the WHOLE utterance to
+///                 the configured engine on a background thread:
+///                   · whisper  (default) — OpenAI's Whisper via whisper.cpp
+///                     (Services/WhisperEngine): dramatically more accurate
+///                     than the Windows desktop recognizer, still fully
+///                     offline. The model is downloaded once on demand; when
+///                     it is missing, ModelNeeded fires BEFORE any recording
+///                     starts and the UI offers the one-time setup.
+///                   · windows — the SAPI fallback, one blocking Recognize()
+///                     over the whole clip (the v2.6.0-alpha.4 path, kept for
+///                     machines that skip the download).
 ///   3. SHOW     — the finished text is marshalled to the calling Dispatcher
 ///                 and raised as Final exactly once; nothing touches the prompt
 ///                 box until recognition is done (WYSIWYG: what appears is what
@@ -35,10 +41,8 @@ public enum VoiceStage
 ///
 /// A generation counter makes results from a cancelled session land silently —
 /// Cancel() during recording discards the clip, during transcribing discards
-/// the pending text. Every failure — no mic, no recognizer, no speech, COM
-/// error — surfaces as Failed(reason), never an exception crossing the API.
-/// The engine itself stays SAPI (ships with Windows, no cloud, no key); it is
-/// created fresh per transcription so a poisoned engine can't linger.
+/// the pending text. Every failure — no mic, no engine, no speech — surfaces as
+/// Failed(reason), never an exception crossing the API.
 /// </summary>
 public sealed class VoiceInputService : IDisposable
 {
@@ -48,6 +52,9 @@ public sealed class VoiceInputService : IDisposable
     /// <summary>A clip shorter than this after trimming is treated as "didn't hear anything".</summary>
     private const int MinClipMs = 250;
 
+    public const string EngineWhisper = "whisper";
+    public const string EngineWindows = "windows";
+
     private const string NoSpeechMessage =
         "Didn't hear anything — speak after clicking the mic, then click again to finish.";
     private const string NoMatchMessage =
@@ -56,6 +63,8 @@ public sealed class VoiceInputService : IDisposable
     private WaveRecorder? _recorder;
     private Dispatcher? _dispatcher;
     private string? _preferred;
+    private string _engine = EngineWhisper;
+    private string _modelId = VoiceWhisper.DefaultModelId;
     private int _generation;
 
     public VoiceStage Stage { get; private set; } = VoiceStage.Idle;
@@ -65,6 +74,10 @@ public sealed class VoiceInputService : IDisposable
     public bool IsRecording => Stage == VoiceStage.Recording;
     public bool IsTranscribing => Stage == VoiceStage.Transcribing;
 
+    /// <summary>v2.6.0-alpha.5 — paused capture: the mic is open but audio is being discarded.</summary>
+    public bool IsPaused => _recorder?.IsPaused ?? false;
+
+    /// <summary>Windows SAPI recognizers installed (the fallback engine's availability).</summary>
     public static bool IsSupported
     {
         get
@@ -78,6 +91,8 @@ public sealed class VoiceInputService : IDisposable
     public event Action? TranscribingStarted;   // clip finished, recognition running
     public event Action<string>? Final;         // the whole clip transcribed — show it
     public event Action<string>? Failed;        // human-readable reason, shown in the UI
+    public event Action<double>? Level;         // v2.6.0-alpha.5 — 0..1 mic loudness, ~10 Hz
+    public event Action<string>? ModelNeeded;   // v2.6.0-alpha.5 — whisper chosen but the model isn't installed
 
     /// <summary>Installed recognizers as (id, culture) pairs — empty on any error. Feeds the picker and the Settings status line.</summary>
     public static IReadOnlyList<(string Id, string Culture)> Installed()
@@ -92,17 +107,40 @@ public sealed class VoiceInputService : IDisposable
         catch { return Array.Empty<(string, string)>(); }
     }
 
+    /// <summary>Legacy entry point — defaults to the Whisper engine with the catalog default model.</summary>
+    public void Start(string? preferredCulture) =>
+        Start(preferredCulture, EngineWhisper, VoiceWhisper.DefaultModelId);
+
     /// <summary>
-    /// Starts recording a clip. Safe to call when busy (no-op) and on machines
-    /// without speech support (Failed fires with the reason). Must be called on
-    /// the UI thread — its Dispatcher receives every event.
+    /// Starts recording a clip with the configured engine. Safe to call when
+    /// busy (no-op) and on machines without speech support (Failed fires with
+    /// the reason). When the Whisper engine is selected but its model is not
+    /// installed yet, ModelNeeded fires and nothing is recorded — the UI shows
+    /// the one-time setup card. Must be called on the UI thread — its Dispatcher
+    /// receives every event.
     /// </summary>
     /// <param name="preferredCulture">settings.json "VoiceLanguage" — "" follows the OS UI language.</param>
-    public void Start(string? preferredCulture)
+    /// <param name="engine">"whisper" (default) or "windows" (SAPI fallback).</param>
+    /// <param name="modelId">settings.json "VoiceModel" — a Core/VoiceWhisper catalog id.</param>
+    public void Start(string? preferredCulture, string engine, string modelId)
     {
         if (Stage != VoiceStage.Idle) return;
         _dispatcher = Dispatcher.CurrentDispatcher;
         _preferred = preferredCulture;
+        _engine = string.Equals(engine, EngineWindows, StringComparison.OrdinalIgnoreCase) ? EngineWindows : EngineWhisper;
+        _modelId = modelId;
+
+        if (_engine == EngineWhisper)
+        {
+            var model = VoiceWhisper.FromId(_modelId);
+            if (!WhisperEngine.IsDownloaded(model))
+            {
+                DiagnosticLogger.Log("Voice", $"Whisper model missing: {model.Id} — asking the UI to set it up");
+                ModelNeeded?.Invoke(model.Id);
+                return;
+            }
+        }
+
         ++_generation;
 
         var recorder = new WaveRecorder();
@@ -117,9 +155,16 @@ public sealed class VoiceInputService : IDisposable
                 if (IsRecording) FinishCapture();
             });
 
+            // 10 Hz mic loudness → the waveform visualizer (already on the pump
+            // thread; marshal once here so every consumer lands on the UI thread)
+            recorder.LevelAvailable += level => _dispatcher?.BeginInvoke(() =>
+            {
+                if (IsRecording) Level?.Invoke(level);
+            });
+
             _recorder = recorder;
             Stage = VoiceStage.Recording;
-            DiagnosticLogger.Log("Voice", "Recording started");
+            DiagnosticLogger.Log("Voice", $"Recording started (engine: {_engine})");
             CaptureStarted?.Invoke();
         }
         catch (Exception ex)
@@ -136,6 +181,26 @@ public sealed class VoiceInputService : IDisposable
     public void Stop()
     {
         if (Stage == VoiceStage.Recording) FinishCapture();
+    }
+
+    /// <summary>v2.6.0-alpha.5 — pause capture: the mic stays open, the clip doesn't grow.</summary>
+    public void Pause()
+    {
+        if (Stage == VoiceStage.Recording)
+        {
+            _recorder?.Pause();
+            DiagnosticLogger.Log("Voice", "Recording paused");
+        }
+    }
+
+    /// <summary>v2.6.0-alpha.5 — resume after Pause().</summary>
+    public void Resume()
+    {
+        if (Stage == VoiceStage.Recording)
+        {
+            _recorder?.Resume();
+            DiagnosticLogger.Log("Voice", "Recording resumed");
+        }
     }
 
     /// <summary>
@@ -160,7 +225,7 @@ public sealed class VoiceInputService : IDisposable
         }
     }
 
-    /// <summary>Recording → Transcribing: stop the capture, hand the PCM to the batch recognizer.</summary>
+    /// <summary>Recording → Transcribing: stop the capture, hand the PCM to the configured engine.</summary>
     private void FinishCapture()
     {
         if (Stage != VoiceStage.Recording) return;
@@ -183,21 +248,23 @@ public sealed class VoiceInputService : IDisposable
         Stage = VoiceStage.Transcribing;
         var gen = ++_generation;
         var preferred = _preferred;
+        var engine = _engine;
+        var modelId = _modelId;
         var dispatcher = _dispatcher;
-        DiagnosticLogger.Log("Voice", $"Recording finished ({pcm.Length / 2000.0:0.0#} s) — transcribing");
+        DiagnosticLogger.Log("Voice", $"Recording finished ({pcm.Length / 2000.0:0.0#} s) — transcribing with {engine}");
         TranscribingStarted?.Invoke();
 
-        Task.Run(() => Transcribe(pcm, preferred, gen, dispatcher));
+        _ = Task.Run(() => TranscribeAsync(pcm, preferred, engine, modelId, gen, dispatcher));
     }
 
     /// <summary>
-    /// The batch pass — background thread: trim edge silence, wrap as WAV, one
-    /// blocking Recognize() over the whole clip, then marshal the finished text
-    /// to the UI. This is where the accuracy comes from: the engine sees the
-    /// complete utterance with full acoustic context instead of forced 450 ms
-    /// segments, and silence-trimmed audio can't hallucinate edge filler.
+    /// The batch pass — background thread: trim edge silence, then run the clip
+    /// through the configured engine and marshal the finished text to the UI.
+    /// This is where the accuracy comes from: the engine sees the complete
+    /// utterance with full acoustic context instead of forced 450 ms segments,
+    /// and silence-trimmed audio can't hallucinate edge filler.
     /// </summary>
-    private void Transcribe(byte[] pcm, string? preferred, int gen, Dispatcher? dispatcher)
+    private async Task TranscribeAsync(byte[] pcm, string? preferred, string engine, string modelId, int gen, Dispatcher? dispatcher)
     {
         try
         {
@@ -205,43 +272,30 @@ public sealed class VoiceInputService : IDisposable
             if (range is null || range.Value.End - range.Value.Start < VoiceAudio.SampleRate / 1000 * MinClipMs * 2)
                 throw new InvalidOperationException(NoSpeechMessage);
 
-            var wav = VoiceAudio.BuildWav(
-                pcm.AsSpan(range.Value.Start, range.Value.End - range.Value.Start),
-                VoiceAudio.SampleRate, VoiceAudio.Channels, VoiceAudio.BitsPerSample);
-
-            // same recognizer the live build picked — settings pinned or OS-following
-            var infos = SpeechRecognitionEngine.InstalledRecognizers();
-            var pickId = VoiceLanguage.Pick(
-                preferred,
-                infos.Select(i => (i.Id, i.Culture?.Name ?? "")).ToList(),
-                CultureInfo.CurrentUICulture.Name);
-            RecognizerInfo? info = pickId is null
-                ? null
-                : infos.FirstOrDefault(i => string.Equals(i.Id, pickId, StringComparison.OrdinalIgnoreCase));
-
-            using var engine = info is null ? new SpeechRecognitionEngine() : new SpeechRecognitionEngine(info);
-            engine.LoadGrammar(new DictationGrammar());
-            engine.BabbleTimeout = TimeSpan.Zero;         // batch mode: the clip is finite,
-            engine.InitialSilenceTimeout = TimeSpan.Zero; // timeouts only manufacture rejections
-            engine.EndSilenceTimeout = TimeSpan.Zero;
-
+            var clip = pcm.AsSpan(range.Value.Start, range.Value.End - range.Value.Start).ToArray();
             string text;
-            float confidence;
-            using (var ms = new MemoryStream(wav))
+
+            if (engine == EngineWhisper)
             {
-                engine.SetInputToWaveStream(ms);
-                var result = engine.Recognize();          // blocking — the whole clip at once
-                text = result?.Text ?? "";
-                confidence = result?.Confidence ?? 0f;
+                var model = VoiceWhisper.FromId(modelId);
+                string language = VoiceWhisper.ResolveLanguage(model, preferred);
+                var raw = await WhisperEngine.TranscribeAsync(clip, model, language, CancellationToken.None).ConfigureAwait(false);
+                if (raw is null)
+                    throw new InvalidOperationException("Whisper could not run — check the log or pick Windows speech in settings.json (\"VoiceEngine\": \"windows\").");
+                text = raw;
+                DiagnosticLogger.Log("Voice", $"Whisper ok ({text.Length} chars, lang {language})");
+            }
+            else
+            {
+                text = SapiTranscribe(clip, preferred);
             }
 
-            if (text.Length == 0 || confidence < MinConfidence)
+            if (text.Length == 0)
             {
-                DiagnosticLogger.Log("Voice", $"Batch dictation rejected ({confidence:0.00}, \"{text}\")");
+                DiagnosticLogger.Log("Voice", "Batch dictation produced no text");
                 throw new InvalidOperationException(NoMatchMessage);
             }
 
-            DiagnosticLogger.Log("Voice", $"Batch dictation ok ({confidence:0.00}, {text.Length} chars)");
             dispatcher?.BeginInvoke(() =>
             {
                 if (gen != _generation) return;           // cancelled while recognizing — land silently
@@ -260,6 +314,47 @@ public sealed class VoiceInputService : IDisposable
                 Failed?.Invoke(reason);
             });
         }
+    }
+
+    /// <summary>
+    /// The SAPI fallback (settings "VoiceEngine": "windows"): one blocking
+    /// Recognize() over the whole clip with a fresh engine, exactly the
+    /// v2.6.0-alpha.4 batch flow.
+    /// </summary>
+    private static string SapiTranscribe(byte[] clip, string? preferred)
+    {
+        var wav = VoiceAudio.BuildWav(clip, VoiceAudio.SampleRate, VoiceAudio.Channels, VoiceAudio.BitsPerSample);
+
+        var infos = SpeechRecognitionEngine.InstalledRecognizers();
+        if (infos.Count == 0)
+            throw new InvalidOperationException("Windows speech is not installed — switch the engine back to Whisper or install it under Windows Settings → Time & Language → Speech.");
+
+        var pickId = VoiceLanguage.Pick(
+            preferred,
+            infos.Select(i => (i.Id, i.Culture?.Name ?? "")).ToList(),
+            CultureInfo.CurrentUICulture.Name);
+        RecognizerInfo? info = pickId is null
+            ? null
+            : infos.FirstOrDefault(i => string.Equals(i.Id, pickId, StringComparison.OrdinalIgnoreCase));
+
+        using var engine = info is null ? new SpeechRecognitionEngine() : new SpeechRecognitionEngine(info);
+        engine.LoadGrammar(new DictationGrammar());
+        engine.BabbleTimeout = TimeSpan.Zero;         // batch mode: the clip is finite,
+        engine.InitialSilenceTimeout = TimeSpan.Zero; // timeouts only manufacture rejections
+        engine.EndSilenceTimeout = TimeSpan.Zero;
+
+        using var ms = new MemoryStream(wav);
+        engine.SetInputToWaveStream(ms);
+        var result = engine.Recognize();              // blocking — the whole clip at once
+        string text = result?.Text ?? "";
+        float confidence = result?.Confidence ?? 0f;
+
+        if (text.Length == 0 || confidence < MinConfidence)
+        {
+            DiagnosticLogger.Log("Voice", $"SAPI batch dictation rejected ({confidence:0.00}, \"{text}\")");
+            throw new InvalidOperationException(NoMatchMessage);
+        }
+        return text;
     }
 
     /// <summary>SAPI errors are COM walls of text — translate the two common ones, pass the rest through.</summary>
