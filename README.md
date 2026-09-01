@@ -214,30 +214,36 @@ authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
 
-## 🆕 What's new in v3.0.0-alpha.4 — the App Deck fixed + its tutorial, and the AI page failure surfaced
+## 🆕 What's new in v3.0.0-alpha.4 — the AI page opens again (+ the App Deck fixed, + its tutorial)
 
-Bugfix + onboarding round on top of the hub:
+The probe-and-fix round on top of the hub — every failure below is now covered by
+real Windows CI smoke tests so none of them can ship silently again:
 
-1. **🎮 The App Deck tab actually opens now.** The deck view was constructed
-   *before* it joined the window tree, and it asked for theme brushes with a
-   throwing `FindResource` — the tokens live in the hub window's resources, not
-   the application's, so the lookup failed and the whole tab died silently
-   (click the deck → nothing happens). Every token access now falls back
-   safely: live window brush → ThemeService-resolved palette → hard fallback.
-   The smoke suite now builds the real window on a Windows CI runner so this
-   class of bug can never ship silently again.
-2. **📖 The App Deck tutorial.** "How it works" now opens a proper guided page —
+1. **🛟 The AI page opens again.** The hub window could never construct: its nav
+   rail styled the settings button with `BasedOn` pointing at a *RadioButton*
+   style — WPF throws "Can only base on a Style with target type that is base
+   type 'Button'" during XAML parse, the exception vanished into the log, and
+   clicking an AI row did nothing. The style is now self-contained, and a new
+   CI smoke test builds the REAL hub window on a Windows runner every push.
+2. **🎮 The App Deck tab actually opens now.** A second silent killer: the deck
+   view is built *before* it joins the window tree and asked for theme brushes
+   with a throwing `FindResource` — those tokens live only in the hub window's
+   resources, so the lookup failed and the tab died quietly. Every token access
+   now falls back safely: live window brush → ThemeService-resolved palette →
+   hard fallback. A failed deck build also can't wedge the nav rail anymore.
+3. **📖 The App Deck tutorial.** "How it works" now opens a proper guided page —
    a numpad map, four steps (assign → launch → go global → fine-tune) and the
    global-hotkeys switch right inside the tour. It auto-shows the first time
    the deck opens (once; the button reopens it). The switch persists and
    re-registers the hotkeys live, no settings detour needed.
-3. **🎹 The deck grid now truly mirrors the numpad.** Cards fill 7-8-9 /
+4. **🎹 The deck grid now truly mirrors the numpad.** Cards fill 7-8-9 /
    4-5-6 / 1-2-3 like the physical keys — card position equals key position.
    Card badges (the key numbers) were always correct.
-4. **🛟 Failures are never silent anymore.** If the AI page ever fails to open
-   on your machine, Lumo now tells you exactly why (with the log path) instead
-   of swallowing the exception. A failed deck build also can't wedge the nav
-   rail anymore — it recovers to the AI tab so the next click retries.
+5. **🛡️ appdeck.json can never regress.** The deck's background save had a
+   race where a stale save could overwrite newer state (the "Expected 2,
+   Actual 1" CI flake). Saves are generation-stamped now: the disk only ever
+   moves forward. And if the AI page ever fails on your machine, Lumo shows
+   the reason (with the log path) instead of swallowing it.
 
 ## 🆕 What's new in v3.0.0-alpha.3 — persona faces + the animated mascot (the AI experience)
 

@@ -3,23 +3,30 @@
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
 
-WHAT'S NEW IN v3.0.0-alpha.4 (App Deck fixed + tutorial)
+WHAT'S NEW IN v3.0.0-alpha.4 (AI page fixed + deck tutorial)
 ---------------------------------------------------------------
-1. THE APP DECK OPENS NOW. The deck tab in the hub window
-   silently failed to appear (a theme-brush lookup threw
-   while the deck was being built). Fixed: the deck renders
-   every time, and a failure can never wedge the nav rail.
-2. THE DECK TUTORIAL. "How it works" now opens a real
+1. THE AI PAGE OPENS AGAIN. Since the hub landed, the AI
+   window could not construct at all: a nav-rail button
+   based its style on a RadioButton style, which WPF rejects
+   at load time - the error vanished into the log and the
+   page just "did nothing". Fixed, and new CI smoke tests
+   now open the real window on every build.
+2. THE APP DECK OPENS NOW. A second silent failure: the deck
+   asked for theme colors before it was inside the window,
+   which threw and quietly killed the tab. Fixed with safe
+   fallbacks; a failed build can never wedge the nav rail.
+3. THE DECK TUTORIAL. "How it works" now opens a real
    guided page: the numpad map, four steps (assign, launch,
    go global, fine-tune) and the global-hotkeys switch right
    in the tour. It shows itself the first time you open the
    deck; reopen it any time from "How it works".
-3. THE GRID MIRRORS THE NUMPAD. Cards now fill 7-8-9 /
+4. THE GRID MIRRORS THE NUMPAD. Cards now fill 7-8-9 /
    4-5-6 / 1-2-3 exactly like the physical keys. The little
    key-number badges on the cards were always correct.
-4. NEVER SILENT. If the AI page ever fails to open, Lumo
-   now shows the reason (and where the log lives) instead
-   of doing nothing.
+5. SAVE RACE FIXED. appdeck.json can no longer regress to an
+   older state when edits land mid-save. And if the AI page
+   ever fails, Lumo now shows the reason (and where the log
+   lives) instead of doing nothing.
 
 WHAT'S NEW IN v3.0.0-alpha.3 (persona faces + mascot)
 ---------------------------------------------------------------

@@ -17,6 +17,14 @@ public sealed class DeckStore
     private readonly string _file;
     private readonly DeckSlots.Slot[] _slots = new DeckSlots.Slot[DeckSlots.Count];
     private int _saving;
+    // v3.0.0-alpha.4 — save generations: the disk can never regress to an older
+    // snapshot. Every mutation bumps _gen (under the _slots lock); a save claims a
+    // generation and writes it, so a STALE background save can no longer overwrite
+    // a newer state — the exact race that made the round-trip test flaky on
+    // Windows (run #102/#105: "Expected 2, Actual 1") and could regress the real
+    // appdeck.json when two mutations landed inside one save window.
+    private long _gen;
+    private long _writtenGen;
 
     public DeckStore(string? file = null)
     {
@@ -134,11 +142,27 @@ public sealed class DeckStore
 
     private void ScheduleSave()
     {
-        if (Interlocked.Exchange(ref _saving, 1) == 1) return;
-        var snapshot = Slots();
-        Task.Run(() =>
+        lock (_slots) _gen++;
+        if (Interlocked.Exchange(ref _saving, 1) == 1) return;   // a save is in flight; it loops until it has written every generation
+        _ = Task.Run(() =>
         {
-            try { SaveSnapshot(snapshot, _file); }
+            try
+            {
+                while (true)
+                {
+                    long gen;
+                    DeckSlots.Slot[] snapshot;
+                    lock (_slots)
+                    {
+                        gen = _gen;
+                        if (gen <= _writtenGen) return;   // disk already holds this state or newer
+                        _writtenGen = gen;                // we own writing this generation
+                        snapshot = (DeckSlots.Slot[])_slots.Clone();
+                    }
+                    SaveSnapshot(snapshot, _file);
+                    // a mutation during the write? go around once more with the newer state
+                }
+            }
             catch (Exception ex) { DiagnosticLogger.LogException("DeckStore.Save", ex); }
             finally { Interlocked.Exchange(ref _saving, 0); }
         });
