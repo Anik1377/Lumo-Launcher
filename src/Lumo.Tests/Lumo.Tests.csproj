@@ -59,6 +59,8 @@
     <Compile Include="../Lumo/Services/FirstPartyStore.cs" Link="Services/FirstPartyStore.cs" />
     <!-- v2.6.0-alpha.3 — voice typing pure policy (recognizer pick + text compose) -->
     <Compile Include="../Lumo/Core/VoiceDictation.cs" Link="Core/VoiceDictation.cs" />
+    <!-- v2.6.0-alpha.4 — record → transcribe → show: WAV wrap + silence trim policy -->
+    <Compile Include="../Lumo/Core/VoiceAudio.cs" Link="Core/VoiceAudio.cs" />
     <Compile Include="../Lumo/Native/NativeMethods.cs" Link="Native/NativeMethods.cs" />
     <Compile Include="../Lumo/Services/HotkeyService.cs" Link="Services/HotkeyService.cs" />
     <Compile Include="../Lumo/Services/Shortcuts.cs" Link="Services/Shortcuts.cs" />

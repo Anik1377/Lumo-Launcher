@@ -48,8 +48,9 @@ public partial class AiChatWindow : Window
     private bool _sourceReady;
     private bool _atBottom = true;
 
-    // ---- v2.6.0-alpha.3 — offline voice typing (System.Speech SAPI dictation);
-    //      _voiceBase is everything committed so far, partials render on top of it.
+    // ---- v2.6.0-alpha.4 — offline voice typing, record → transcribe → show:
+    //      the clip is captured in full, recognized as ONE batch, and only then
+    //      shown — _voiceBase is the text the transcription will join onto.
     private readonly VoiceInputService _voice = new();
     private string _voiceBase = "";
     private System.Windows.Threading.DispatcherTimer? _voiceErrTimer;
@@ -93,7 +94,7 @@ public partial class AiChatWindow : Window
         Closed += (_, _) =>
         {
             try { _genCts?.Cancel(); } catch { }
-            try { _voice.Dispose(); } catch { }   // v2.6.0-alpha.3 — never leave SAPI listening after the window dies
+            try { _voice.Dispose(); } catch { }   // v2.6.0-alpha.4 — never leave a recording or transcription dangling after the window dies
         };
         Loaded += (_, _) =>
         {
@@ -102,13 +103,12 @@ public partial class AiChatWindow : Window
             UpdateMicState();
         };
 
-        // v2.6.0-alpha.3 — SAPI raises events on its own audio thread; the service
-        // marshals onto the session dispatcher and InvokeAsync re-queues to the UI
-        // thread, so dictation can never touch a control from a worker.
-        _voice.ListeningStarted += () => Dispatcher.InvokeAsync(OnVoiceStarted);
-        _voice.Partial += t => Dispatcher.InvokeAsync(() => OnVoicePartial(t));
+        // v2.6.0-alpha.4 — capture and recognition run off the UI thread; the service
+        // marshals every event onto its session dispatcher and InvokeAsync re-queues
+        // to the window thread, so voice can never touch a control from a worker.
+        _voice.CaptureStarted += () => Dispatcher.InvokeAsync(OnVoiceStarted);
+        _voice.TranscribingStarted += () => Dispatcher.InvokeAsync(OnVoiceTranscribing);
         _voice.Final += t => Dispatcher.InvokeAsync(() => OnVoiceFinal(t));
-        _voice.ListeningStopped += () => Dispatcher.InvokeAsync(OnVoiceStopped);
         _voice.Failed += m => Dispatcher.InvokeAsync(() => OnVoiceFailed(m));
     }
 
@@ -431,7 +431,7 @@ public partial class AiChatWindow : Window
             if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None)
             {
                 e.Handled = true;
-                SendFromInput();   // v2.6.0-alpha.3 — SendFromInput stops dictation first; Enter sends what the user sees
+                SendFromInput();   // v2.6.0-alpha.4 — while recording, Enter finishes the clip and shows the text; a second Enter sends it
             }
             // Shift+Enter falls through — the TextBox inserts the newline
         }
@@ -450,7 +450,7 @@ public partial class AiChatWindow : Window
             if (e.Key == Key.Escape)
             {
                 e.Handled = true;
-                if (_voice.IsListening) { StopVoice(); return; }   // v2.6.0-alpha.3 — first Esc ends dictation, not the window
+                if (_voice.IsListening) { _voice.Cancel(); OnVoiceStopped(); return; }   // v2.6.0-alpha.4 — first Esc cancels voice (clip or pending text), not the window
                 if (_sidebarOpen) { CloseSidebar(); return; }
                 // v2.4.0-alpha.6 — while a generation is running, Esc stops it first
                 // (the hint line says "esc stop / hide"); a second Esc then hides.
@@ -498,7 +498,7 @@ public partial class AiChatWindow : Window
         catch { }
     }
 
-    // ---------------------------------------------------------------- voice typing (v2.6.0-alpha.3)
+    // ---------------------------------------------------------------- voice typing (v2.6.0-alpha.4 — record → transcribe → show)
 
     /// <summary>Show the mic only when voice is enabled AND the machine ships a recognizer.</summary>
     private void UpdateMicState()
@@ -515,7 +515,8 @@ public partial class AiChatWindow : Window
 
     private void ToggleVoice()
     {
-        if (_voice.IsListening) StopVoice();
+        if (_voice.IsRecording) StopVoice();        // second press: finish the clip → transcribe
+        else if (_voice.IsListening) return;        // transcribing — the text is about to appear
         else StartVoice();
     }
 
@@ -524,12 +525,13 @@ public partial class AiChatWindow : Window
         try
         {
             if (_voice.IsListening || _generating || !VoiceInputService.IsSupported || !_settings.VoiceEnabled) return;
-            _voiceBase = PromptBox.Text;   // dictation appends to whatever is already typed
+            _voiceBase = PromptBox.Text;   // transcription joins whatever is already typed
             _voice.Start(_settings.VoiceLanguage);
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceStart", ex); }
     }
 
+    /// <summary>Finish the clip and let the batch recognizer run — no partials, the text shows when it is done.</summary>
     private void StopVoice()
     {
         try { _voice.Stop(); }
@@ -538,51 +540,61 @@ public partial class AiChatWindow : Window
 
     private void OnVoiceStarted()
     {
-        if (!_voice.IsListening) return;   // stale queued event after an instant stop — drop
+        if (!_voice.IsRecording) return;   // stale queued event after an instant cancel — drop
         try
         {
             MicButton.Tag = "listening";
-            MicButton.ToolTip = "Stop voice input (Ctrl+M or Esc)";
-            PromptPlaceholder.Text = "Listening… speak, then pause";
+            MicButton.Content = "\uE71A";   // mic cap becomes a stop cap: click again to finish
+            MicButton.ToolTip = "Finish & transcribe (Ctrl+M or Enter) · Esc cancels";
+            PromptPlaceholder.Text = "Recording… click again when done speaking";
             PromptShell.BorderBrush = _focusRingBrush ?? (Brush)FindResource("AccentBrush");
             StartMicPulse();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceStarted", ex); }
     }
 
-    /// <summary>Live hypothesis — renders base + partial WYSIWYG, caret pinned to the end.</summary>
-    private void OnVoicePartial(string text)
+    /// <summary>Clip captured, recognition running — keep the ring busy, touch nothing until the text lands.</summary>
+    private void OnVoiceTranscribing()
     {
-        if (!_voice.IsListening) return;   // in-flight SAPI event after a stop/send — never repopulate a cleared box
+        if (!_voice.IsTranscribing) return;   // stale queued event — drop
         try
         {
-            string merged = VoiceText.Compose(_voiceBase, text);
-            if (merged == PromptBox.Text) return;
-            PromptBox.Text = merged;
-            PromptBox.CaretIndex = PromptBox.Text.Length;
+            MicButton.Tag = "transcribing";
+            MicButton.IsEnabled = false;      // nothing to click while the batch runs
+            MicButton.ToolTip = "Transcribing…";
+            PromptPlaceholder.Text = "Transcribing…";
         }
-        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoicePartial", ex); }
+        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceTranscribing", ex); }
     }
 
-    /// <summary>Settled segment — commits into the base so the next hypothesis builds on top.</summary>
+    /// <summary>
+    /// v2.6.0-alpha.4 — the SHOW step: the whole clip transcribed, the text lands
+    /// in the prompt once, caret pinned to the end. Nothing was written to the box
+    /// during recording or recognition, so this is the first thing the user sees.
+    /// </summary>
     private void OnVoiceFinal(string text)
     {
-        if (!_voice.IsListening) return;   // same staleness rule as partials
+        if (_voice.IsListening) return;   // stale queued event after a cancel — never repopulate a cleared box
         try
         {
             if (string.IsNullOrWhiteSpace(text)) return;
             _voiceBase = VoiceText.Compose(_voiceBase, text);
             PromptBox.Text = _voiceBase;
             PromptBox.CaretIndex = _voiceBase.Length;
+            PromptBox.Focus();
         }
         catch (Exception ex) { DiagnosticLogger.LogException("AiChat.VoiceFinal", ex); }
+        OnVoiceStopped();
     }
 
+    /// <summary>Restore the idle voice UI — after show, after failure, and after Esc cancels.</summary>
     private void OnVoiceStopped()
     {
         try
         {
             MicButton.Tag = "";
+            MicButton.Content = "\uE720";   // back to the mic glyph
+            MicButton.IsEnabled = true;
             MicButton.ToolTip = "Voice input (Ctrl+M)";
             PromptPlaceholder.Text = "Ask anything…";
             StopMicPulse();
@@ -651,7 +663,11 @@ public partial class AiChatWindow : Window
     {
         try
         {
-            if (_voice.IsListening) StopVoice();   // v2.6.0-alpha.3 — sending ends dictation; the box's visible text is what sends
+            // v2.6.0-alpha.4 — record → transcribe → show: while recording, the first
+            // Enter / send click finishes the clip and shows the text instead of sending;
+            // while transcribing there is nothing to send yet, wait for it.
+            if (_voice.IsRecording) { StopVoice(); return; }
+            if (_voice.IsTranscribing) return;
             string t = PromptBox.Text.Trim();
             if (t.Length == 0 || _generating) return;
             PromptBox.Clear();

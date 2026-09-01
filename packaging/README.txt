@@ -1,7 +1,29 @@
 ======================================================
-  LUMO v2.6.0-alpha.3  —  universal launcher for Windows
+  LUMO v2.6.0-alpha.4  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v2.6.0-alpha.4 (voice typing rebuilt: record,
+transcribe, show)
+---------------------------------------------------------------
+1. THE MIC NOW WORKS IN THREE CLEAN STEPS. Click the mic (or
+   press Ctrl+M) and speak the whole thought - Lumo records the
+   complete clip; click again (or press Enter) and the recording
+   is recognized as ONE batch on the Windows speech stack; only
+   then does the text appear in the prompt, ready to edit or
+   send. No more half-thoughts committed at every pause - the
+   recognizer now sees the full utterance with full context.
+2. SILENCE IS TRIMMED BEFORE RECOGNITION. Room tone at the
+   edges made the recognizer invent filler words ("the", "uh");
+   the clip is cut to the spoken part (with breathing room)
+   before it ever reaches SAPI.
+3. PREDICTABLE KEYS. While recording - mic / Ctrl+M / Enter
+   finishes and transcribes, Esc cancels the clip. While
+   transcribing - Esc discards the pending text. The
+   transcription appends to whatever you already typed; what
+   appears is exactly what a second Enter sends. Still offline:
+   no cloud, no API key, no extra install. The toggle stays in
+   Settings -> AI -> Voice input.
 
 WHAT'S NEW IN v2.6.0-alpha.3 (voice typing in the AI chat)
 ---------------------------------------------------------------

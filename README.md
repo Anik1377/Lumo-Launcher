@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.6.0--alpha.3-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-2.6.0--alpha.4-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -71,7 +71,7 @@ calculations, web searches and system utilities — entirely from the keyboard.
 | 💬 | **AI chat** | `AI/` (or the bare word `AI`) opens a dedicated chat tab — streaming replies, markdown rendering, multi-line input |
 | 🗂️ | **Chat sessions** | Full history (`chats.json`, 40 sessions / 200 messages) with a Raycast-style slide-over sidebar, pin/rename/delete curation, `Ctrl+N` new chat, last-answer-only regenerate |
 | 🎭 | **Personas** | 6 built-in system-prompt personas + your own (`personas.json`, edited in Settings → AI) — pick per chat from the persona chip flyout |
-| 🎤 | **Voice typing** | The chat's mic button (or `Ctrl+M`) dictates into the prompt — offline Windows speech (SAPI), words land live as you speak, `Enter` sends what you heard, `Esc` stops. No cloud, no key, no setup; recognizer follows the Windows display language (`"VoiceLanguage"` in settings.json pins one) |
+| 🎤 | **Voice typing** | The chat's mic button (or `Ctrl+M`): click, speak the whole thought, click again — the clip is recorded in full, recognized as **one batch** offline (Windows SAPI), and the text shows in the prompt ready to edit or send. Silence is trimmed before recognition for accuracy. No cloud, no key, no setup; recognizer follows the Windows display language (`"VoiceLanguage"` in settings.json pins one) |
 | 🔌 | **Providers** | **Ollama** (local, no key — one-click setup incl. model pull) or **Anthropic** Messages API (key stored only in `settings.json`, redacted from every log line) |
 
 ### Plugins (extensible keywords)
@@ -182,7 +182,7 @@ expansion is never recursive.
 | `Tab` | open the preview pane for the selection |
 | `Ctrl+→` | open the quick-action menu (again closes) |
 | `Ctrl+N` (in AI chat) | new chat session |
-| `Ctrl+M` (in AI chat) | start / stop voice typing — words appear in the prompt live; `Enter` sends, `Esc` stops without sending |
+| `Ctrl+M` (in AI chat) | start / stop voice recording — text shows after the batch transcribe; `Enter` finishes the clip, `Esc` cancels |
 | `F11` | fullscreen / window toggle (AI chat) |
 
 ### Plugins in one minute
@@ -211,6 +211,29 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v2.6.0-alpha.4 — voice typing rebuilt: record → transcribe → show
+
+The AI chat's mic no longer transcribes live — accuracy first:
+
+1. **🎙️ The whole clip, then one recognition.** alpha.3 finalized a segment at
+   every 450 ms pause, so half-thoughts were committed mid-sentence and every
+   "final" word stuck. Now: click the mic (or press `Ctrl+M`) and speak — Lumo
+   **records the complete clip**; click again (or press `Enter`) and the
+   recording is recognized as **one batch** on the desktop speech stack that
+   ships with Windows; only then does the text appear in the prompt, ready to
+   edit or send. Still **no cloud, no API key, no extra install** — the AI
+   conversation never leaves the PC.
+2. **✂️ Silence is cut before recognition.** Room tone at the edges made SAPI
+   hallucinate filler words ("the", "uh") — the clip is trimmed to the spoken
+   part (with breathing-room padding) before the recognizer ever sees it.
+3. **⌨️ Predictable keys.** While recording: mic / `Ctrl+M` / `Enter` finishes
+   and transcribes, `Esc` cancels the clip. While transcribing: `Esc` discards
+   the pending text. The transcription appends to whatever you already typed;
+   what appears is exactly what a second `Enter` sends.
+4. **🧪 +6 tests → 316.** WAV header layout (RIFF/fmt/data, byte-exact),
+   payload round-trip, and silence trimming (edge cutting + padding,
+   all-speech, silence-only, quiet-but-audible speech kept).
 
 ## 🆕 What's new in v2.6.0-alpha.3 — voice typing in the AI chat
 
@@ -776,7 +799,7 @@ The Settings window writes this file for you; every key can still be edited by h
 `Theme` accepts `dark`, `light` or `auto` (follows the Windows colour mode).
 `Hotkey` accepts combos of `Ctrl` `Alt` `Shift` `Win` + a letter, digit, `F1`–`F24`, `Space` or `` ` ``.
 `WebEngine` accepts `google`, `bing` or `duckduckgo`.
-`VoiceLanguage` (AI chat dictation) is empty by default — it follows the Windows
+`VoiceLanguage` (AI chat voice typing) is empty by default — it follows the Windows
 display language; set a culture like `"en-GB"` to pin one specific recognizer.
 
 ## ⚡ Shortcuts & macros — `%APPDATA%\Lumo\shortcuts.json`
