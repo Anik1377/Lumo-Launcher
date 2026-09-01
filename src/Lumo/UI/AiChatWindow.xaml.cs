@@ -297,6 +297,13 @@ public partial class AiChatWindow : Window
     private AppDeckView? _deckView;
     private bool _deckActive;
 
+    /// <summary>v3.0.0-alpha.4 — the deck's tutorial toggled global numpad hotkeys
+    /// (already persisted); the host (App) re-registers them on the launcher.</summary>
+    public event Action? DeckHotkeysChanged;
+
+    /// <summary>v3.0.0-alpha.4 — the deck's tutorial asks for Settings (general page).</summary>
+    public event Action? DeckSettingsRequested;
+
     private void OnRailTabChanged(object sender, RoutedEventArgs e)
     {
         // fires during XAML parse (RailAi IsChecked=True) before the tree is complete
@@ -307,27 +314,45 @@ public partial class AiChatWindow : Window
     private void SwitchTab(bool deck)
     {
         if (_deckActive == deck) return;
-        _deckActive = deck;
         try
         {
             if (deck)
             {
-                if (DeckHost.Child is null) DeckHost.Child = new AppDeckView(_settings);
-                ((AppDeckView)DeckHost.Child).Refresh();
+                if (DeckHost.Child is null)
+                {
+                    var view = new AppDeckView(_settings);
+                    // v3.0.0-alpha.4 — the deck is created ORPHANED (before it joins the
+                    // tree), so its theme tokens must never throw; these wires route the
+                    // tutorial's actions to the app's hotkey/settings plumbing.
+                    view.GlobalHotkeysChanged += () => DeckHotkeysChanged?.Invoke();
+                    view.SettingsRequested += () => DeckSettingsRequested?.Invoke();
+                    DeckHost.Child = view;
+                }
+                _deckView = (AppDeckView)DeckHost.Child;
+                _deckView.Refresh();
                 DeckHost.Visibility = Visibility.Visible;
                 if (_settings.AnimationsEnabled)
                     DeckHost.BeginAnimation(OpacityProperty,
                         new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160))
                         { EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut } });
                 Keyboard.Focus(DeckHost);   // the chat prompt must not hold focus underneath
+                _deckActive = true;         // committed only after the deck actually exists
             }
             else
             {
                 DeckHost.Visibility = Visibility.Collapsed;
                 PromptBox.Focus();
+                _deckActive = false;
             }
         }
-        catch (Exception ex) { DiagnosticLogger.LogException("AiChat.SwitchTab", ex); }
+        catch (Exception ex)
+        {
+            // v3.0.0-alpha.4 — never wedge the rail: a failed deck build leaves the
+            // state on the AI tab, so the next click can retry instead of desyncing.
+            _deckActive = false;
+            try { if (RailDeck is not null) RailDeck.IsChecked = false; if (RailAi is not null) RailAi.IsChecked = true; } catch { }
+            DiagnosticLogger.LogException("AiChat.SwitchTab", ex);
+        }
     }
 
     private void OnRailSettingsClick(object sender, RoutedEventArgs e)

@@ -15,6 +15,10 @@
     <IsPackable>false</IsPackable>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <UseWPF Condition="'$(TargetFramework)' == 'net8.0-windows'">true</UseWPF>
+    <!-- v3.0.0-alpha.4 — the WPF smoke tests (real window construction on the CI
+         runner) compile only where the Lumo assembly + WPF exist. A dedicated
+         constant beats guessing which OS symbols the SDK defines. -->
+    <DefineConstants Condition="'$(TargetFramework)' == 'net8.0-windows'">$(DefineConstants);LUMO_TESTS_WPF</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net8.0'">

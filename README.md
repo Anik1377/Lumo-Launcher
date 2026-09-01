@@ -1,7 +1,7 @@
 # Lumo — a fast, keyboard-first launcher for Windows
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-3.0.0--alpha.3-FF6363?style=flat-square" alt="version"/>
+  <img src="https://img.shields.io/badge/version-3.0.0--alpha.4-FF6363?style=flat-square" alt="version"/>
   <img src="https://img.shields.io/badge/status-ALPHA%20·%20UNSTABLE-red?style=flat-square" alt="alpha unstable"/>
   <img src="https://img.shields.io/badge/.NET-8.0-512BD4?style=flat-square" alt=".NET 8"/>
   <img src="https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?style=flat-square" alt="platform"/>
@@ -213,6 +213,31 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v3.0.0-alpha.4 — the App Deck fixed + its tutorial, and the AI page failure surfaced
+
+Bugfix + onboarding round on top of the hub:
+
+1. **🎮 The App Deck tab actually opens now.** The deck view was constructed
+   *before* it joined the window tree, and it asked for theme brushes with a
+   throwing `FindResource` — the tokens live in the hub window's resources, not
+   the application's, so the lookup failed and the whole tab died silently
+   (click the deck → nothing happens). Every token access now falls back
+   safely: live window brush → ThemeService-resolved palette → hard fallback.
+   The smoke suite now builds the real window on a Windows CI runner so this
+   class of bug can never ship silently again.
+2. **📖 The App Deck tutorial.** "How it works" now opens a proper guided page —
+   a numpad map, four steps (assign → launch → go global → fine-tune) and the
+   global-hotkeys switch right inside the tour. It auto-shows the first time
+   the deck opens (once; the button reopens it). The switch persists and
+   re-registers the hotkeys live, no settings detour needed.
+3. **🎹 The deck grid now truly mirrors the numpad.** Cards fill 7-8-9 /
+   4-5-6 / 1-2-3 like the physical keys — card position equals key position.
+   Card badges (the key numbers) were always correct.
+4. **🛟 Failures are never silent anymore.** If the AI page ever fails to open
+   on your machine, Lumo now tells you exactly why (with the log path) instead
+   of swallowing the exception. A failed deck build also can't wedge the nav
+   rail anymore — it recovers to the AI tab so the next click retries.
 
 ## 🆕 What's new in v3.0.0-alpha.3 — persona faces + the animated mascot (the AI experience)
 

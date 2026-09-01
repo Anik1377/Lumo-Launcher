@@ -57,6 +57,10 @@ public sealed class Settings
     // numpad keys belong to games first, and this is an opt-in trade.
     public bool DeckGlobalHotkeys { get; set; } = false;
 
+    /// <summary>v3.0.0-alpha.4 — the deck tutorial auto-shows the first time the deck
+    /// tab opens; this flag keeps it to exactly once ("How it works" reopens it).</summary>
+    public bool DeckTutorialSeen { get; set; } = false;
+
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -139,6 +143,7 @@ public sealed class Settings
         s.ThemePreset       = GetStr(root, nameof(ThemePreset), s.ThemePreset);             // v3.0
         s.CustomThemeFile   = GetStr(root, nameof(CustomThemeFile), s.CustomThemeFile);     // v3.0
         s.DeckGlobalHotkeys = GetBool(root, nameof(DeckGlobalHotkeys), s.DeckGlobalHotkeys); // v3.0
+        s.DeckTutorialSeen  = GetBool(root, nameof(DeckTutorialSeen), s.DeckTutorialSeen);   // v3.0.0-alpha.4
         s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
         s.DisabledPlugins  = GetStrList(root, nameof(DisabledPlugins), s.DisabledPlugins);   // v2.5 — Task 4.2
         s.AiEnabled         = GetBool(root, nameof(AiEnabled), s.AiEnabled);
@@ -283,6 +288,7 @@ public sealed class Settings
         ThemePreset = o.ThemePreset;           // v3.0
         CustomThemeFile = o.CustomThemeFile;   // v3.0
         DeckGlobalHotkeys = o.DeckGlobalHotkeys; // v3.0
+        DeckTutorialSeen = o.DeckTutorialSeen;   // v3.0.0-alpha.4
         CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
         DisabledPlugins = new List<string>(o.DisabledPlugins);   // v2.5 — Task 4.2
         AiEnabled = o.AiEnabled;

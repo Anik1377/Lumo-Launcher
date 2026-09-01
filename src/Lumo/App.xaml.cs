@@ -257,6 +257,9 @@ public partial class App : Application
     /// v2.3.0-alpha.3 — open (or focus) the dedicated AI chat window. Singleton per
     /// app lifetime: a second AI/ activation just focuses it and forwards the new
     /// question. Reuses the launcher's AiService (one cache, one log stream).
+    /// v3.0.0-alpha.4 — a failure here used to vanish into the log, so the user saw
+    /// "nothing happened"; now it surfaces with the log path, and the CI smoke test
+    /// covers this exact construction path on a real Windows runner.
     /// </summary>
     private void OpenAiChat(string? query)
     {
@@ -276,6 +279,16 @@ public partial class App : Application
             {
                 try { OpenSettings(initialPage: 6); } catch (Exception ex) { DiagnosticLogger.LogException("App.AiChatSettings", ex); }
             };
+            // v3.0.0-alpha.4 — the deck tutorial's plumbing: the global-hotkeys toggle
+            // re-registers the hotkeys live; "Open settings" lands on General.
+            _aiChatWindow.DeckHotkeysChanged += () =>
+            {
+                try { _window.ReapplyDeckHotkeys(); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckHotkeysChanged", ex); }
+            };
+            _aiChatWindow.DeckSettingsRequested += () =>
+            {
+                try { OpenSettings(initialPage: 0); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckSettings", ex); }
+            };
             _aiChatWindow.Closed += (_, _) => _aiChatWindow = null;
             _aiChatWindow.Show();
             _aiChatWindow.Activate();
@@ -284,6 +297,15 @@ public partial class App : Application
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("App.OpenAiChat", ex);
+            // v3.0.0-alpha.4 — never silent: the user must see WHY the page didn't open.
+            try
+            {
+                MessageBox.Show(
+                    "The AI page failed to open.\n\n" + ex.Message +
+                    "\n\nDetails were written to:\n" + AppPaths.LogFile,
+                    "Lumo", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch { /* never crash over the crash dialog */ }
         }
     }
 

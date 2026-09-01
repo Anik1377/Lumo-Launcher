@@ -42,8 +42,9 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- v3.0.0-alpha.4 — the tutorial's accent pill (primary "Got it") -->
         <Style x:Key="DeckAccentButton" TargetType="Button" BasedOn="{StaticResource DeckGhostButton}">
-            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
@@ -51,7 +52,8 @@
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="7"
                                 Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextBlock.Foreground="White"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -75,6 +77,46 @@
             <Setter Property="Padding" Value="9,6"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
+        <!-- v3.0.0-alpha.4 — the tutorial's mini toggle: a quiet 38×20 pill with a
+             sliding knob, self-contained (no dependency on the settings window's
+             Switch style). Click carries the state; the code persists it. -->
+        <Style x:Key="DeckSwitch" TargetType="ToggleButton">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Grid>
+                            <Border x:Name="Track" CornerRadius="10"
+                                    Background="{DynamicResource ChipBrush}"
+                                    BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"/>
+                            <Ellipse x:Name="Knob" Width="14" Height="14" Fill="{DynamicResource SubtitleBrush}"
+                                     HorizontalAlignment="Left" Margin="3,0,0,0" VerticalAlignment="Center"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Knob" Property="Fill" Value="White"/>
+                                <Setter TargetName="Knob" Property="Margin" Value="21,0,0,0"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- v3.0.0-alpha.4 — tutorial keycap: the numpad illustration's one key -->
+        <Style x:Key="DeckKeycap" TargetType="Border">
+            <Setter Property="Width" Value="42"/>
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Background" Value="{DynamicResource ChipBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderLineBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Margin" Value="3"/>
+        </Style>
     </UserControl.Resources>
 
     <Grid Background="Transparent">
@@ -95,10 +137,11 @@
                            Foreground="{DynamicResource TitleBrush}"/>
                 <TextBlock FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
                            Foreground="{DynamicResource SubtitleBrush}"
-                           Text="Nine slots for the apps and games you want one keystroke away — press numpad 1–9 while Lumo is open. Drop a file onto a card, or click an empty card to assign it."/>
+                           Text="Nine slots for the apps and games you want one keystroke away — the grid mirrors your numpad. Click a card to launch, drop a file onto it to assign."/>
             </StackPanel>
             <Button x:Name="DeckHelpButton" Grid.Column="1" Style="{StaticResource DeckGhostButton}"
                     VerticalAlignment="Top" Content="How it works" Click="OnHowItWorksClick"/>
+
         </Grid>
 
         <!-- the 3×3 grid (cards built in code) -->
@@ -174,6 +217,142 @@
                         </StackPanel>
                     </Grid>
                 </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- ============ v3.0.0-alpha.4 — the tutorial page ============
+             A quiet full-page overlay (same pattern as the slot editor): the
+             numpad map, four steps, and the global-hotkeys switch — reachable
+             from the "How it works" button and auto-shown the first time the
+             deck opens (Settings.DeckTutorialSeen). Esc / scrim / Got it close. -->
+        <Grid x:Name="TutorialOverlay" Grid.Row="0" Grid.RowSpan="3" Visibility="Collapsed">
+            <Border Background="#66000000" MouseLeftButtonDown="OnTutorialClose"/>
+            <Border Width="620" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="{DynamicResource CardBrush}" CornerRadius="16"
+                    BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                    Margin="20">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="540"
+                              Padding="28,24,28,20">
+                    <StackPanel>
+                        <!-- header -->
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <behaviors:PersonaFaceView Width="26" Height="26" VerticalAlignment="Center"/>
+                            <TextBlock Text="App Deck — the 60-second tour" FontSize="17" FontWeight="SemiBold"
+                                       Margin="11,0,0,0" Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock FontSize="12.5" Margin="0,7,0,0" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource SubtitleBrush}"
+                                   Text="Put the nine apps and games you open the most on your numpad. Assign once — after that a launch is one keystroke, no launcher, no hunting through menus."/>
+
+                        <!-- the numpad map: physically identical to the keyboard -->
+                        <Border Margin="0,18,0,0" Padding="16,14" CornerRadius="12"
+                                Background="{DynamicResource ChipBrush}"
+                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0" Width="144">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition/><RowDefinition/><RowDefinition/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource DeckKeycap}"><TextBlock Text="7" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource DeckKeycap}"><TextBlock Text="8" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="0" Grid.Column="2" Style="{StaticResource DeckKeycap}"><TextBlock Text="9" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource DeckKeycap}"><TextBlock Text="4" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource DeckKeycap}"><TextBlock Text="5" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource DeckKeycap}"><TextBlock Text="6" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource DeckKeycap}"><TextBlock Text="1" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource DeckKeycap}"><TextBlock Text="2" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                    <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource DeckKeycap}"><TextBlock Text="3" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                                </Grid>
+                                <StackPanel Grid.Column="1" Margin="16,2,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="The grid mirrors your numpad" FontSize="12.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TitleBrush}"/>
+                                    <TextBlock Text="Slot 7 sits where the key 7 sits — what you see is what your finger finds. Each card shows its key number in the corner."
+                                               FontSize="11.5" Margin="0,4,0,0" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource SubtitleBrush}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- the four steps -->
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,10"
+                                    Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="1" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
+                                <TextBlock Text="Assign a slot" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
+                                <TextBlock Text="Click an empty card, or drag an app, shortcut or file straight onto it — the icon lands automatically." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                            </StackPanel>
+
+                            <Border Grid.Row="1" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,10"
+                                    Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="2" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,10">
+                                <TextBlock Text="Launch" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
+                                <TextBlock Text="Click the card — or press its numpad key (1–9) while Lumo is open. The status line confirms every launch." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                            </StackPanel>
+
+                            <Border Grid.Row="2" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,10"
+                                    Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="3" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,10">
+                                <TextBlock Text="Launch from anywhere" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
+                                <TextBlock Text="Turn on global numpad hotkeys below and the slots fire even when Lumo is hidden — ideal for games. Note: games that use the numpad will see the keys go to Lumo." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                            </StackPanel>
+
+                            <Border Grid.Row="3" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,0"
+                                    Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="4" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <StackPanel Grid.Row="3" Grid.Column="1">
+                                <TextBlock Text="Fine-tune" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
+                                <TextBlock Text="Hover a card for edit and clear buttons; right-click any card to open its editor. Name, target, arguments and start-in folder are all editable." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- the global-hotkeys switch -->
+                        <Border Margin="0,16,0,0" Padding="14,11" CornerRadius="10"
+                                Background="{DynamicResource FieldBrush}"
+                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="Global numpad hotkeys" FontSize="12.5" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TitleBrush}"/>
+                                    <TextBlock Text="Numpad 1–9 launch slots even when Lumo is in the background" FontSize="11"
+                                               Margin="0,2,0,0" Foreground="{DynamicResource SubtitleBrush}"/>
+                                </StackPanel>
+                                <ToggleButton x:Name="TutorialGlobalToggle" Grid.Column="1" Style="{StaticResource DeckSwitch}"
+                                              VerticalAlignment="Center" Margin="12,0,0,0" Click="OnTutorialGlobalToggle"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- footer -->
+                        <Grid Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" HorizontalAlignment="Left" Style="{StaticResource DeckGhostButton}"
+                                    Content="Open settings…" Click="OnTutorialSettings"
+                                    ToolTip="Deck hotkeys also live in Settings → General"/>
+                            <Button x:Name="TutorialGotIt" Grid.Column="1" Style="{StaticResource DeckAccentButton}"
+                                    Content="Got it" Padding="22,6" Click="OnTutorialClose"/>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
         </Grid>
     </Grid>

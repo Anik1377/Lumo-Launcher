@@ -1,7 +1,25 @@
 ======================================================
-  LUMO v3.0.0-alpha.3  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.4  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.4 (App Deck fixed + tutorial)
+---------------------------------------------------------------
+1. THE APP DECK OPENS NOW. The deck tab in the hub window
+   silently failed to appear (a theme-brush lookup threw
+   while the deck was being built). Fixed: the deck renders
+   every time, and a failure can never wedge the nav rail.
+2. THE DECK TUTORIAL. "How it works" now opens a real
+   guided page: the numpad map, four steps (assign, launch,
+   go global, fine-tune) and the global-hotkeys switch right
+   in the tour. It shows itself the first time you open the
+   deck; reopen it any time from "How it works".
+3. THE GRID MIRRORS THE NUMPAD. Cards now fill 7-8-9 /
+   4-5-6 / 1-2-3 exactly like the physical keys. The little
+   key-number badges on the cards were always correct.
+4. NEVER SILENT. If the AI page ever fails to open, Lumo
+   now shows the reason (and where the log lives) instead
+   of doing nothing.
 
 WHAT'S NEW IN v3.0.0-alpha.3 (persona faces + mascot)
 ---------------------------------------------------------------
