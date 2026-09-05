@@ -13,13 +13,15 @@ namespace Lumo.UI;
 ///
 /// The hub's AI window keeps only the chat; its rail deck button raises
 /// <see cref="DeckLaunchRequested"/> and App.OpenDeck() shows this window
-/// (singleton per app lifetime). The deck surface itself is the unchanged
+/// (singleton per app lifetime). The deck surface itself is the
 /// AppDeckView — same store, editor, tutorial and global-hotkey plumbing;
 /// its two events are re-exposed so App wires them exactly once.
 ///
 /// Keyboard: numpad 1–9 (and the digit row) launch the matching slot whenever
 /// the user is not typing in a field; Esc backs out of the slot editor /
 /// tutorial first, then closes the window.
+/// v3.0.0-alpha.6 — Ctrl+Tab / Ctrl+Shift+Tab cycle pages, Ctrl+1…9 jumps to a
+/// page, and the window's size/position survive restarts (Settings.DeckWin*).
 /// </summary>
 public partial class AppDeckWindow : Window
 {
@@ -33,8 +35,9 @@ public partial class AppDeckWindow : Window
     public event Action? GlobalHotkeysChanged;
 
     private bool _sourceReady;
+    private bool _geometryRestored;
 
-    public AppDeckWindow(Settings settings)
+    public AppDeckWindow(Settings settings, UsageStore? usage = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -42,7 +45,7 @@ public partial class AppDeckWindow : Window
         // v3.0.0-alpha.4 doctrine — the view is built ORPHANED (before it joins
         // the tree), so its theme tokens must survive without a live window:
         // TryFindResource + the resolved palette, never a throwing FindResource.
-        var view = new AppDeckView(_settings);
+        var view = new AppDeckView(_settings, usage);
         view.GlobalHotkeysChanged += () => GlobalHotkeysChanged?.Invoke();
         view.SettingsRequested += () => SettingsRequested?.Invoke();
         DeckHost.Content = view;
@@ -52,6 +55,7 @@ public partial class AppDeckWindow : Window
 
         Closed += (_, _) =>
         {
+            SaveGeometry();
             try { _view = null; DeckHost.Content = null; } catch { }
         };
         Loaded += (_, _) => TryFocusDeck();
@@ -64,6 +68,71 @@ public partial class AppDeckWindow : Window
         base.OnSourceInitialized(e);
         _sourceReady = true;
         try { ApplySelfTheme(); } catch (Exception ex) { DiagnosticLogger.LogException("DeckWindow.Theme", ex); }
+        RestoreGeometry();
+    }
+
+    // ---------------------------------------------------------------- geometry
+
+    /// <summary>v3.0.0-alpha.6 — put the deck back where the user left it (0 = unset
+    /// → centered), then clamp into the nearest monitor's work area so a monitor
+    /// change can never strand the window off-screen.</summary>
+    private void RestoreGeometry()
+    {
+        if (_geometryRestored) return;
+        _geometryRestored = true;
+        try
+        {
+            if (_settings.DeckWinWidth > 200 && _settings.DeckWinHeight > 150 &&
+                _settings.DeckWinWidth < 4000 && _settings.DeckWinHeight < 3000)
+            {
+                Width = _settings.DeckWinWidth;
+                Height = _settings.DeckWinHeight;
+            }
+            if (_settings.DeckWinLeft != 0 || _settings.DeckWinTop != 0)
+            {
+                Left = _settings.DeckWinLeft;
+                Top = _settings.DeckWinTop;
+                ClampIntoNearestWorkArea();
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("DeckWindow.RestoreGeometry", ex); }
+    }
+
+    private void ClampIntoNearestWorkArea()
+    {
+        try
+        {
+            var source = PresentationSource.FromVisual(this);
+            double dpiX = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            double dpiY = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+            if (dpiX <= 0 || dpiY <= 0) return;
+            var px = new System.Drawing.Point(
+                (int)Math.Round((Left + Width / 2) * dpiX),
+                (int)Math.Round((Top + Height / 2) * dpiY));
+            var area = System.Windows.Forms.Screen.FromPoint(px).WorkingArea;
+            double workLeft = area.Left / dpiX, workTop = area.Top / dpiY;
+            double workRight = (area.Left + area.Width) / dpiX;
+            double workBottom = (area.Top + area.Height) / dpiY;
+            Left = Math.Clamp(Left, workLeft, Math.Max(workLeft, workRight - Width));
+            Top = Math.Clamp(Top, workTop, Math.Max(workTop, workBottom - Height));
+        }
+        catch { /* cosmetic — a stray position beats a crash */ }
+    }
+
+    private void SaveGeometry()
+    {
+        try
+        {
+            if (WindowState == WindowState.Normal)
+            {
+                _settings.DeckWinLeft = Left;
+                _settings.DeckWinTop = Top;
+                _settings.DeckWinWidth = Width;
+                _settings.DeckWinHeight = Height;
+            }
+            _settings.Save();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("DeckWindow.SaveGeometry", ex); }
     }
 
     /// <summary>The same Fluent token set as the hub — the deck is part of the family.</summary>
@@ -120,9 +189,44 @@ public partial class AppDeckWindow : Window
                 return;
             }
 
+            bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
+
+            // v3.0.0-alpha.6 — page navigation: Ctrl+Tab cycles (Shift reverses),
+            // Ctrl+1…9 jumps straight to a page. Skipped while an overlay owns the
+            // surface — switching pages under the editor would be confusing.
+            if (ctrl && !(_view?.IsOverlayOpen ?? true))
+            {
+                if (e.Key == Key.Tab)
+                {
+                    e.Handled = true;
+                    bool shift = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+                    _view?.CyclePage(shift ? -1 : 1);
+                    return;
+                }
+                int page = e.Key switch
+                {
+                    Key.D1 or Key.NumPad1 => 1,
+                    Key.D2 or Key.NumPad2 => 2,
+                    Key.D3 or Key.NumPad3 => 3,
+                    Key.D4 or Key.NumPad4 => 4,
+                    Key.D5 or Key.NumPad5 => 5,
+                    Key.D6 or Key.NumPad6 => 6,
+                    Key.D7 or Key.NumPad7 => 7,
+                    Key.D8 or Key.NumPad8 => 8,
+                    Key.D9 or Key.NumPad9 => 9,
+                    _ => -1,
+                };
+                if (page > 0)
+                {
+                    e.Handled = _view?.JumpToPage(page) == true;
+                    if (e.Handled) return;
+                }
+            }
+
             // numpad 1–9 (and the digit row) launch slots — unless the user is
             // typing in the slot editor, where the digits belong to the fields
             if (Keyboard.FocusedElement is TextBox) return;
+            if (ctrl) return;   // Ctrl+<other> belongs to the control, not the deck
             int slot = e.Key switch
             {
                 Key.D1 or Key.NumPad1 => 0,

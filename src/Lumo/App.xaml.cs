@@ -325,7 +325,9 @@ public partial class App : Application
                 return;
             }
 
-            _deckWindow = new AppDeckWindow(_settings);
+            // v3.0.0-alpha.6 — the usage store feeds the deck's app-picker ranking
+            // and the editor's "you open these a lot" suggestions.
+            _deckWindow = new AppDeckWindow(_settings, _usage);
             _deckWindow.SettingsRequested += () =>
             {
                 try { OpenSettings(initialPage: 0); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckSettings", ex); }

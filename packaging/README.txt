@@ -1,7 +1,42 @@
 ======================================================
-  LUMO v3.0.0-alpha.5  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.6  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.6 (the App Deck gets useful)
+---------------------------------------------------------------
+1. THE APP PICKER. Clicking an empty deck slot no longer
+   opens Windows Explorer - it opens a "Choose an app"
+   window listing EVERY Start Menu + Desktop app on the PC
+   with live fuzzy search, real icons, most-used first, and
+   a full keyboard flow (type, arrow keys, Enter). The old
+   file dialog is still one click away ("Browse for a
+   file...") and the slot editor gained "Pick app..." too.
+2. PAGES - A DECK FOR EVERY MOOD. The chip row above the
+   grid holds full 3x3 layouts: + Add page offers Games,
+   Studio, Office and Entertainment in one click, or add
+   blanks and rename (double-click a chip). Numpad 1-9
+   always fires the page you see; Ctrl+Tab cycles pages and
+   Ctrl+1..9 jumps straight to one. Existing slots migrate
+   untouched into the Main page.
+3. IMPORT & EXPORT. The header buttons write every page to
+   a shareable .lumodeck file and merge imported pages in
+   with collision-safe names - nothing you had is ever
+   overwritten. Backups and sharing made boring.
+4. PLUS TEN MORE. Drag a card onto another to swap them;
+   duplicate slot; sort page A->Z; clear page (with
+   confirm); persisted per-slot launch counters; run-as-
+   administrator per slot; launch window state (Normal/
+   Min/Max) per slot; a right-click card menu (open file
+   location, copy path, ...); multi-file drop fills empty
+   slots in order; "you open these a lot" suggestions in
+   the editor; and the deck window remembers its size and
+   position across restarts. The tutorial page covers it
+   all (five steps now).
+5. UNDER THE HOOD. 27 new tests (438 total) pin the page
+   model, the v2 appdeck.json format (v1 files migrate
+   automatically), the .lumodeck round-trip, the new slot
+   options and the picker ranking.
 
 WHAT'S NEW IN v3.0.0-alpha.5 (the quality-of-life round)
 ---------------------------------------------------------------

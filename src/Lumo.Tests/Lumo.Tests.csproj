@@ -74,6 +74,11 @@
     <!-- v3.0 — App Deck slot model + store -->
     <Compile Include="../Lumo/Core/DeckSlots.cs" Link="Core/DeckSlots.cs" />
     <Compile Include="../Lumo/Services/DeckStore.cs" Link="Services/DeckStore.cs" />
+    <!-- v3.0.0-alpha.6 — deck pages (multi-mode layouts) + the .lumodeck layout JSON,
+         the app-picker ranking, and AppIndex (AppPicker reads its AppEntry records) -->
+    <Compile Include="../Lumo/Core/DeckPages.cs" Link="Core/DeckPages.cs" />
+    <Compile Include="../Lumo/Core/AppPicker.cs" Link="Core/AppPicker.cs" />
+    <Compile Include="../Lumo/Core/AppIndex.cs" Link="Core/AppIndex.cs" />
     <!-- v3.0.0-alpha.4 — the shared atomic tmp→file swap + read retry + stale sweep -->
     <Compile Include="../Lumo/Core/AtomicIo.cs" Link="Core/AtomicIo.cs" />
     <!-- v3.0.0-alpha.5 — Lumo cache/temp cleanup (scan + clear, bounded I/O) -->

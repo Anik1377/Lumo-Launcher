@@ -186,6 +186,8 @@ expansion is never recursive.
 | `Ctrl+N` (in AI chat) | new chat session |
 | `Ctrl+M` (in AI chat) | start / stop voice recording — the overlay shows a live waveform; the red cap finishes & transcribes (Whisper, offline), pause/resume holds mid-recording, `Esc` cancels |
 | `F11` | fullscreen / window toggle (AI chat) |
+| `1…9` (in App Deck) | launch the matching slot — or, on an empty card, open the app picker |
+| `Ctrl+Tab` / `Ctrl+1…9` (in App Deck) | cycle pages / jump straight to a page |
 
 ### Plugins in one minute
 
@@ -213,6 +215,53 @@ Copy Kit). The full schema, routing rules, limits and the copyable AI
 authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
+
+## 🆕 What's new in v3.0.0-alpha.6 — the App Deck gets genuinely useful
+
+Four asks (a real app picker, multi-mode pages, import/export, plus "add 10 more
+features") — all in, and the suite grew to 438:
+
+1. **🔍 The app picker.** Clicking an empty slot no longer opens Windows Explorer.
+   It opens a proper **Choose an app** window: every Start Menu + Desktop app on
+   the PC with live fuzzy search, real icons, most-used first, full keyboard flow
+   (type → ↑↓ → **Enter**) and double-click. The classic file dialog survives one
+   click away ("Browse for a file…") for scripts, folders and anything not in the
+   Start Menu — and the slot editor gained a **Pick app…** button too.
+2. **🗂️ Pages — a deck for every mood.** The new chip row above the grid holds
+   full 3×3 layouts: **Games**, **Studio**, **Office** and **Entertainment** are
+   one click each under **+ Add page**, or add blanks and rename (double-click a
+   chip / right-click). The numpad always fires the page you see; **Ctrl+Tab**
+   cycles pages, **Ctrl+1…9** jumps straight to one. Your existing slots migrate
+   untouched into the Main page.
+3. **💾 Import & export the whole layout.** The header's export button writes
+   every page to a shareable **`.lumodeck`** file; import merges pages in with
+   collision-safe names ("Games (2)") and never overwrites what you had. Great
+   for backups and for sending your setup to a friend.
+4. **↔️ Drag a card onto another to swap them** — reorder without clearing
+   (numpad numbers follow, of course).
+5. **📄 Duplicate slot** — copy an assignment into the first empty slot from the
+   new right-click card menu.
+6. **🔤 Sort page A→Z** — one click (⋮ menu) re-orders the page's assigned slots
+   alphabetically, empties tuck to the end.
+7. **🧽 Clear page** — wipe the whole current page after a confirm, for when a
+   layout has served its purpose.
+8. **📈 Launch counters** — every successful launch bumps a persisted per-slot
+   counter, shown in the editor and tooltips ("Launched 12 times").
+9. **🛡️ Run as administrator** — a per-slot toggle; launches use the shell's
+   `runas` verb (a cancelled UAC prompt is a status message, never a crash).
+10. **🪟 Launch window state** — per-slot Normal / Minimized / Maximized chips;
+    great for terminals and tools you always open maximized.
+11. **🖱️ Right-click card menu** — Open, Edit, Pick a different app, Duplicate,
+    **Open file location** (Explorer with the file selected), **Copy target
+    path**, Clear.
+12. **📎 Multi-file drop** — drop several files at once: the first lands where
+    you dropped, the rest fill empty slots in order.
+13. **💡 "You open these a lot"** — an unassigned slot's editor lists your
+    top-launched apps as one-click chips (fueled by the launcher's usage store,
+    which also ranks the picker).
+14. **📐 The deck window remembers itself** — size and position persist across
+    restarts, clamped back on-screen if a monitor goes away. The tutorial page
+    was rewritten for all of the above (five steps now).
 
 ## 🆕 What's new in v3.0.0-alpha.5 — the quality-of-life round
 

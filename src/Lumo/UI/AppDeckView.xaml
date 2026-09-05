@@ -42,6 +42,100 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- v3.0.0-alpha.6 — themed context menus (card menu, chip menu, page menu):
+             a popup hosts its own window, but resource lookup walks the logical
+             tree from the placement target, so these DynamicResource tokens resolve -->
+        <Style x:Key="DeckMenu" TargetType="ContextMenu">
+            <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="10"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DeckMenuItem" TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="7" Padding="12,7,14,7">
+                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DeckMenuSeparator" TargetType="Separator">
+            <Setter Property="Background" Value="{DynamicResource BorderLineBrush}"/>
+            <Setter Property="Height" Value="1"/>
+            <Setter Property="Margin" Value="8,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Separator">
+                        <Border Background="{TemplateBinding Background}" Height="1" Margin="{TemplateBinding Margin}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- v3.0.0-alpha.6 — the editor's window-mode chips (Normal/Min/Max):
+             a checked chip lights up, the exclusivity is handled in code -->
+        <Style x:Key="DeckWinChip" TargetType="ToggleButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="9,3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="7"
+                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- v3.0.0-alpha.6 — icon-only ghost button for the header tool strip -->
+        <Style x:Key="DeckIconButton" TargetType="Button" BasedOn="{StaticResource DeckGhostButton}">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="9,5"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
         <!-- v3.0.0-alpha.4 — the tutorial's accent pill (primary "Got it") -->
         <Style x:Key="DeckAccentButton" TargetType="Button" BasedOn="{StaticResource DeckGhostButton}">
             <Setter Property="Foreground" Value="White"/>
@@ -137,30 +231,52 @@
                            Foreground="{DynamicResource TitleBrush}"/>
                 <TextBlock FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
                            Foreground="{DynamicResource SubtitleBrush}"
-                           Text="Nine slots for the apps and games you want one keystroke away — the grid mirrors your numpad. Click a card to launch, drop a file onto it to assign."/>
+                           Text="Nine numpad-bound slots per page. Click a card to launch, click an empty card to pick an app from this PC, or drop a file onto it — and keep separate pages for Games, Studio, Office and more."/>
             </StackPanel>
-            <Button x:Name="DeckHelpButton" Grid.Column="1" Style="{StaticResource DeckGhostButton}"
-                    VerticalAlignment="Top" Content="How it works" Click="OnHowItWorksClick"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+                <Button x:Name="DeckHelpButton" Style="{StaticResource DeckGhostButton}"
+                        Content="How it works" Click="OnHowItWorksClick"/>
+                <Button x:Name="DeckImportButton" Style="{StaticResource DeckIconButton}" Content="&#xE8B5;"
+                        Click="OnImportClick" ToolTip="Import a deck layout (.lumodeck) — pages are added, nothing is overwritten"/>
+                <Button x:Name="DeckExportButton" Style="{StaticResource DeckIconButton}" Content="&#xE74E;"
+                        Click="OnExportClick" ToolTip="Export every page to a shareable .lumodeck file"/>
+                <Button x:Name="DeckMoreButton" Style="{StaticResource DeckIconButton}" Content="&#xE712;"
+                        Click="OnMoreClick" ToolTip="Page tools — sort A→Z, clear page"/>
+            </StackPanel>
 
         </Grid>
 
+        <!-- v3.0.0-alpha.6 — the page chips (Main / Games / Studio / …), built in
+             code; the trailing chip adds a page from a template -->
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled" Padding="26,12,26,0">
+            <StackPanel Orientation="Horizontal">
+                <StackPanel x:Name="PageChips" Orientation="Horizontal"/>
+                <Button x:Name="AddPageButton" Style="{StaticResource DeckGhostButton}"
+                        Content="&#xE710;  Add page" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                        Margin="6,0,0,0" Click="OnAddPageClick"
+                        ToolTip="Add a page — Games, Studio, Office, Entertainment or a blank one"/>
+            </StackPanel>
+        </ScrollViewer>
+
         <!-- the 3×3 grid (cards built in code) -->
-        <ScrollViewer Grid.Row="1" behaviors:SmoothScroll.Enabled="True"
+        <ScrollViewer Grid.Row="2" behaviors:SmoothScroll.Enabled="True"
                       VerticalScrollBarVisibility="Auto" Padding="26,8,26,0">
             <UniformGrid x:Name="DeckGrid" Rows="3" Columns="3" Margin="0,4,0,0"/>
         </ScrollViewer>
 
         <!-- status line: launch feedback / errors -->
-        <TextBlock x:Name="DeckStatus" Grid.Row="2" Margin="26,6,26,12" FontSize="11.5"
+        <TextBlock x:Name="DeckStatus" Grid.Row="3" Margin="26,6,26,12" FontSize="11.5"
                    Foreground="{DynamicResource SubtitleBrush}" TextTrimming="CharacterEllipsis"/>
 
         <!-- ============ slot editor overlay ============ -->
-        <Grid x:Name="EditorOverlay" Grid.Row="0" Grid.RowSpan="3" Visibility="Collapsed">
+        <Grid x:Name="EditorOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed">
             <Border x:Name="EditorScrim" Background="#66000000" MouseLeftButtonDown="OnEditorCancel"/>
-            <Border Width="440" VerticalAlignment="Center" HorizontalAlignment="Center"
+            <Border Width="460" VerticalAlignment="Center" HorizontalAlignment="Center"
                     Background="{DynamicResource CardBrush}" CornerRadius="14"
                     BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
                     Margin="20" KeyboardNavigation.TabNavigation="Continue">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="600">
                 <StackPanel Margin="20,18">
                     <Grid>
                         <Grid.ColumnDefinitions>
@@ -174,6 +290,8 @@
                                        Foreground="{DynamicResource TitleBrush}"/>
                             <TextBlock x:Name="EditorKeycap" FontSize="11"
                                        Foreground="{DynamicResource SubtitleBrush}" Margin="0,2,0,0"/>
+                            <TextBlock x:Name="EditorLaunches" FontSize="11" Margin="0,2,0,0" Visibility="Collapsed"
+                                       Foreground="{DynamicResource AccentBrush}"/>
                         </StackPanel>
                     </Grid>
 
@@ -186,10 +304,15 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBox x:Name="EditorTarget" Style="{StaticResource DeckFieldBox}" MaxLength="400"/>
-                        <Button x:Name="EditorBrowse" Grid.Column="1" Style="{StaticResource DeckGhostButton}"
-                                Content="Browse…" Margin="8,0,0,0" Click="OnEditorBrowse"/>
+                        <Button x:Name="EditorPickApp" Grid.Column="1" Style="{StaticResource DeckGhostButton}"
+                                Content="Pick app…" Margin="8,0,0,0" Click="OnEditorPickApp"
+                                ToolTip="Search every app installed on this PC"/>
+                        <Button x:Name="EditorBrowse" Grid.Column="2" Style="{StaticResource DeckGhostButton}"
+                                Content="Browse…" Margin="8,0,0,0" Click="OnEditorBrowse"
+                                ToolTip="Pick any file with the classic dialog"/>
                     </Grid>
 
                     <TextBlock Text="Arguments (optional)" FontSize="11.5" Margin="0,10,0,4"
@@ -200,6 +323,35 @@
                     <TextBlock Text="Start in (optional folder)" FontSize="11.5" Margin="0,10,0,4"
                                Foreground="{DynamicResource SubtitleBrush}"/>
                     <TextBox x:Name="EditorWorkDir" Style="{StaticResource DeckFieldBox}" MaxLength="400"/>
+
+                    <!-- v3.0.0-alpha.6 — launch options: elevation + window mode -->
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <ToggleButton x:Name="EditorAdmin" Style="{StaticResource DeckSwitch}" Click="OnEditorAdminChanged"/>
+                            <TextBlock Text="Run as administrator" FontSize="11.5" Margin="8,0,0,0"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource TitleBrush}"
+                                       MouseLeftButtonDown="OnEditorAdminLabel" Cursor="Hand"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Window" FontSize="11.5" Margin="0,0,6,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource SubtitleBrush}"/>
+                            <ToggleButton x:Name="EditorWinNormal" Style="{StaticResource DeckWinChip}" Content="Normal" Click="OnWinModeClick"/>
+                            <ToggleButton x:Name="EditorWinMin" Style="{StaticResource DeckWinChip}" Content="Min" Margin="4,0,0,0" Click="OnWinModeClick"/>
+                            <ToggleButton x:Name="EditorWinMax" Style="{StaticResource DeckWinChip}" Content="Max" Margin="4,0,0,0" Click="OnWinModeClick"/>
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- v3.0.0-alpha.6 — one-click suggestions from the apps the user actually launches -->
+                    <StackPanel x:Name="EditorSuggestionsHost" Margin="0,14,0,0" Visibility="Collapsed">
+                        <TextBlock Text="YOU OPEN THESE A LOT" FontSize="10" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource SubtitleBrush}" Opacity="0.8"/>
+                        <WrapPanel x:Name="EditorSuggestions" Margin="0,7,0,0"/>
+                    </StackPanel>
 
                     <Grid Margin="0,18,0,0">
                         <Grid.ColumnDefinitions>
@@ -217,6 +369,32 @@
                         </StackPanel>
                     </Grid>
                 </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- ============ v3.0.0-alpha.6 — the page rename overlay ============ -->
+        <Grid x:Name="RenameOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed">
+            <Border Background="#66000000" MouseLeftButtonDown="OnRenameCancel"/>
+            <Border Width="360" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="{DynamicResource CardBrush}" CornerRadius="14"
+                    BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" Margin="20">
+                <StackPanel Margin="20,18">
+                    <TextBlock Text="Rename page" FontSize="14.5" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TitleBrush}"/>
+                    <TextBox x:Name="RenameBox" Style="{StaticResource DeckFieldBox}" MaxLength="24" Margin="0,12,0,0"
+                             KeyDown="OnRenameKeyDown"/>
+                    <Grid Margin="0,16,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="1" Style="{StaticResource DeckAccentButton}"
+                                Content="Save name" Click="OnRenameSave" Padding="18,6"/>
+                        <Button Grid.Column="0" HorizontalAlignment="Left" Style="{StaticResource DeckGhostButton}"
+                                Content="Cancel" Click="OnRenameCancel"/>
+                    </Grid>
+                </StackPanel>
             </Border>
         </Grid>
 
@@ -225,7 +403,7 @@
              numpad map, four steps, and the global-hotkeys switch — reachable
              from the "How it works" button and auto-shown the first time the
              deck opens (Settings.DeckTutorialSeen). Esc / scrim / Got it close. -->
-        <Grid x:Name="TutorialOverlay" Grid.Row="0" Grid.RowSpan="3" Visibility="Collapsed">
+        <Grid x:Name="TutorialOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed">
             <Border Background="#66000000" MouseLeftButtonDown="OnTutorialClose"/>
             <Border Width="620" VerticalAlignment="Center" HorizontalAlignment="Center"
                     Background="{DynamicResource CardBrush}" CornerRadius="16"
@@ -242,7 +420,7 @@
                         </StackPanel>
                         <TextBlock FontSize="12.5" Margin="0,7,0,0" TextWrapping="Wrap"
                                    Foreground="{DynamicResource SubtitleBrush}"
-                                   Text="Put the nine apps and games you open the most on your numpad. Assign once — after that a launch is one keystroke, no launcher, no hunting through menus."/>
+                                   Text="Put the nine apps and games you open the most on your numpad — in as many pages as you like. Assign once; after that a launch is one keystroke, no launcher, no hunting through menus."/>
 
                         <!-- the numpad map: physically identical to the keyboard -->
                         <Border Margin="0,18,0,0" Padding="16,14" CornerRadius="12"
@@ -280,42 +458,49 @@
                             </Grid>
                         </Border>
 
-                        <!-- the four steps -->
+                        <!-- the five steps -->
                         <Grid Margin="0,18,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
-                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
+                                <RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/><RowDefinition/>
                             </Grid.RowDefinitions>
 
                             <Border Grid.Row="0" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,10"
                                     Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="1" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,10">
                                 <TextBlock Text="Assign a slot" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
-                                <TextBlock Text="Click an empty card, or drag an app, shortcut or file straight onto it — the icon lands automatically." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                                <TextBlock Text="Click an empty card to pick from EVERY app on this PC — search, press Enter, done. Drag a file straight onto a card, or use “Pick app… / Browse…” inside the editor for anything else." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
                             </StackPanel>
 
                             <Border Grid.Row="1" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,10"
                                     Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="2" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,10">
                                 <TextBlock Text="Launch" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
-                                <TextBlock Text="Click the card — or press its numpad key (1–9) while Lumo is open. The status line confirms every launch." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                                <TextBlock Text="Click the card — or press its numpad key (1–9) while Lumo is open. Right-click any card for open-file-location, copy path, duplicate and more." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
                             </StackPanel>
 
                             <Border Grid.Row="2" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,10"
                                     Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="3" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
                             <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,0,0,10">
+                                <TextBlock Text="Pages for every mood" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
+                                <TextBlock Text="“Add page” up top creates Games, Studio, Office or Entertainment layouts — each with its own nine slots. The numpad always fires the page you see; Ctrl+Tab cycles and Ctrl+1…9 jumps. Drag cards onto each other to swap, or export the whole deck from the header to share it." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                            </StackPanel>
+
+                            <Border Grid.Row="3" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,10"
+                                    Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="4" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,0,0,10">
                                 <TextBlock Text="Launch from anywhere" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
                                 <TextBlock Text="Turn on global numpad hotkeys below and the slots fire even when Lumo is hidden — ideal for games. Note: games that use the numpad will see the keys go to Lumo." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
                             </StackPanel>
 
-                            <Border Grid.Row="3" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,0"
-                                    Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="4" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
-                            <StackPanel Grid.Row="3" Grid.Column="1">
+                            <Border Grid.Row="4" Grid.Column="0" Width="22" Height="22" CornerRadius="11" Margin="0,1,12,0"
+                                    Background="{DynamicResource GlyphBoxBrush}"><TextBlock Text="5" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <StackPanel Grid.Row="4" Grid.Column="1">
                                 <TextBlock Text="Fine-tune" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TitleBrush}"/>
-                                <TextBlock Text="Hover a card for edit and clear buttons; right-click any card to open its editor. Name, target, arguments and start-in folder are all editable." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
+                                <TextBlock Text="Hover a card for edit and clear buttons; right-click for the full menu. Name, arguments, start-in folder, run-as-administrator and the launch window state are all editable per slot." FontSize="11.5" Margin="0,2,0,0" TextWrapping="Wrap" Foreground="{DynamicResource SubtitleBrush}"/>
                             </StackPanel>
                         </Grid>
 

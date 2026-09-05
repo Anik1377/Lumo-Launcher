@@ -53,6 +53,32 @@ public sealed class UsageStore
     public int Count { get { lock (_gate) { return _m.Count; } } }
 
     /// <summary>
+    /// v3.0.0-alpha.6 — the top-used targets (highest count first, ties broken by
+    /// recency), for the App Deck editor's "you open these a lot" suggestions.
+    /// Only keys that still exist on disk are returned (the caller passes its own
+    /// probe so the store stays I/O-free). Bounded and snapshot-safe; never throws.
+    /// </summary>
+    public IReadOnlyList<(string Key, UsageEntry Entry)> Top(int n, Func<string, bool>? existsProbe = null)
+    {
+        var result = new List<(string, UsageEntry)>();
+        if (n <= 0) return result;
+        try
+        {
+            List<KeyValuePair<string, UsageEntry>> snapshot;
+            lock (_gate) snapshot = _m.ToList();
+            foreach (var kv in snapshot.OrderByDescending(kv => kv.Value.Count)
+                                       .ThenByDescending(kv => kv.Value.LastUsed))
+            {
+                if (result.Count >= n) break;
+                if (existsProbe is not null && !existsProbe(kv.Key)) continue;
+                result.Add((kv.Key, kv.Value));
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("UsageStore.Top", ex); }
+        return result;
+    }
+
+    /// <summary>
     /// Persist off the UI thread. A single-flight guard collapses bursts (rapid
     /// macro launches) into one write; the write itself is a temp-file swap so a
     /// crash can never truncate the JSON.

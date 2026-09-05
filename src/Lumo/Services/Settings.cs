@@ -61,6 +61,15 @@ public sealed class Settings
     /// tab opens; this flag keeps it to exactly once ("How it works" reopens it).</summary>
     public bool DeckTutorialSeen { get; set; } = false;
 
+    // ---- v3.0.0-alpha.6 — App Deck window geometry ---------------------------
+    // 0 = "unset" → the window centers itself; otherwise the last position/size
+    // is restored (clamped into the visible work area by the window). Size keys
+    // fall back to the 760×620 default when 0 or implausibly small.
+    public double DeckWinLeft { get; set; } = 0;
+    public double DeckWinTop { get; set; } = 0;
+    public double DeckWinWidth { get; set; } = 0;
+    public double DeckWinHeight { get; set; } = 0;
+
     // ---- v2.1 (DEV_PLAN Task 1.3) — user-defined web providers: keyword → URL template
     public Dictionary<string, string> CustomWebProviders { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
@@ -153,6 +162,10 @@ public sealed class Settings
         s.CustomThemeFile   = GetStr(root, nameof(CustomThemeFile), s.CustomThemeFile);     // v3.0
         s.DeckGlobalHotkeys = GetBool(root, nameof(DeckGlobalHotkeys), s.DeckGlobalHotkeys); // v3.0
         s.DeckTutorialSeen  = GetBool(root, nameof(DeckTutorialSeen), s.DeckTutorialSeen);   // v3.0.0-alpha.4
+        s.DeckWinLeft       = GetNum(root, nameof(DeckWinLeft), s.DeckWinLeft);        // v3.0.0-alpha.6
+        s.DeckWinTop        = GetNum(root, nameof(DeckWinTop), s.DeckWinTop);
+        s.DeckWinWidth      = GetNum(root, nameof(DeckWinWidth), s.DeckWinWidth);
+        s.DeckWinHeight     = GetNum(root, nameof(DeckWinHeight), s.DeckWinHeight);
         s.CustomWebProviders = GetStrMap(root, nameof(CustomWebProviders), s.CustomWebProviders);
         s.DisabledPlugins  = GetStrList(root, nameof(DisabledPlugins), s.DisabledPlugins);   // v2.5 — Task 4.2
         s.AiEnabled         = GetBool(root, nameof(AiEnabled), s.AiEnabled);
@@ -299,6 +312,10 @@ public sealed class Settings
         CustomThemeFile = o.CustomThemeFile;   // v3.0
         DeckGlobalHotkeys = o.DeckGlobalHotkeys; // v3.0
         DeckTutorialSeen = o.DeckTutorialSeen;   // v3.0.0-alpha.4
+        DeckWinLeft = o.DeckWinLeft;             // v3.0.0-alpha.6
+        DeckWinTop = o.DeckWinTop;
+        DeckWinWidth = o.DeckWinWidth;
+        DeckWinHeight = o.DeckWinHeight;
         CustomWebProviders = new Dictionary<string, string>(o.CustomWebProviders, StringComparer.OrdinalIgnoreCase);
         DisabledPlugins = new List<string>(o.DisabledPlugins);   // v2.5 — Task 4.2
         AiEnabled = o.AiEnabled;

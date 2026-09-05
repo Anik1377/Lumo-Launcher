@@ -6,6 +6,10 @@ namespace Lumo.Core;
 /// v3.0 — the App Deck: nine quick-launch slots bound to numpad 1–9.
 /// Pure model + policy (no WPF, no store I/O) so the test harness can pin the
 /// normalization and validation rules.
+/// v3.0.0-alpha.6 — slots grew launch options: RunAsAdmin (ShellExecute "runas"),
+/// a window mode ("" normal | "min" | "max") and a persisted launch counter.
+/// The new record parameters are OPTIONAL so every existing positional call
+/// site (and test) keeps compiling untouched.
 /// </summary>
 public static class DeckSlots
 {
@@ -16,7 +20,8 @@ public static class DeckSlots
 
     /// <summary>One slot. Index 0..8 ↔ numpad 1..9 (the UI shows +1). Target empty = unassigned.</summary>
     public sealed record Slot(
-        int Index, string Name, string Target, string Args, string WorkDir)
+        int Index, string Name, string Target, string Args, string WorkDir,
+        bool Admin = false, string WindowMode = "", int Launches = 0)
     {
         public bool IsAssigned => !string.IsNullOrWhiteSpace(Target);
         public string DisplayName => string.IsNullOrWhiteSpace(Name) ? DefaultName(Index) : Name;
@@ -28,12 +33,18 @@ public static class DeckSlots
     public static Slot Empty(int index) => new(
         Math.Clamp(index, 0, Count - 1), "", "", "", "");
 
+    /// <summary>"" → normal, "min"/"max" honoured, anything else falls back to normal.</summary>
+    public static string CleanWindowMode(string? mode) =>
+        string.Equals(mode, "min", StringComparison.OrdinalIgnoreCase) ? "min" :
+        string.Equals(mode, "max", StringComparison.OrdinalIgnoreCase) ? "max" : "";
+
     /// <summary>
     /// Normalizes a user edit into a slot. Empty target clears the slot entirely;
     /// whitespace collapses; length caps mirror the persona editor. Returns null
     /// only for a null/empty target combined with an empty name (nothing to save).
     /// </summary>
-    public static Slot? Normalize(int index, string? name, string? target, string? args, string? workDir)
+    public static Slot? Normalize(int index, string? name, string? target, string? args, string? workDir,
+        bool admin = false, string? windowMode = null, int launches = 0)
     {
         if (index < 0 || index >= Count) return null;
 
@@ -54,7 +65,10 @@ public static class DeckSlots
             name.Length > MaxNameChars ? name[..MaxNameChars] : name,
             target.Length > MaxTargetChars ? target[..MaxTargetChars] : target,
             args.Length > MaxArgsChars ? args[..MaxArgsChars] : args,
-            workDir.Length > MaxTargetChars ? workDir[..MaxTargetChars] : workDir);
+            workDir.Length > MaxTargetChars ? workDir[..MaxTargetChars] : workDir,
+            admin,
+            CleanWindowMode(windowMode),
+            Math.Max(0, launches));
     }
 
     /// <summary>Collapse internal whitespace runs to single spaces, trim ends.</summary>
@@ -81,16 +95,30 @@ public static class DeckSlots
         return null;
     }
 
-    /// <summary>Builds the launch start info (null when the slot is empty).</summary>
+    /// <summary>
+    /// Builds the launch start info (null when the slot is empty).
+    /// v3.0.0-alpha.6 — honours the per-slot launch options: Admin elevates via
+    /// the "runas" ShellExecute verb (a cancelled UAC prompt surfaces as a
+    /// Win32Exception the caller reports, never a crash), and WindowMode maps to
+    /// the shell's WindowStyle (best-effort: not every target obeys).
+    /// </summary>
     public static ProcessStartInfo? BuildStartInfo(Slot slot)
     {
         if (!slot.IsAssigned) return null;
-        return new ProcessStartInfo
+        var psi = new ProcessStartInfo
         {
             FileName = slot.Target,
             Arguments = slot.Args,
             WorkingDirectory = slot.WorkDir.Length > 0 ? slot.WorkDir : "",
             UseShellExecute = true,
         };
+        if (slot.Admin) psi.Verb = "runas";
+        psi.WindowStyle = slot.WindowMode switch
+        {
+            "min" => ProcessWindowStyle.Minimized,
+            "max" => ProcessWindowStyle.Maximized,
+            _ => ProcessWindowStyle.Normal,
+        };
+        return psi;
     }
 }
