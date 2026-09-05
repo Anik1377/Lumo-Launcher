@@ -473,7 +473,7 @@
                                             </Border>
                                         </Grid>
 
-                                        <!-- v3.0 — App Deck -->
+                                        <!-- v3.0 — App Deck · v3.0.0-alpha.5 — the deck is its own window -->
                                         <Separator Background="{DynamicResource BorderLineBrush}" Margin="0,14"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
@@ -481,11 +481,22 @@
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
                                             <StackPanel Grid.Column="0">
-                                                <TextBlock Text="Global numpad hotkeys (App Deck)" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Text="App Deck" Style="{StaticResource SettingName}"/>
                                                 <TextBlock Style="{StaticResource SettingDesc}" TextWrapping="Wrap"
-                                                           Text="Register numpad 1–9 as system-wide hotkeys so the deck launches from anywhere. Off by default: inside full-screen games the numpad belongs to the game — leave this off unless you actually want it."/>
+                                                           Text="Nine quick-launch slots bound to numpad 1–9, living in their own window — open it below or from the deck button in the AI page's rail, then click a card (or drop a file on it) to assign an app or game."/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                                                    <Button x:Name="OpenDeckButton" Content="Open App Deck"
+                                                            Style="{StaticResource AccentButton}" HorizontalAlignment="Left"
+                                                            Click="OnOpenDeck"/>
+                                                </StackPanel>
                                             </StackPanel>
-                                            <ToggleButton x:Name="DeckGlobalHotkeysToggle" Grid.Column="1" Style="{StaticResource Switch}" VerticalAlignment="Center"/>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="14,0,0,0">
+                                                <TextBlock Text="Global hotkeys" FontSize="11"
+                                                           Foreground="{DynamicResource SubtitleBrush}"
+                                                           HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                                <ToggleButton x:Name="DeckGlobalHotkeysToggle" Style="{StaticResource Switch}"
+                                                              ToolTip="Register numpad 1–9 as system-wide hotkeys so the deck launches from anywhere. Off by default: inside full-screen games the numpad belongs to the game."/>
+                                            </StackPanel>
                                         </Grid>
                                     </StackPanel>
                                 </Border>
@@ -1118,6 +1129,63 @@
                                                        Text="Ollama is installed but not answering on its local port — start it, then pull a model below."/>
                                         </StackPanel>
 
+                                        <!-- ============ v3.0.0-alpha.5 — where Ollama itself lives ============ -->
+                                        <Border Margin="0,14,0,0" Padding="13,11" CornerRadius="10"
+                                                Background="{DynamicResource FieldBrush}"
+                                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1">
+                                            <StackPanel>
+                                                <TextBlock Text="Install location" Style="{StaticResource SettingName}"/>
+                                                <TextBlock x:Name="OllamaExePathText" FontSize="11.5" Margin="0,3,0,0"
+                                                           Foreground="{DynamicResource SubtitleBrush}" TextWrapping="Wrap"
+                                                           Text="Searching the standard locations…"/>
+                                                <Grid Margin="0,9,0,0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Button x:Name="OllamaInstallDirBrowse" Grid.Column="0" Content="Choose install folder…"
+                                                            Style="{StaticResource GhostButton}" HorizontalAlignment="Left"
+                                                            Padding="12,6" Click="OnOllamaInstallDirBrowse"
+                                                            ToolTip="Where the one-click installer puts Ollama (and where Lumo looks for ollama.exe)"/>
+                                                    <Button x:Name="OllamaInstallDirSave" Grid.Column="1" Content="Save location"
+                                                            Style="{StaticResource GhostButton}" Margin="8,0,0,0" Padding="12,6"
+                                                            Click="OnOllamaInstallDirSave" Visibility="Collapsed"/>
+                                                    <Button x:Name="OllamaInstallDirReset" Grid.Column="2" Content="Reset to default"
+                                                            Style="{StaticResource GhostButton}" Margin="8,0,0,0" Padding="12,6"
+                                                            Click="OnOllamaInstallDirReset"/>
+                                                </Grid>
+                                                <TextBlock Style="{StaticResource SettingDesc}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                           Text="Applies to the one-click install above (it passes /DIR to the official installer) and to where Lumo looks for ollama.exe. Standard locations: %LOCALAPPDATA%\Programs\Ollama and Program Files\Ollama."/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- ============ v3.0.0-alpha.5 — where the models live ============ -->
+                                        <Border x:Name="OllamaStorageBlock" Margin="0,10,0,0" Padding="13,11" CornerRadius="10"
+                                                Background="{DynamicResource FieldBrush}"
+                                                BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="1"
+                                                Visibility="Collapsed">
+                                            <StackPanel>
+                                                <TextBlock Text="Model storage" Style="{StaticResource SettingName}"/>
+                                                <TextBlock x:Name="OllamaModelsPathText" FontSize="11.5" Margin="0,3,0,0"
+                                                           Foreground="{DynamicResource SubtitleBrush}" TextWrapping="Wrap"/>
+                                                <StackPanel Orientation="Horizontal" Margin="0,9,0,0">
+                                                    <Button x:Name="OllamaModelsMoveButton" Content="Change folder…"
+                                                            Style="{StaticResource GhostButton}" Padding="12,6" Click="OnOllamaModelsDirChange"
+                                                            ToolTip="Point Ollama at another folder for model downloads (sets OLLAMA_MODELS and restarts Ollama)"/>
+                                                    <Button x:Name="OllamaModelsOpenButton" Content="Open folder"
+                                                            Style="{StaticResource GhostButton}" Margin="8,0,0,0" Padding="12,6"
+                                                            Click="OnOllamaOpenModelsFolder"/>
+                                                    <Button x:Name="OllamaRestartButton" Content="Restart Ollama"
+                                                            Style="{StaticResource GhostButton}" Margin="8,0,0,0" Padding="12,6"
+                                                            Click="OnOllamaRestart"
+                                                            ToolTip="Stop and start the local server — needed after OLLAMA_MODELS was changed outside Lumo"/>
+                                                </StackPanel>
+                                                <TextBlock Style="{StaticResource SettingDesc}" Margin="0,6,0,0" TextWrapping="Wrap"
+                                                           Text="Downloads and uninstalls below act on this folder. Moving the folder points new downloads elsewhere — models already downloaded stay in the old location, move them with File Explorer if you want to keep them."/>
+                                            </StackPanel>
+                                        </Border>
+
                                         <!-- shared progress line (download bytes or pull percent) -->
                                         <ProgressBar x:Name="OllamaProgress" Height="5" Minimum="0" Maximum="100"
                                                      Visibility="Collapsed" Margin="0,12,0,4"
@@ -1174,6 +1242,31 @@
                                             <Button Content="Replay intro tour" Style="{StaticResource GhostButton}" Margin="10,0,0,0" Click="OnReplayTour"/>
                                         </StackPanel>
                                         <TextBlock x:Name="AboutStatus" Margin="0,10,0,0" FontSize="11.5" Foreground="{DynamicResource SubtitleBrush}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- v3.0.0-alpha.5 — storage & maintenance: Lumo's own caches
+                                     and temp files, sized live, clearable one click each -->
+                                <TextBlock Text="Storage &amp; maintenance" Style="{StaticResource SectionTitle}" Margin="0,22,0,0"/>
+                                <Border Style="{StaticResource Card}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="Cache and temp files" Style="{StaticResource SettingName}"/>
+                                                <TextBlock Style="{StaticResource SettingDesc}" TextWrapping="Wrap"
+                                                           Text="Everything here is safe to clear while Lumo runs — logs are re-created, downloads can be re-fetched, and nothing user-created is ever touched."/>
+                                            </StackPanel>
+                                            <Button x:Name="CleanupRefreshButton" Grid.Column="1" Content="Refresh"
+                                                    Style="{StaticResource GhostButton}" Padding="12,6" VerticalAlignment="Top"
+                                                    Click="OnCleanupRefresh"/>
+                                        </Grid>
+                                        <ItemsControl x:Name="CleanupList" Margin="0,12,0,0"/>
+                                        <TextBlock x:Name="CleanupStatus" Margin="0,10,0,0" FontSize="11.5"
+                                                   Foreground="{DynamicResource SubtitleBrush}" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
 

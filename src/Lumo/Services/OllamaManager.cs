@@ -223,7 +223,15 @@ public static class OllamaManager
 
     // ---------------------------------------------------------------- install state
 
-    /// <summary>Where ollama.exe lives, or null. Standard install roots + PATH, no registry, no throw.</summary>
+    /// <summary>
+    /// v3.0.0-alpha.5 — where the user asked Lumo to find/install Ollama
+    /// (Settings → AI). Empty = the standard roots. Set once at startup from
+    /// Settings.OllamaInstallDir and whenever the value changes in Settings;
+    /// <see cref="ExePath"/> checks it before every other candidate.
+    /// </summary>
+    public static string CustomInstallDir { get; set; } = "";
+
+    /// <summary>Where ollama.exe lives, or null. The custom install dir first, then the standard roots + PATH — no registry, no throw.</summary>
     public static string? ExePath
     {
         get
@@ -231,6 +239,17 @@ public static class OllamaManager
             try
             {
                 if (!OperatingSystem.IsWindows()) return null;
+
+                // v3.0.0-alpha.5 — the user-chosen install location wins
+                string custom = (CustomInstallDir ?? "").Trim();
+                if (custom.Length > 0)
+                {
+                    string customExe = custom.EndsWith("ollama.exe", StringComparison.OrdinalIgnoreCase)
+                        ? custom
+                        : Path.Combine(custom, "ollama.exe");
+                    if (File.Exists(customExe)) return customExe;
+                }
+
                 string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
                 string pf = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
                 var candidates = new[]
@@ -305,11 +324,25 @@ public static class OllamaManager
     }
 
     /// <summary>
+    /// v3.0.0-alpha.5 — the silent Inno Setup argument line, extracted pure for
+    /// the test harness. An empty/whitespace dir yields the classic flags; a
+    /// custom dir appends /DIR="…" (quoted — spaces are legal in paths).
+    /// </summary>
+    public static string BuildInstallArgs(string? installDir)
+    {
+        string baseArgs = "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS";
+        string dir = (installDir ?? "").Trim();
+        return dir.Length == 0 ? baseArgs : $"{baseArgs} /DIR=\"{dir}\"";
+    }
+
+    /// <summary>
     /// Runs the downloaded installer silently (Inno Setup flags) and waits for it
     /// to finish. Returns true when the exit code is 0. Can take a couple of
     /// minutes — the caller keeps the UI alive with a status line.
+    /// v3.0.0-alpha.5 — <paramref name="installDir"/> (optional) installs Ollama
+    /// to that folder via the Inno Setup /DIR flag instead of the default.
     /// </summary>
-    public static async Task<bool> RunInstallerAsync(string installerPath, CancellationToken ct)
+    public static async Task<bool> RunInstallerAsync(string installerPath, CancellationToken ct, string? installDir = null)
     {
         try
         {
@@ -317,10 +350,10 @@ public static class OllamaManager
             var psi = new ProcessStartInfo
             {
                 FileName = installerPath,
-                Arguments = "/VERYSILENT /NORESTART /SUPPRESSMSGBOXES /CLOSEAPPLICATIONS",
+                Arguments = BuildInstallArgs(installDir),
                 UseShellExecute = true,
             };
-            DiagnosticLogger.Log("Ollama", "running OllamaSetup.exe (silent)");
+            DiagnosticLogger.Log("Ollama", $"running OllamaSetup.exe (silent){((installDir ?? "").Trim().Length > 0 ? $" → {installDir.Trim()}" : "")}");
             using var p = Process.Start(psi);
             if (p is null) return false;
             await p.WaitForExitAsync(ct).ConfigureAwait(false);
@@ -470,6 +503,163 @@ public static class OllamaManager
         {
             DiagnosticLogger.LogException("Ollama.Delete", ex);
             return (false, ex.Message);
+        }
+    }
+
+    // ---------------------------------------------------------------- v3.0.0-alpha.5 — model storage location
+
+    /// <summary>The stock Ollama model folder on Windows (what Ollama uses when OLLAMA_MODELS is unset).</summary>
+    public static string DefaultModelsDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Ollama", "models");
+
+    /// <summary>
+    /// The Ollama models folder, resolved the way Ollama itself resolves it:
+    /// the OLLAMA_MODELS environment variable wins (user, then machine), the
+    /// stock %LOCALAPPDATA%\Ollama\models is the fallback. Pure in its inputs —
+    /// the live <see cref="ModelsDir"/> wrapper feeds it the real values, and
+    /// the test harness feeds it synthetic ones.
+    /// </summary>
+    public static string ResolveModelsDir(string? userEnv, string? machineEnv, string localAppData)
+    {
+        string user = (userEnv ?? "").Trim();
+        if (user.Length > 0) return user;
+        string machine = (machineEnv ?? "").Trim();
+        if (machine.Length > 0) return machine;
+        return Path.Combine(localAppData, "Ollama", "models");
+    }
+
+    /// <summary>The models folder Ollama is actually serving from right now.</summary>
+    public static string ModelsDir =>
+        OperatingSystem.IsWindows()
+            ? ResolveModelsDir(
+                Environment.GetEnvironmentVariable("OLLAMA_MODELS", EnvironmentVariableTarget.User),
+                Environment.GetEnvironmentVariable("OLLAMA_MODELS", EnvironmentVariableTarget.Machine),
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData))
+            : ResolveModelsDir(Environment.GetEnvironmentVariable("OLLAMA_MODELS"), null,
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+
+    /// <summary>
+    /// Bounded recursive byte count of a folder. Skips unreadable entries,
+    /// stops after <paramref name="maxFiles"/> (a hostile path can't hang the
+    /// UI), returns 0 for a missing folder. Never throws.
+    /// </summary>
+    public static long FolderBytes(string? path, int maxFiles = 20_000)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return 0;
+            long total = 0;
+            int seen = 0;
+            var stack = new Stack<string>();
+            stack.Push(path);
+            while (stack.Count > 0)
+            {
+                var dir = stack.Pop();
+                try
+                {
+                    foreach (var f in Directory.EnumerateFiles(dir))
+                    {
+                        if (++seen > maxFiles) return total;
+                        try { total += new FileInfo(f).Length; } catch { /* unreadable file — skip */ }
+                    }
+                    foreach (var d in Directory.EnumerateDirectories(dir)) stack.Push(d);
+                }
+                catch { /* unreadable dir — skip */ }
+            }
+            return total;
+        }
+        catch { return 0; }
+    }
+
+    /// <summary>True when OLLAMA_MODELS points somewhere other than the stock folder.</summary>
+    public static bool ModelsDirIsCustom =>
+        !string.Equals(ModelsDir, DefaultModelsDir, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Points Ollama at a new models folder: validates it (creating is fine),
+    /// persists OLLAMA_MODELS as a USER environment variable (the documented
+    /// Ollama mechanism — Lumo stores nothing), then restarts the local server
+    /// so the change is live without a reboot. Windows only (the env-var target
+    /// does not exist on other platforms). Returns (ok, short human error).
+    /// </summary>
+    public static async Task<(bool Ok, string Error)> SetModelsDirAsync(string? newDir, CancellationToken ct)
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows())
+                return (false, "model storage moves are a Windows-only operation");
+
+            string dir = (newDir ?? "").Trim().TrimEnd(Path.DirectorySeparatorChar);
+            if (dir.Length == 0) return (false, "pick a folder first");
+            if (!Path.IsPathRooted(dir)) return (false, "the folder must be an absolute path");
+            try { Directory.CreateDirectory(dir); }
+            catch (Exception ex) { return (false, $"can't create that folder: {ex.Message}"); }
+
+            string previous = ModelsDir;
+            Environment.SetEnvironmentVariable("OLLAMA_MODELS", dir, EnvironmentVariableTarget.User);
+            DiagnosticLogger.Log("Ollama", $"OLLAMA_MODELS → {dir} (was {previous}); restarting the server");
+
+            bool up = await RestartServerAsync(ct).ConfigureAwait(false);
+            return up
+                ? (true, "")
+                : (false, "the env var is set, but Ollama didn't come back up — start it once manually and press Refresh");
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Ollama.SetModelsDir", ex);
+            return (false, ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Restarts the local Ollama server: stops every ollama process this install
+    /// owns (the tray app spawns the server, so both go down), starts a fresh
+    /// `ollama serve`, and polls the port for up to ~12 s. Never throws.
+    /// </summary>
+    public static async Task<bool> RestartServerAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows()) return false;
+            string? exe = ExePath;
+            if (exe is null) return false;
+
+            // stop the running instances — "ollama" catches both ollama.exe (the
+            // server) and "ollama app.exe" (the tray that spawned it)
+            int killed = 0;
+            foreach (var p in Process.GetProcessesByName("ollama"))
+            {
+                try { p.Kill(entireProcessTree: true); killed++; } catch { /* already gone / access denied */ }
+                try { p.Dispose(); } catch { }
+            }
+            if (killed > 0)
+            {
+                DiagnosticLogger.Log("Ollama", $"stopped {killed} running ollama process(es)");
+                await Task.Delay(1200, ct).ConfigureAwait(false);   // let the port actually free up
+            }
+
+            StartServer();
+
+            // poll the version endpoint — the server needs a beat to bind
+            for (int i = 0; i < 12; i++)
+            {
+                if (ct.IsCancellationRequested) return false;
+                string baseUri = "";
+                try { baseUri = AiProviders.NormalizeBase("", anthropic: false); } catch { }
+                if (await ProbeServerUpAsync(baseUri).ConfigureAwait(false))
+                {
+                    DiagnosticLogger.Log("Ollama", "server is back up after restart");
+                    return true;
+                }
+                await Task.Delay(1000, ct).ConfigureAwait(false);
+            }
+            DiagnosticLogger.Log("Ollama", "server did not come back within 12 s");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Ollama.RestartServer", ex);
+            return false;
         }
     }
 

@@ -10,24 +10,26 @@ using Xunit;
 namespace Lumo.Tests;
 
 /// <summary>
-/// v3.0.0-alpha.4 — WPF SMOKE TESTS: the harness builds the REAL hub window on a
-/// real Windows runner (the CI job), exactly the way App.OpenAiChat does, and
-/// switches both hub tabs. This exists because "AI page doesn't open" (v3.0.0-alpha.3
+/// v3.0.0-alpha.4 — WPF SMOKE TESTS: the harness builds the REAL windows on a
+/// real Windows runner (the CI job), exactly the way App.OpenAiChat and
+/// App.OpenDeck do. This exists because "AI page doesn't open" (v3.0.0-alpha.3
 /// user report) was invisible to the pure-core suite: a XamlParseException or a
-/// resource lookup failure inside AiChatWindow/AppDeckView construction is a RUNTIME
-/// event on Windows only — it compiles clean everywhere and CI never opened a window.
+/// resource lookup failure inside window construction is a RUNTIME event on
+/// Windows only — it compiles clean everywhere and CI never opened a window.
 ///
-/// What the probe covers, in one pass:
+/// v3.0.0-alpha.5 — the App Deck moved OUT of the hub into its own window, so
+/// the probe covers three things now:
 ///   · App boot with the same merged dictionaries as App.xaml (WPF-UI ThemesDictionary
 ///     + ControlsDictionary) — the layer every window's implicit styles come from;
 ///   · the full AiChatWindow constructor (XAML parse, ThemeService paint, ChatStore,
-///     PersonaStore, mascot, persona face);
-///   · Show() — OnSourceInitialized → GlassBackdrop/DWM chrome;
-///   · SwitchTab(true) — the App Deck view construction (regression: the orphan
-///     FindResource("AccentBrush") ResourceReferenceKeyNotFoundException that made the
-///     deck tab dead in alpha.3);
-///   · SwitchTab(false) — back to the AI page;
-///   · a clean Close().
+///     PersonaStore, mascot, persona face) + Show() + the deck launch button — the
+///     hub is the AI chat only now, and must never fail to construct without the deck;
+///   · the standalone AppDeckWindow constructor + Show() — the deck hosts the same
+///     orphaned-constructed AppDeckView the hub used to (regression: the orphan
+///     FindResource("AccentBrush") ResourceReferenceKeyNotFoundException that made
+///     the deck tab dead in alpha.3);
+///   · the AppDeckView still constructs orphaned and renders all nine cards;
+///   · clean Close() on both windows.
 ///
 /// Any failure fails the test with the FULL exception chain (type + message + stack
 /// per inner level), so the log alone is enough to debug.
@@ -89,7 +91,7 @@ public class HubWindowSmokeTests
     }
 
     [Fact]
-    public void HubWindow_constructs_shows_and_switches_both_tabs()
+    public void HubWindow_constructs_shows_and_carries_the_deck_launch_button()
     {
         var failure = RunOnSta(() =>
         {
@@ -104,26 +106,17 @@ public class HubWindowSmokeTests
             win.Show();
             Pump(400);   // Loaded handlers, layout, first render
 
-            // Switch to the App Deck tab the way the nav rail does (SwitchTab is
-            // private; reflection keeps the production surface untouched).
-            var switchTab = typeof(AiChatWindow).GetMethod("SwitchTab",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            Assert.NotNull(switchTab);
-            var deckHost = (System.Windows.Controls.Border?)typeof(AiChatWindow)
-                .GetField("DeckHost", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            // v3.0.0-alpha.5 — the deck is no longer a tab; the rail must carry
+            // the launch BUTTON that App wires to OpenDeck().
+            var deckButton = (System.Windows.Controls.Button?)typeof(AiChatWindow)
+                .GetField("RailDeckButton",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
                 ?.GetValue(win);
-            Assert.NotNull(deckHost);
+            Assert.NotNull(deckButton);
 
-            switchTab!.Invoke(win, new object[] { true });
-            Pump(400);
-            Assert.True(deckHost!.Child is AppDeckView,
-                $"DeckHost.Child should be AppDeckView but was {deckHost.Child?.GetType().FullName ?? "null"}");
-            Assert.Equal(Visibility.Visible, deckHost.Visibility);
-
-            // Back to the AI page — the report's headline path.
-            switchTab.Invoke(win, new object[] { false });
-            Pump(150);
-            Assert.Equal(Visibility.Collapsed, deckHost.Visibility);
+            // the hub must NOT still carry the old deck-tab plumbing
+            Assert.Null(typeof(AiChatWindow).GetField("DeckHost",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance));
 
             win.Close();
             Pump(120);
@@ -131,8 +124,42 @@ public class HubWindowSmokeTests
 
         if (failure is not null)
             throw new Exception(
-                "the AI hub window failed to construct/show/switch tabs on Windows — " +
-                "this is the same path App.OpenAiChat takes:\n" + Describe(failure), failure);
+                "the AI hub window failed to construct/show on Windows — this is the same path App.OpenAiChat takes:\n" +
+                Describe(failure), failure);
+    }
+
+    /// <summary>v3.0.0-alpha.5 — the App Deck window is built by App.OpenDeck(); its
+    /// AppDeckView is constructed ORPHANED (before it joins the tree), so every
+    /// theme token it asks for must survive orphan lookup.</summary>
+    [Fact]
+    public void AppDeckWindow_constructs_shows_and_hosts_the_deck_view()
+    {
+        var failure = RunOnSta(() =>
+        {
+            BootApp();
+            SmoothScroll.MotionAllowed = () => false;
+            MascotView.MotionAllowed = () => false;
+
+            var settings = new Settings();
+            var win = new AppDeckWindow(settings);
+
+            win.Show();
+            Pump(400);
+
+            var host = (System.Windows.Controls.ContentControl?)typeof(AppDeckWindow)
+                .GetField("DeckHost",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?.GetValue(win);
+            Assert.NotNull(host);
+            Assert.IsType<AppDeckView>(host!.Content);
+
+            win.Close();
+            Pump(120);
+        });
+
+        if (failure is not null)
+            throw new Exception("the standalone App Deck window failed to construct/show on Windows — " +
+                                "this is the same path App.OpenDeck takes:\n" + Describe(failure), failure);
     }
 
     /// <summary>The App Deck view is built BEFORE it joins the window tree, so every
@@ -148,7 +175,7 @@ public class HubWindowSmokeTests
             MascotView.MotionAllowed = () => false;
 
             var settings = new Settings();
-            var view = new AppDeckView(settings);   // orphaned — no parent, exactly like SwitchTab builds it
+            var view = new AppDeckView(settings);   // orphaned — no parent, exactly like AppDeckWindow builds it
 
             var grid = (System.Windows.Controls.Primitives.UniformGrid?)typeof(AppDeckView)
                 .GetField("DeckGrid", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)

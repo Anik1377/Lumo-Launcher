@@ -735,7 +735,9 @@
 
             <!-- ============ v3.0 — the hub nav rail: AI chat / App Deck / settings.
                  A quiet 54 px strip under the caption; the active tab reads by its
-                 accent glyph + soft fill, never a loud highlight bar. ============ -->
+                 accent glyph + soft fill, never a loud highlight bar.
+                 v3.0.0-alpha.5 — the deck is its OWN window now: the rail button
+                 raises DeckLaunchRequested and App.OpenDeck() shows it. ============ -->
             <Border Grid.Row="1" Grid.RowSpan="4" Grid.Column="0" x:Name="NavRail"
                     Background="{DynamicResource CaptionBrush}"
                     BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="0,0,1,0">
@@ -748,12 +750,10 @@
                     <StackPanel Margin="0,8">
                         <RadioButton x:Name="RailAi" Style="{StaticResource RailRadio}"
                                      Content="&#xE99A;" GroupName="RailTab" IsChecked="True"
-                                     Checked="OnRailTabChanged" Unchecked="OnRailTabChanged"
                                      ToolTip="AI chat"/>
-                        <RadioButton x:Name="RailDeck" Style="{StaticResource RailRadio}"
-                                     Content="&#xE8A9;" GroupName="RailTab"
-                                     Checked="OnRailTabChanged" Unchecked="OnRailTabChanged"
-                                     ToolTip="App Deck — numpad 1–9 quick launch"/>
+                        <Button x:Name="RailDeckButton" Style="{StaticResource RailButton}"
+                                Content="&#xE8A9;" Click="OnRailDeckClick"
+                                ToolTip="Open the App Deck — numpad 1–9 quick launch (its own window)"/>
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -962,13 +962,6 @@
                            Foreground="{DynamicResource SubtitleBrush}"
                            Text="&#x21B5; send&#160;&#160;&#183;&#160;&#160;&#x21E7;&#x21B5; line break&#160;&#160;&#183;&#160;&#160;Ctrl+M voice&#160;&#160;&#183;&#160;&#160;Ctrl+N new chat&#160;&#160;&#183;&#160;&#160;F11 fullscreen&#160;&#160;&#183;&#160;&#160;esc stop / hide"/>
             </StackPanel>
-
-                        <!-- ============ v3.0 — the App Deck tab: an opaque overlay over the
-                 chat content (the chat keeps its state underneath; nothing is
-                 rebuilt when you switch back). Content is the AppDeckView
-                 UserControl, created in the constructor. ============ -->
-            <Border x:Name="DeckHost" Grid.Row="1" Grid.RowSpan="4" Grid.Column="1"
-                    Background="{DynamicResource PanelBrush}" Visibility="Collapsed"/>
 
             <!-- ============ v2.4.0-alpha.5 — chat history slide-over (Raycast pattern):
                  a scrim + left panel that overlays the whole card, so the window keeps

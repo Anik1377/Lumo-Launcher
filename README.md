@@ -214,6 +214,38 @@ authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
 
+## 🆕 What's new in v3.0.0-alpha.5 — the quality-of-life round
+
+Four asks, one alpha: the deck grows up, the AI stack gets movable parts, and Lumo
+learns to clean up after itself.
+
+1. **🚀 The App Deck is its own window now.** No longer a tab inside the AI page —
+   open it from the deck button in the AI rail, the **Open App Deck** button in
+   Settings → General, or straight from the tray menu. The 3×3 numpad grid, the
+   slot editor, drag-and-drop and the tutorial all came along unchanged; the deck
+   just has a proper resizable window (and the AI page's numpad keys are free
+   again for chat use).
+2. **📍 Ollama install location.** Settings → AI shows where `ollama.exe` lives.
+   Pick any folder and the one-click installer passes `/DIR` to the official
+   Ollama installer so it lands exactly there — and Lumo's probe checks the saved
+   location first on every refresh. "Reset to default" puts the standard roots
+   back.
+3. **💾 Model storage location + one-click uninstall.** The new **Model storage**
+   panel shows the live models folder (wherever `OLLAMA_MODELS` points) and its
+   size on disk. *Change folder* moves new downloads anywhere you like — Lumo sets
+   the `OLLAMA_MODELS` user variable and restarts the local server so it takes
+   effect immediately — while *Open folder* and *Restart Ollama* round it out.
+   Installed models already had per-model **Uninstall** (the Delete button,
+   now saying what it does).
+4. **🧹 Storage & maintenance.** Settings → About lists Lumo's own clutter — the
+   diagnostics log, staged update zips, `%TEMP%\Lumo` scratch files and the
+   Whisper voice-model cache — each with its real size and a one-click **Clear**.
+   Every location is re-creatable by design; nothing user-created is ever touched.
+5. **🔬 17 new tests (411 total).** The pure suite pins the location resolution,
+   install-argument building, bounded folder sizing and cleanup behavior; the
+   Windows CI smoke tests now open both the AI hub *and* the standalone deck
+   window on every push.
+
 ## 🆕 What's new in v3.0.0-alpha.4 — the AI page opens again (+ the App Deck fixed, + its tutorial)
 
 The probe-and-fix round on top of the hub — every failure below is now covered by

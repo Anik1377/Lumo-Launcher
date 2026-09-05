@@ -82,6 +82,15 @@ public sealed class Settings
     public string AiApiKey { get; set; } = "";                         // anthropic x-api-key / optional gateway bearer
     public string AiPersona { get; set; } = "assistant";               // v2.4.0-alpha.5 — persona id for NEW chats
 
+    /// <summary>
+    /// v3.0.0-alpha.5 — where Ollama is (or should be) installed, per the user.
+    /// Empty = the standard roots (%LOCALAPPDATA%\Programs\Ollama, Program Files,
+    /// PATH). Used by the one-click installer's /DIR flag and by the ollama.exe
+    /// probe; the model storage location lives in the OLLAMA_MODELS env var
+    /// instead (Ollama's own mechanism), NOT here.
+    /// </summary>
+    public string OllamaInstallDir { get; set; } = "";
+
     // ---- v2.6.0-alpha.3 — voice typing in the AI chat (offline dictation).
     // The recognizer is chosen at session start: VoiceLanguage non-empty pins a
     // culture ("en-GB"); empty follows the OS UI language.
@@ -152,6 +161,7 @@ public sealed class Settings
         s.AiModel           = GetStr(root, nameof(AiModel), s.AiModel);
         s.AiApiKey          = GetStr(root, nameof(AiApiKey), s.AiApiKey);
         s.AiPersona         = GetStr(root, nameof(AiPersona), s.AiPersona);
+        s.OllamaInstallDir  = GetStr(root, nameof(OllamaInstallDir), s.OllamaInstallDir);   // v3.0.0-alpha.5
         s.VoiceEnabled      = GetBool(root, nameof(VoiceEnabled), s.VoiceEnabled);          // v2.6.0-alpha.3
         s.VoiceLanguage     = GetStr(root, nameof(VoiceLanguage), s.VoiceLanguage);
         s.VoiceEngine       = GetStr(root, nameof(VoiceEngine), s.VoiceEngine);             // v2.6.0-alpha.5
@@ -297,6 +307,7 @@ public sealed class Settings
         AiModel = o.AiModel;
         AiApiKey = o.AiApiKey;
         AiPersona = o.AiPersona;
+        OllamaInstallDir = o.OllamaInstallDir;   // v3.0.0-alpha.5
         VoiceEnabled = o.VoiceEnabled;          // v2.6.0-alpha.3
         VoiceLanguage = o.VoiceLanguage;
         VoiceEngine = o.VoiceEngine;            // v2.6.0-alpha.5

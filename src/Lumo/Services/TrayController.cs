@@ -17,13 +17,15 @@ public sealed class TrayController : IDisposable
     private readonly Settings _settings;
     private readonly Action _openLauncher;
     private readonly Action? _openSettings;
+    private readonly Action? _openDeck;   // v3.0.0-alpha.5 — the App Deck, one click from the tray
     private readonly Action _exit;
 
-    public TrayController(Settings settings, Action openLauncher, Action? openSettings, Action exit)
+    public TrayController(Settings settings, Action openLauncher, Action? openSettings, Action exit, Action? openDeck = null)
     {
         _settings = settings;
         _openLauncher = openLauncher;
         _openSettings = openSettings;
+        _openDeck = openDeck;
         _exit = exit;
 
         _icon = new NotifyIcon
@@ -39,6 +41,9 @@ public sealed class TrayController : IDisposable
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("Open Lumo", null, (_, _) => Safe(_openLauncher));
+        // v3.0.0-alpha.5 — the deck is its own window; launch it straight from here
+        if (_openDeck is not null)
+            menu.Items.Add("Open App Deck", null, (_, _) => Safe(_openDeck));
         menu.Items.Add("Settings…", null, (_, _) => { if (_openSettings is not null) Safe(_openSettings); });
         menu.Items.Add(new ToolStripSeparator());
 

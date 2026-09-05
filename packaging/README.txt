@@ -1,7 +1,37 @@
 ======================================================
-  LUMO v3.0.0-alpha.4  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.5  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.5 (the quality-of-life round)
+---------------------------------------------------------------
+1. THE APP DECK IS ITS OWN WINDOW. No longer a tab inside
+   the AI page: open it from the deck button in the AI rail,
+   the "Open App Deck" button in Settings -> General, or
+   right from the tray menu. Numpad 1-9, the editor and the
+   tutorial all work exactly as before - the deck just has
+   a proper window now (resize it, minimize it, whatever).
+2. OLLAMA INSTALL LOCATION. Settings -> AI now shows where
+   ollama.exe lives. Point Lumo at any folder and the
+   one-click installer will put Ollama there (/DIR), and
+   the probe looks there first. Reset to the standard
+   locations any time.
+3. MODEL STORAGE LOCATION. The new "Model storage" panel
+   shows the live models folder (the OLLAMA_MODELS location)
+   and its size on disk. "Change folder" moves new downloads
+   anywhere you like and restarts Ollama so it takes effect
+   immediately; "Open folder" and "Restart Ollama" are there
+   too. Uninstalling models was already one click ("Delete"
+   on any installed model).
+4. CACHE & TEMP CLEANUP. Settings -> About -> "Storage &
+   maintenance" lists Lumo's own logs, staged update zips,
+   %TEMP%\Lumo scratch files and the Whisper voice-model
+   cache, each with its real size and a one-click Clear.
+   Nothing user-created is ever touched.
+5. UNDER THE HOOD. 17 new tests (411 total) pin the new
+   location resolution, cleanup behavior and the standalone
+   deck window; the CI smoke tests open both the AI hub and
+   the deck window on real Windows runners.
 
 WHAT'S NEW IN v3.0.0-alpha.4 (AI page fixed + deck tutorial)
 ---------------------------------------------------------------

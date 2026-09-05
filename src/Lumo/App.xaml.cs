@@ -14,6 +14,7 @@ public partial class App : Application
     private LauncherWindow? _window;
     private SettingsWindow? _settingsWindow;
     private AiChatWindow? _aiChatWindow;      // v2.3.0-alpha.3 — dedicated AI chat tab
+    private AppDeckWindow? _deckWindow;       // v3.0.0-alpha.5 — the App Deck, its own window
     private Settings _settings = new();
     private ShortcutStore? _shortcuts;
     private PluginStore? _plugins;                   // v2.5 — Task 4.2 JSON plugin commands
@@ -60,6 +61,9 @@ public partial class App : Application
             }
 
             _settings = Settings.Load();
+            // v3.0.0-alpha.5 — the ollama.exe probe honours the user's custom install
+            // location from the very first probe (no window needs to be open).
+            OllamaManager.CustomInstallDir = _settings.OllamaInstallDir;
             // v3.0 — the smooth-scroll behavior reads the motion gate through this hook.
             SmoothScroll.MotionAllowed = () =>
                 _settings.AnimationsEnabled && SystemParameters.ClientAreaAnimation;
@@ -138,7 +142,8 @@ public partial class App : Application
                 {
                     _window.PrepareForExit();
                     Shutdown(0);
-                }));
+                }),
+                openDeck: () => Dispatcher.InvokeAsync(OpenDeck));   // v3.0.0-alpha.5 — deck from the tray
 
             _tray.ThemeChanged += () => Dispatcher.InvokeAsync(() => _window.ApplyTheme());
 
@@ -209,7 +214,8 @@ public partial class App : Application
                 },
                 updates: _updates,                       // v2.6 — Task 5.1 updates card
                 replayOnboarding: () => Dispatcher.InvokeAsync(ShowOnboarding),
-                applyDeckHotkeys: () => { try { _window?.ReapplyDeckHotkeys(); } catch { } });   // v3.0 — App Deck
+                applyDeckHotkeys: () => { try { _window?.ReapplyDeckHotkeys(); } catch { } },   // v3.0 — App Deck
+                openDeck: () => Dispatcher.InvokeAsync(OpenDeck));                              // v3.0.0-alpha.5 — General page button
 
             _settingsWindow.Topmost = true; // stay above other apps while customizing
             _settingsWindow.Closed += (_, _) => _settingsWindow = null;
@@ -279,15 +285,10 @@ public partial class App : Application
             {
                 try { OpenSettings(initialPage: 6); } catch (Exception ex) { DiagnosticLogger.LogException("App.AiChatSettings", ex); }
             };
-            // v3.0.0-alpha.4 — the deck tutorial's plumbing: the global-hotkeys toggle
-            // re-registers the hotkeys live; "Open settings" lands on General.
-            _aiChatWindow.DeckHotkeysChanged += () =>
+            // v3.0.0-alpha.5 — the rail's deck button opens the STANDALONE App Deck window
+            _aiChatWindow.DeckLaunchRequested += () =>
             {
-                try { _window.ReapplyDeckHotkeys(); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckHotkeysChanged", ex); }
-            };
-            _aiChatWindow.DeckSettingsRequested += () =>
-            {
-                try { OpenSettings(initialPage: 0); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckSettings", ex); }
+                try { OpenDeck(); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckLaunch", ex); }
             };
             _aiChatWindow.Closed += (_, _) => _aiChatWindow = null;
             _aiChatWindow.Show();
@@ -302,6 +303,48 @@ public partial class App : Application
             {
                 MessageBox.Show(
                     "The AI page failed to open.\n\n" + ex.Message +
+                    "\n\nDetails were written to:\n" + AppPaths.LogFile,
+                    "Lumo", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            catch { /* never crash over the crash dialog */ }
+        }
+    }
+
+    /// <summary>
+    /// v3.0.0-alpha.5 — open (or focus) the standalone App Deck window. Singleton
+    /// per app lifetime, same pattern as OpenAiChat. A failure here is never
+    /// silent: the user gets the reason and the log path.
+    /// </summary>
+    private void OpenDeck()
+    {
+        try
+        {
+            if (_deckWindow is { IsLoaded: true })
+            {
+                _deckWindow.Activate();
+                return;
+            }
+
+            _deckWindow = new AppDeckWindow(_settings);
+            _deckWindow.SettingsRequested += () =>
+            {
+                try { OpenSettings(initialPage: 0); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckSettings", ex); }
+            };
+            _deckWindow.GlobalHotkeysChanged += () =>
+            {
+                try { _window?.ReapplyDeckHotkeys(); } catch (Exception ex) { DiagnosticLogger.LogException("App.DeckHotkeysChanged", ex); }
+            };
+            _deckWindow.Closed += (_, _) => _deckWindow = null;
+            _deckWindow.Show();
+            _deckWindow.Activate();
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("App.OpenDeck", ex);
+            try
+            {
+                MessageBox.Show(
+                    "The App Deck failed to open.\n\n" + ex.Message +
                     "\n\nDetails were written to:\n" + AppPaths.LogFile,
                     "Lumo", MessageBoxButton.OK, MessageBoxImage.Error);
             }

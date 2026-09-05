@@ -44,6 +44,7 @@ public partial class SettingsWindow : Window
     private readonly Func<ShortcutDef, string>? _shortcutHotkeyFeedback;   // v2.5 — Task 4.3
     private readonly UpdateService? _updates;    // v2.6 — Task 5.1 update check + staged download
     private readonly Action? _replayOnboarding;  // v2.6 — Task 5.3 replay the intro tour
+    private readonly Action? _openDeck;          // v3.0.0-alpha.5 — "Open App Deck" (General page)
     private UpdateInfo? _updateInfo;             // newest release found this session (for the card)
     private string? _updateStagedPath;           // completed download, ready to open
     private CancellationTokenSource? _updateCts;  // cancels an in-flight download
@@ -66,7 +67,7 @@ public partial class SettingsWindow : Window
                           PluginStore? plugins = null,
                           Func<ShortcutDef, string>? shortcutHotkeyFeedback = null,
                           UpdateService? updates = null, Action? replayOnboarding = null,
-                          Action? applyDeckHotkeys = null)
+                          Action? applyDeckHotkeys = null, Action? openDeck = null)
     {
         InitializeComponent();
         _settings = settings;
@@ -83,6 +84,7 @@ public partial class SettingsWindow : Window
         _shortcutHotkeyFeedback = shortcutHotkeyFeedback;
         _updates = updates;
         _replayOnboarding = replayOnboarding;
+        _openDeck = openDeck;
         _initialPage = initialPage;
 
         BuildAccentSwatches();
@@ -114,6 +116,9 @@ public partial class SettingsWindow : Window
         // v2.6 — Task 5.1 surface the update card state
         _updateInfo = _updates?.Latest;
         RefreshUpdateCard();
+
+        // v3.0.0-alpha.5 — size Lumo's caches in the background (About → Storage & maintenance)
+        _ = LoadCleanupListAsync();
 
         // open directly on the requested page (e.g. Shortcuts from the launcher)
         if (_initialPage > 0) SelectPage(_initialPage);
@@ -1737,6 +1742,30 @@ public partial class SettingsWindow : Window
         OllamaStartButton.IsEnabled = !busy;
         OllamaRefreshButton.IsEnabled = !busy;
 
+        // v3.0.0-alpha.5 — where Ollama itself lives (exe probe honours the saved location)
+        string? exe = OllamaManager.ExePath;
+        OllamaExePathText.Text = exe is not null
+            ? $"ollama.exe: {exe}"
+            : "ollama.exe not found yet — standard locations, PATH, or the saved location below are probed on every refresh.";
+        OllamaInstallDirBrowse.IsEnabled = !busy;
+        OllamaInstallDirReset.IsEnabled = !busy;
+        OllamaInstallDirSave.IsEnabled = !busy;
+
+        // v3.0.0-alpha.5 — where the models live (OLLAMA_MODELS) + their disk size
+        bool showStorage = st.Probed && st.Installed;
+        OllamaStorageBlock.Visibility = showStorage ? Visibility.Visible : Visibility.Collapsed;
+        if (showStorage)
+        {
+            string modelsDir = OllamaManager.ModelsDir;
+            long bytes = OllamaManager.FolderBytes(modelsDir);
+            OllamaModelsPathText.Text = modelsDir + (bytes > 0 ? $"   ·   {FmtBytes(bytes)} on disk" : "   ·   empty");
+            bool custom = OllamaManager.ModelsDirIsCustom;
+            OllamaModelsPathText.Text += custom ? "   ·   custom location" : "";
+            OllamaModelsMoveButton.IsEnabled = !busy;
+            OllamaModelsOpenButton.IsEnabled = !busy;
+            OllamaRestartButton.IsEnabled = !busy;
+        }
+
         // installed models (server up only — the list comes from /api/tags)
         OllamaInstalledList.Items.Clear();
         bool showInstalled = st.ServerUp && st.Models.Count > 0;
@@ -1792,7 +1821,7 @@ public partial class SettingsWindow : Window
             grid.Children.Add(use);
         }
 
-        var del = new Button { Content = "Delete", Padding = new Thickness(12, 4, 12, 4) };
+        var del = new Button { Content = "Uninstall", Padding = new Thickness(12, 4, 12, 4) };
         if (TryFindResource("GhostButton") is Style delStyle) del.Style = delStyle;
         del.Tag = m.Name;
         del.Click += OnOllamaDelete;
@@ -1849,6 +1878,12 @@ public partial class SettingsWindow : Window
             OllamaInstallButton.IsEnabled = !busy;
             OllamaStartButton.IsEnabled = !busy;
             OllamaRefreshButton.IsEnabled = !busy;
+            OllamaInstallDirBrowse.IsEnabled = !busy;      // v3.0.0-alpha.5 — location controls
+            OllamaInstallDirSave.IsEnabled = !busy;
+            OllamaInstallDirReset.IsEnabled = !busy;
+            OllamaModelsMoveButton.IsEnabled = !busy;
+            OllamaModelsOpenButton.IsEnabled = !busy;
+            OllamaRestartButton.IsEnabled = !busy;
             foreach (var b in _pullButtons)
                 b.IsEnabled = !busy;
             OllamaProgress.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
@@ -1901,7 +1936,9 @@ public partial class SettingsWindow : Window
 
             OllamaProgress.IsIndeterminate = true;
             OllamaProgressText.Text = "Running the installer — this can take a minute or two…";
-            bool ok = await Task.Run(() => OllamaManager.RunInstallerAsync(path, ct)).ConfigureAwait(true);
+            // v3.0.0-alpha.5 — honour the user's install folder (Inno Setup /DIR) when set
+            string? installDir = (_settings.OllamaInstallDir ?? "").Trim();
+            bool ok = await Task.Run(() => OllamaManager.RunInstallerAsync(path, ct, string.IsNullOrWhiteSpace(installDir) ? null : installDir)).ConfigureAwait(true);
 
             OllamaProgressText.Text = "Installed — waiting for the local server…";
             await Task.Delay(2500).ConfigureAwait(true);   // give the service a beat to bind the port
@@ -2037,7 +2074,7 @@ public partial class SettingsWindow : Window
             if (sender is not Button { Tag: string model }) return;
             if (_ollamaBusy) return;
             var confirm = MessageBox.Show(this,
-                $"Delete {model} from disk to free its space?", "Lumo",
+                $"Uninstall {model} and remove it from disk to free its space?", "Lumo",
                 MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (confirm != MessageBoxResult.Yes) return;
 
@@ -2057,6 +2094,280 @@ public partial class SettingsWindow : Window
             SetOllamaBusy(false, null);
         }
         finally { _ollamaBusy = false; }
+    }
+
+    // ------------------------------------------------- v3.0.0-alpha.5 — install & model locations
+
+    /// <summary>Picks the folder Ollama is (or will be) installed in. .NET 8's OpenFolderDialog — no WinForms dependency.</summary>
+    private string? _pendingOllamaInstallDir;
+
+    private void OnOllamaInstallDirBrowse(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var dlg = new Microsoft.Win32.OpenFolderDialog
+            {
+                Title = "Where should Ollama live?",
+                InitialDirectory = TryGetInitialDir(_settings.OllamaInstallDir),
+            };
+            if (dlg.ShowDialog(this) == true)
+            {
+                _pendingOllamaInstallDir = dlg.FolderName.TrimEnd(Path.DirectorySeparatorChar);
+                OllamaInstallDirSave.Visibility = Visibility.Visible;   // explicit Save keeps it deliberate
+                OllamaStatusText.Text = "Press \"Save location\" to keep " + _pendingOllamaInstallDir;
+            }
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaInstallDirBrowse", ex); }
+    }
+
+    /// <summary>Persists the folder chosen in Browse (and immediately re-probes for ollama.exe).</summary>
+    private void OnOllamaInstallDirSave(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string dir = (_pendingOllamaInstallDir ?? "").Trim();
+            if (dir.Length == 0) return;
+            _settings.OllamaInstallDir = dir;
+            OllamaManager.CustomInstallDir = dir;
+            _settings.Save();
+            _pendingOllamaInstallDir = null;
+            OllamaInstallDirSave.Visibility = Visibility.Collapsed;
+            OllamaManager.Invalidate();
+            _ = ProbeAndRenderOllamaAsync();
+            OllamaStatusText.Text = "Install location saved — Lumo will look for ollama.exe there first";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaInstallDirSave", ex); }
+    }
+
+    /// <summary>Back to the standard roots.</summary>
+    private void OnOllamaInstallDirReset(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            _settings.OllamaInstallDir = "";
+            OllamaManager.CustomInstallDir = "";
+            _settings.Save();
+            _pendingOllamaInstallDir = null;
+            OllamaInstallDirSave.Visibility = Visibility.Collapsed;
+            OllamaManager.Invalidate();
+            _ = ProbeAndRenderOllamaAsync();
+            OllamaStatusText.Text = "Install location reset — the standard roots and PATH are probed";
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaInstallDirReset", ex); }
+    }
+
+    /// <summary>
+    /// Moves Ollama's model storage: folder picker → OLLAMA_MODELS (user env) →
+    /// server restart so it is live immediately. Existing models stay in the old
+    /// folder (the description says so); a download later re-fills the new one.
+    /// </summary>
+    private async void OnOllamaModelsDirChange(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_ollamaBusy) return;
+            var dlg = new Microsoft.Win32.OpenFolderDialog
+            {
+                Title = "Where should models be stored?",
+                InitialDirectory = TryGetInitialDir(OllamaManager.ModelsDir),
+            };
+            if (dlg.ShowDialog(this) != true) return;
+
+            string newDir = dlg.FolderName.TrimEnd(Path.DirectorySeparatorChar);
+            if (string.Equals(newDir, OllamaManager.ModelsDir, StringComparison.OrdinalIgnoreCase))
+            {
+                OllamaStatusText.Text = "That is already the model storage folder";
+                return;
+            }
+
+            var confirm = MessageBox.Show(this,
+                "Point Ollama at this folder for model storage?\n\n" + newDir +
+                "\n\nLUMO sets the OLLAMA_MODELS environment variable and restarts Ollama so it takes effect now." +
+                "\n\nModels already downloaded stay in the old folder — move them with File Explorer if you want to keep them.",
+                "Lumo", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            _ollamaBusy = true;
+            SetOllamaBusy(true, "Moving model storage — restarting Ollama…");
+            _ollamaCts?.Cancel();
+            _ollamaCts?.Dispose();
+            _ollamaCts = new CancellationTokenSource();
+            var (ok, err) = await Task.Run(() => OllamaManager.SetModelsDirAsync(newDir, _ollamaCts.Token)).ConfigureAwait(true);
+            await Task.Run(() => OllamaManager.RefreshStatusAsync(_settings.AiEndpoint)).ConfigureAwait(true);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+            RenderOllamaPanel();
+            OllamaStatusText.Text = ok
+                ? $"Model storage now {OllamaManager.ModelsDir} — new downloads land there"
+                : $"Couldn't move model storage — {err}";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.OllamaModelsDir", ex);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+        }
+        finally { _ollamaBusy = false; }
+    }
+
+    private void OnOllamaOpenModelsFolder(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string dir = OllamaManager.ModelsDir;
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+            if (OperatingSystem.IsWindows())
+                Process.Start(new ProcessStartInfo { FileName = dir, UseShellExecute = true });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OllamaOpenModels", ex); }
+    }
+
+    private async void OnOllamaRestart(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_ollamaBusy) return;
+            _ollamaBusy = true;
+            SetOllamaBusy(true, "Restarting Ollama…");
+            _ollamaCts?.Cancel();
+            _ollamaCts?.Dispose();
+            _ollamaCts = new CancellationTokenSource();
+            bool up = await Task.Run(() => OllamaManager.RestartServerAsync(_ollamaCts.Token)).ConfigureAwait(true);
+            await Task.Run(() => OllamaManager.RefreshStatusAsync(_settings.AiEndpoint)).ConfigureAwait(true);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+            RenderOllamaPanel();
+            OllamaStatusText.Text = up
+                ? "Ollama restarted and answering"
+                : "Ollama didn't come back up — press Start Ollama, or check the log";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLogger.LogException("Settings.OllamaRestart", ex);
+            _ollamaBusy = false;
+            SetOllamaBusy(false, null);
+        }
+        finally { _ollamaBusy = false; }
+    }
+
+    /// <summary>Safe seed folder for a picker: falls back to the user profile when the path doesn't exist yet.</summary>
+    private static string? TryGetInitialDir(string? path)
+    {
+        try
+        {
+            string p = (path ?? "").Trim();
+            if (p.Length > 0 && Directory.Exists(p)) return p;
+            string? parent = Path.GetDirectoryName(p);
+            return parent is not null && Directory.Exists(parent) ? parent : null;
+        }
+        catch { return null; }
+    }
+
+    // ------------------------------------------------- v3.0.0-alpha.5 — Storage & maintenance
+
+    /// <summary>Background scan of Lumo's caches → dispatcher render. Fire-and-forget safe.</summary>
+    private async Task LoadCleanupListAsync()
+    {
+        try
+        {
+            var items = await Task.Run(() => AppCleanup.Scan()).ConfigureAwait(true);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                try
+                {
+                    bool busy = _cleanupBusy;
+                    CleanupList.Items.Clear();
+                    foreach (var item in items)
+                        CleanupList.Items.Add(BuildCleanupRow(item));
+                    if (!busy && CleanupStatus.Text.Length == 0)
+                        CleanupStatus.Text = items.Any(i => i.Clearable)
+                            ? "Clear a row to free its space — nothing user-created is ever touched."
+                            : "Nothing to clear right now — every location is already empty.";
+                }
+                catch (Exception ex) { DiagnosticLogger.LogException("Settings.CleanupRender", ex); }
+            });
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.CleanupScan", ex); }
+    }
+
+    private FrameworkElement BuildCleanupRow(AppCleanup.CleanupItem item)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 3, 0, 3) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var text = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var name = new TextBlock
+        {
+            Text = item.Label + (item.Bytes > 0 ? $"   ·   {FmtBytes(item.Bytes)}" : "   ·   empty"),
+            FontSize = 12.5,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        };
+        name.SetResourceReference(TextBlock.ForegroundProperty, "TitleBrush");
+        var path = new TextBlock { Text = item.Path, FontSize = 10.5, TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = item.Path };
+        path.SetResourceReference(TextBlock.ForegroundProperty, "SubtitleBrush");
+        var hint = new TextBlock { Text = item.Hint, FontSize = 10.5, TextWrapping = TextWrapping.Wrap, Opacity = 0.85 };
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "SubtitleBrush");
+        text.Children.Add(name);
+        text.Children.Add(path);
+        text.Children.Add(hint);
+        Grid.SetColumn(text, 0);
+        grid.Children.Add(text);
+
+        if (item.Clearable)
+        {
+            var clear = new Button
+            {
+                Content = "Clear",
+                Padding = new Thickness(13, 4, 13, 4),
+                Tag = item.Id,
+                ToolTip = item.Hint,
+            };
+            if (TryFindResource("GhostButton") is Style s) clear.Style = s;
+            clear.Click += OnCleanupClear;
+            Grid.SetColumn(clear, 1);
+            grid.Children.Add(clear);
+        }
+        return grid;
+    }
+
+    private bool _cleanupBusy;   // one clear at a time — sizes refresh after each
+
+    private async void OnCleanupClear(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (sender is not Button { Tag: string id } || _cleanupBusy) return;
+            var confirm = MessageBox.Show(this,
+                id == "whisper"
+                    ? "Delete the downloaded voice models? The next voice session re-downloads them."
+                    : "Clear this location? It only holds re-creatable files.",
+                "Lumo", MessageBoxButton.YesNo, MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.Yes) return;
+
+            _cleanupBusy = true;
+            var (ok, err, freed) = await Task.Run(() => AppCleanup.Clear(id)).ConfigureAwait(true);
+            _cleanupBusy = false;
+            CleanupStatus.Text = ok
+                ? (freed > 0 ? $"Freed {FmtBytes(freed)}." : "Already clear.")
+                : $"Couldn't clear — {err}";
+            _ = LoadCleanupListAsync();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.CleanupClear", ex); }
+    }
+
+    private void OnCleanupRefresh(object sender, RoutedEventArgs e)
+    {
+        try { _ = LoadCleanupListAsync(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.CleanupRefresh", ex); }
+    }
+
+    // ------------------------------------------------- v3.0.0-alpha.5 — the App Deck (General page)
+
+    private void OnOpenDeck(object sender, RoutedEventArgs e)
+    {
+        try { _openDeck?.Invoke(); }
+        catch (Exception ex) { DiagnosticLogger.LogException("Settings.OpenDeck", ex); }
     }
 
     private static string FmtBytes(long b)

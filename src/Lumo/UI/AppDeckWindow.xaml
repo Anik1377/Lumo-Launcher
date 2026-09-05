@@ -1,0 +1,129 @@
+<Window x:Class="Lumo.UI.AppDeckWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:Lumo.UI"
+        Title="Lumo — App Deck"
+        Width="760" Height="620"
+        MinWidth="620" MinHeight="520"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResize"
+        Background="Transparent"
+        ShowInTaskbar="True"
+        PreviewKeyDown="OnWindowPreviewKeyDown">
+
+    <!--
+        v3.0.0-alpha.5 — the App Deck, promoted from a tab inside the AI hub to
+        its OWN window. The hub stays the AI chat; the deck is a first-class
+        surface with a caption of its own, launched by the rail button in the
+        hub, the button in Settings → General, or App.OpenDeck(). Content is
+        the same AppDeckView the hub hosted — nothing about the deck's data,
+        editor or tutorial changed, only where it lives.
+    -->
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome GlassFrameThickness="-1" CaptionHeight="0" CornerRadius="0"
+                      UseAeroCaptionButtons="False" ResizeBorderThickness="6"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <Style x:Key="DeckCaptionButton" TargetType="Button">
+            <Setter Property="Width" Value="34"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtitleBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="7" Background="Transparent">
+                            <TextBlock Text="{TemplateBinding Content}" FontSize="11" TextOptions.TextRenderingMode="ClearType"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TitleBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="DeckCloseButton" TargetType="Button" BasedOn="{StaticResource DeckCaptionButton}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="7" Background="Transparent">
+                            <TextBlock Text="{TemplateBinding Content}" FontSize="11" TextOptions.TextRenderingMode="ClearType"
+                                       FontFamily="Segoe MDL2 Assets"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E81123"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#C50F1F"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <!-- the card fills the whole window: DWM rounds + shadows the true edge,
+         the corner radius is synced to the DWM value in ApplySelfTheme -->
+    <Border x:Name="RootCard" CornerRadius="8"
+            Background="{DynamicResource PanelBrush}"
+            TextElement.FontFamily="/Assets/Fonts/#Inter"
+            BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ============ caption band ============ -->
+            <Border Grid.Row="0" x:Name="CaptionBar" Background="{DynamicResource CaptionBrush}"
+                    BorderBrush="{DynamicResource BorderLineBrush}" BorderThickness="0,0,0,1"
+                    CornerRadius="8,8,0,0" MouseLeftButtonDown="OnDragWindow">
+                <Grid Height="46" Margin="14,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- deck mark: the grid glyph in a soft accent tile -->
+                        <Border Width="24" Height="24" CornerRadius="7"
+                                Background="{DynamicResource GlyphBoxBrush}" IsHitTestVisible="False">
+                            <TextBlock Text="&#xE8A9;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="App Deck" FontSize="13.5" FontWeight="SemiBold" Margin="10,0,0,0"
+                                   Foreground="{DynamicResource TitleBrush}" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CaptionHint" Text="numpad 1–9 quick launch" FontSize="11" Margin="10,1.5,0,0"
+                                   Foreground="{DynamicResource SubtitleBrush}" Opacity="0.85" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                HorizontalAlignment="Right" WindowChrome.IsHitTestVisibleInChrome="True">
+                        <Button x:Name="DeckSettingsButton" Content="&#xE713;" Style="{StaticResource DeckCaptionButton}"
+                                Click="OnOpenSettings" ToolTip="Open Lumo settings"/>
+                        <Button Content="&#xE921;" Style="{StaticResource DeckCaptionButton}" Margin="4,0,0,0"
+                                Click="OnMinimize" ToolTip="Minimize"/>
+                        <Button Content="&#xE8BB;" Style="{StaticResource DeckCloseButton}" Margin="4,0,0,0"
+                                Click="OnClose" ToolTip="Close (esc)"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- ============ the deck surface (the same UserControl the hub hosted) ============ -->
+            <ContentControl x:Name="DeckHost" Grid.Row="1" Focusable="False"/>
+        </Grid>
+    </Border>
+</Window>
