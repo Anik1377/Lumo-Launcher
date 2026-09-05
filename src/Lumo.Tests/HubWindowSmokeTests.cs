@@ -36,32 +36,58 @@ namespace Lumo.Tests;
 /// </summary>
 public class HubWindowSmokeTests
 {
-    private static Application? _app;
+    private static readonly object StaLock = new();
+    private static Thread? _staThread;      // ONE STA thread for the whole suite
+    private static Dispatcher? _staDispatcher;
 
-    /// <summary>Boots the WPF Application once per process with App.xaml's layers.</summary>
-    private static void BootApp()
+    /// <summary>
+    /// Boots the WPF Application ONCE, on a dedicated STA thread that stays alive
+    /// (Dispatcher.Run) until the test process ends. The previous harness created
+    /// the Application on each test's own STA thread — when that thread exited at
+    /// the end of the first test, WPF shut the Application down with it, and every
+    /// later LoadComponent died with "The Application object is being shut down"
+    /// (v3.0.0-alpha.5 CI: exactly that, once a third test changed the execution
+    /// order). Marshalling every body onto one long-lived dispatcher makes the
+    /// order — and the timing — irrelevant.
+    /// </summary>
+    private static void EnsureSharedSta()
     {
-        if (_app is not null) return;
-        var app = new Application();   // must be created on an STA thread — RunOnSta guarantees it
-        app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ThemesDictionary { Theme = Wpf.Ui.Appearance.ApplicationTheme.Dark });
-        app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ControlsDictionary());
-        _app = app;
+        lock (StaLock)
+        {
+            if (_staThread is not null) return;
+            var ready = new ManualResetEvent(false);
+            _staThread = new Thread(() =>
+            {
+                try
+                {
+                    var app = new Application();   // one Application per AppDomain — created here, kept alive below
+                    app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ThemesDictionary { Theme = Wpf.Ui.Appearance.ApplicationTheme.Dark });
+                    app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ControlsDictionary());
+                    _staDispatcher = Dispatcher.CurrentDispatcher;
+                }
+                finally { ready.Set(); }
+                Dispatcher.Run();   // keeps the thread, the dispatcher AND the Application alive
+            });
+            _staThread.SetApartmentState(ApartmentState.STA);
+            _staThread.IsBackground = true;   // never blocks test-process exit
+            _staThread.Start();
+            if (!ready.WaitOne(TimeSpan.FromSeconds(30)))
+                throw new TimeoutException("the shared STA dispatcher did not boot within 30 s");
+        }
     }
 
-    /// <summary>Runs body on a dedicated STA thread and pumps the dispatcher for
-    /// layout/render/Loaded callbacks to actually fire (WPF is idle without frames).</summary>
+    /// <summary>Runs body ON the shared STA dispatcher (windows must be created on
+    /// their Application's thread) and waits for it. Nested PushFrame inside the
+    /// body pumps layout/render/Loaded callbacks — WPF is idle without frames.</summary>
     private static Exception? RunOnSta(Action body)
     {
+        EnsureSharedSta();
         Exception? caught = null;
-        var thread = new Thread(() =>
-        {
-            try { body(); }
-            catch (Exception ex) { caught = ex; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        if (!thread.Join(TimeSpan.FromSeconds(180)) && caught is null)
-            caught = new TimeoutException("the STA WPF thread did not finish within 180 s");
+        var op = _staDispatcher!.InvokeAsync(
+            () => { try { body(); } catch (Exception ex) { caught = ex; } },
+            DispatcherPriority.Normal);
+        if (op.Wait(TimeSpan.FromSeconds(180)) != DispatcherOperationStatus.Completed && caught is null)
+            caught = new TimeoutException("the shared STA dispatcher did not finish within 180 s");
         return caught;
     }
 
@@ -95,7 +121,7 @@ public class HubWindowSmokeTests
     {
         var failure = RunOnSta(() =>
         {
-            BootApp();
+            EnsureSharedSta();
             SmoothScroll.MotionAllowed = () => false;    // deterministic: no motion under CI
             MascotView.MotionAllowed = () => false;
 
@@ -136,7 +162,7 @@ public class HubWindowSmokeTests
     {
         var failure = RunOnSta(() =>
         {
-            BootApp();
+            EnsureSharedSta();
             SmoothScroll.MotionAllowed = () => false;
             MascotView.MotionAllowed = () => false;
 
@@ -170,7 +196,7 @@ public class HubWindowSmokeTests
     {
         var failure = RunOnSta(() =>
         {
-            BootApp();
+            EnsureSharedSta();
             SmoothScroll.MotionAllowed = () => false;
             MascotView.MotionAllowed = () => false;
 
