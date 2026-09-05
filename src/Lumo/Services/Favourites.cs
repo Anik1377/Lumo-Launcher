@@ -31,6 +31,12 @@ public sealed class Favourites
     private readonly HashSet<string> _keys = new(StringComparer.OrdinalIgnoreCase);
     private readonly string _file;
     private int _saving;                                     // 1 while a background save is in flight
+    // v3.0.0-alpha.6 — serializes the write side so a background save (fired by
+    // Add/Remove) and a caller's synchronous Save() can never interleave: the
+    // fixed ".tmp" path + unserialized writers used to let one save move the
+    // other's tmp out from under it, and a lost rename after the delete-then-
+    // rename left the store ABSENT (the "Expected 2, Actual 0" CI flake).
+    private readonly object _saveGate = new();
 
     public Favourites(string? file = null) => _file = file ?? AppPaths.FavouritesFile;
 
@@ -120,6 +126,10 @@ public sealed class Favourites
     /// <summary>
     /// Persist off the UI thread. A single-flight guard collapses bursts (rapid
     /// pin/unpin) into one write; the write itself is a temp-file swap.
+    /// v3.0.0-alpha.6 — the write side is serialized under _saveGate and each
+    /// write uses a UNIQUE tmp path (UsageStore's v2.4.0-alpha.4 medicine): two
+    /// overlapping saves used to share one ".tmp" and could swap a file out from
+    /// under each other, which the tolerant Load turned into an empty store.
     /// </summary>
     private void ScheduleSave()
     {
@@ -142,9 +152,19 @@ public sealed class Favourites
             }
             var dir = Path.GetDirectoryName(_file);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-            var tmp = _file + ".tmp";
-            File.WriteAllText(tmp, json);
-            AtomicIo.Swap(tmp, _file);   // v3.0.0-alpha.4 — atomic replace
+            lock (_saveGate)
+            {
+                var tmp = $"{_file}.{Guid.NewGuid():N}.tmp";   // unique per write — never a shared path
+                try
+                {
+                    File.WriteAllText(tmp, json);
+                    AtomicIo.Swap(tmp, _file);   // v3.0.0-alpha.4 — atomic replace
+                }
+                finally
+                {
+                    try { if (File.Exists(tmp)) File.Delete(tmp); } catch { }
+                }
+            }
         }
         catch (Exception ex) { DiagnosticLogger.LogException("Favourites.Save", ex); }
     }
