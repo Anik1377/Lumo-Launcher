@@ -220,5 +220,45 @@ public class HubWindowSmokeTests
             throw new Exception("the App Deck view failed to construct orphaned (theme tokens must not throw):\n" +
                                 Describe(failure), failure);
     }
+
+    /// <summary>
+    /// v3.0.0-alpha.8 — the app picker finally gets the same probe. It is the ONE
+    /// deck surface no test ever constructed: a runtime XAML-parse failure (the
+    /// exact class of bug that killed the AI page in alpha.3) would compile clean
+    /// and never show up until a user clicked an empty slot — reported twice as
+    /// "assigning by clicking is not working" / "app picker still doesn't open".
+    /// This is the same construction AppDeckView.OpenPicker performs, followed by
+    /// the same Show → Loaded → source-initialized pipeline ShowDialog would run.
+    /// </summary>
+    [Fact]
+    public void AppPickerWindow_constructs_shows_and_closes()
+    {
+        var failure = RunOnSta(() =>
+        {
+            EnsureSharedSta();
+            SmoothScroll.MotionAllowed = () => false;
+
+            var settings = new Settings();
+            var dlg = new AppPickerWindow(settings, "Slot 1", null);   // the exact OpenPicker call
+            dlg.Show();
+            Pump(600);   // OnSourceInitialized, Loaded focus, the first Rebuild ticks
+
+            Assert.True(dlg.IsLoaded);
+
+            // the search box must exist and hold keyboard focus ambition; the list
+            // must exist (rows are machine-dependent — the CI Start Menu varies)
+            var list = (System.Windows.Controls.ListBox?)typeof(AppPickerWindow)
+                .GetField("PickerList", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                ?.GetValue(dlg);
+            Assert.NotNull(list);
+
+            dlg.Close();
+            Pump(120);
+        });
+
+        if (failure is not null)
+            throw new Exception("the app picker failed to construct/show on Windows — this is the same path " +
+                                "AppDeckView.OpenPicker takes:\n" + Describe(failure), failure);
+    }
 }
 #endif

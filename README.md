@@ -216,6 +216,27 @@ authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
 
+## 🆕 What's new in v3.0.0-alpha.8 — the picker can't fail silently anymore
+
+A follow-up to the click fix, for one stubborn case: on some machines the app
+picker reportedly still never appears. Static analysis found nothing — every
+layer is guarded — so this release attacks the problem from two sides:
+
+1. **🔔 Never silent.** Opening the picker now logs a breadcrumb at every stage
+   (open → constructed → shown → result) and, if ANY stage fails, shows a real
+   error dialog with the exception and the log path — the same "failures that
+   can no longer hide" doctrine the App Deck itself got in alpha.4. A report
+   like "the picker doesn't open" can now never arrive without its reason.
+2. **🧪 The picker gets the Windows probe.** Until now no test ever constructed
+   `AppPickerWindow` — a runtime XAML-parse failure (the exact bug class that
+   killed the AI page in alpha.3) would only ever surface on a user's machine.
+   CI now builds, shows and closes the real picker window on a Windows runner,
+   the same way `OpenPicker` does.
+
+If the picker still doesn't appear for you after this update, the error dialog
+(if any) plus `%LOCALAPPDATA%\Lumo\log.txt` now tell us exactly why — send
+those two lines and it's fixed next round.
+
 ## 🆕 What's new in v3.0.0-alpha.7 — assigning apps by clicking works again
 
 A hotfix round for the App Deck's two click problems, plus a genuinely easier

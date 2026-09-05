@@ -941,18 +941,45 @@ public partial class AppDeckView : UserControl
     /// card, or "Pick a different app…") assigns immediately; editor mode
     /// (OpenEditor → "Pick app…") fills the fields so the user can add arguments
     /// or a start-in folder before saving.
+    /// v3.0.0-alpha.8 — never silent: every stage logs a breadcrumb, and ANY
+    /// failure shows a real error dialog (the App.OpenDeck doctrine) instead of
+    /// a status line a user can miss. If the picker ever fails to open on a
+    /// user machine, the dialog + the log pinpoint exactly which stage died.
     /// </summary>
     private void OpenPicker(int index, bool fillEditorOnly = false)
     {
+        DiagnosticLogger.Log("Deck.Picker", $"opening for slot {index + 1} (editor mode: {fillEditorOnly})");
         try
         {
             var slot = DeckStore.Current.Slot(index);
             var owner = Window.GetWindow(this);
-            var dlg = new AppPickerWindow(_settings, $"Slot {index + 1}", _usage)
+
+            AppPickerWindow dlg;
+            try
             {
-                Owner = owner is { IsLoaded: true } ? owner : null,
-            };
-            if (dlg.ShowDialog() != true || dlg.PickedPath.Length == 0) return;
+                dlg = new AppPickerWindow(_settings, $"Slot {index + 1}", _usage)
+                {
+                    Owner = owner is { IsLoaded: true } ? owner : null,
+                };
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogException("Deck.Picker.Construct", ex);
+                ShowPickerError("The app picker window failed to build.", ex);
+                return;
+            }
+            DiagnosticLogger.Log("Deck.Picker", "constructed — showing dialog");
+
+            bool confirmed;
+            try { confirmed = dlg.ShowDialog() == true; }
+            catch (Exception ex)
+            {
+                DiagnosticLogger.LogException("Deck.Picker.Show", ex);
+                ShowPickerError("The app picker window failed to open.", ex);
+                return;
+            }
+            DiagnosticLogger.Log("Deck.Picker", $"dialog closed (confirmed: {confirmed}, path: '{dlg.PickedPath}')");
+            if (!confirmed || dlg.PickedPath.Length == 0) return;
 
             if (fillEditorOnly && EditorOverlay.Visibility == Visibility.Visible)
             {
@@ -973,8 +1000,22 @@ public partial class AppDeckView : UserControl
         catch (Exception ex)
         {
             DiagnosticLogger.LogException("Deck.Picker", ex);
-            SetStatus("The app picker failed to open — details are in the log.", good: false);
+            ShowPickerError("The app picker failed.", ex);
         }
+    }
+
+    /// <summary>The picker's failures can no longer hide: the exception lands in the
+    /// log AND in front of the user, so a report like "the picker doesn't open"
+    /// always arrives with its reason attached.</summary>
+    private static void ShowPickerError(string what, Exception ex)
+    {
+        try
+        {
+            System.Windows.MessageBox.Show(
+                $"{what}\n\n{ex.GetType().Name}: {ex.Message}\n\nDetails were written to:\n{AppPaths.LogFile}",
+                "Lumo — App Deck", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        catch { /* never crash over the crash dialog */ }
     }
 
     // ------------------------------------------------------------ editor

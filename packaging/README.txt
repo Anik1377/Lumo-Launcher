@@ -1,7 +1,18 @@
 ======================================================
-  LUMO v3.0.0-alpha.7  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.8  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.8 (the picker can't hide failures)
+---------------------------------------------------------------
+1. NEVER SILENT. If the app picker fails to open on your
+   PC, you now get a real error dialog (with the reason
+   and the log path) instead of nothing at all - and the
+   log (%LOCALAPPDATA%\Lumo\log.txt) records every step.
+   Send the dialog text and the picker gets fixed fast.
+2. CI NOW OPENS THE REAL PICKER on a Windows runner every
+   build, the same way the deck does - the class of bug
+   that once killed the AI page can never ship unnoticed.
 
 WHAT'S NEW IN v3.0.0-alpha.7 (clicking works again)
 ---------------------------------------------------------------
