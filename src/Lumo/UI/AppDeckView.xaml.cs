@@ -60,9 +60,11 @@ public partial class AppDeckView : UserControl
     /// <summary>The data format that identifies an in-flight card swap.</summary>
     private const string SlotDragFormat = "LumoDeckSlot";
 
+    // v3.0.0-alpha.7 — press→drag→click decisions (pure, tested in DeckDragLatchTests).
+    private readonly DeckDragLatch Drag = new();
+
     // drag-to-swap state (armed on press, fired past the system drag threshold)
     private bool _dragArmed;
-    private bool _dragStarted;
     private int _dragIndex = -1;
     private Point _dragStart;
 
@@ -663,36 +665,41 @@ public partial class AppDeckView : UserControl
         // v3.0.0-alpha.6 — press → drag-to-swap; release without a drag → click.
         // Mini-buttons swallow their own MouseDown (ButtonBase), so this never
         // fights the edit/clear buttons.
+        // v3.0.0-alpha.7 — the click decision lives in a pure latch (DeckDragLatch)
+        // and Press() runs for EVERY card, empty ones included: the old code only
+        // cleared its drag flag on assigned cards, so after one drag-to-swap every
+        // click-to-assign on an empty card was silently swallowed (the OLE drag
+        // loop had consumed the release and the flag stayed set).
         card.MouseLeftButtonDown += (_, e) =>
         {
+            Drag.Press();
             if (!assigned) return;
             _dragIndex = slot.Index;
             _dragStart = e.GetPosition(DeckGrid);
             _dragArmed = true;
-            _dragStarted = false;
             try { card.CaptureMouse(); } catch { }
         };
         card.MouseMove += (_, e) =>
         {
-            if (!_dragArmed || _dragStarted) return;
+            if (!_dragArmed || Drag.InDrag) return;
             var pos = e.GetPosition(DeckGrid);
             if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
                 Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance) return;
-            _dragStarted = true;
+            Drag.DragStarted();
             try
             {
                 var data = new DataObject(SlotDragFormat, slot.Index);
                 DragDrop.DoDragDrop(card, data, DragDropEffects.Move);
             }
             catch (Exception ex) { DiagnosticLogger.LogException("Deck.CardDrag", ex); }
-            finally { ResetDrag(card); }
+            finally { ResetDrag(card); Drag.DragFinished(); }
         };
         card.MouseLeftButtonUp += (_, e) =>
         {
             e.Handled = true;
-            bool wasDrag = _dragStarted;
+            bool isClick = Drag.IsClick();
             ResetDrag(card);
-            if (wasDrag) return;
+            if (!isClick) return;
             if (assigned) LaunchSlot(slot.Index);
             else OpenPicker(slot.Index);
         };

@@ -170,7 +170,8 @@
                 <ListBox x:Name="PickerList" Background="Transparent" BorderThickness="0"
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          VirtualizingPanel.IsVirtualizing="True"
-                         MouseDoubleClick="OnListDoubleClick" SelectionChanged="OnListSelectionChanged">
+                         MouseDoubleClick="OnListDoubleClick" MouseLeftButtonUp="OnListClick"
+                         SelectionChanged="OnListSelectionChanged">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Grid>

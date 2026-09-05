@@ -79,6 +79,8 @@
     <Compile Include="../Lumo/Core/DeckPages.cs" Link="Core/DeckPages.cs" />
     <Compile Include="../Lumo/Core/AppPicker.cs" Link="Core/AppPicker.cs" />
     <Compile Include="../Lumo/Core/AppIndex.cs" Link="Core/AppIndex.cs" />
+    <!-- v3.0.0-alpha.7 — the card press→drag→click latch (stale-drag-swallowed-clicks hotfix) -->
+    <Compile Include="../Lumo/Core/DeckDragLatch.cs" Link="Core/DeckDragLatch.cs" />
     <!-- v3.0.0-alpha.4 — the shared atomic tmp→file swap + read retry + stale sweep -->
     <Compile Include="../Lumo/Core/AtomicIo.cs" Link="Core/AtomicIo.cs" />
     <!-- v3.0.0-alpha.5 — Lumo cache/temp cleanup (scan + clear, bounded I/O) -->

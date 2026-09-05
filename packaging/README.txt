@@ -1,7 +1,20 @@
 ======================================================
-  LUMO v3.0.0-alpha.6  —  universal launcher for Windows
+  LUMO v3.0.0-alpha.7  —  universal launcher for Windows
   (ALPHA BUILD — UNSTABLE. Expect bugs; report them!)
 ======================================================
+
+WHAT'S NEW IN v3.0.0-alpha.7 (clicking works again)
+---------------------------------------------------------------
+1. CLICK-TO-ASSIGN UNBRICKED. After one drag-to-swap, clicks
+   on empty deck slots silently did nothing (a stale drag
+   flag ate them). The click/drag decision is now a tested
+   state machine that clears itself on every press - drag
+   and click can no longer poison each other, in any order.
+2. ONE CLICK ASSIGNS. In the app picker, a single click on
+   an app now commits it to the slot. Enter and double-click
+   still work; the scrollbar and empty space are safe.
+3. NO PHANTOM LAUNCHES. A shaky press that crosses the drag
+   threshold no longer launches the app on release.
 
 WHAT'S NEW IN v3.0.0-alpha.6 (the App Deck gets useful)
 ---------------------------------------------------------------

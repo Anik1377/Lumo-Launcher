@@ -216,6 +216,27 @@ authoring prompt live in the
 **[plugin development guide](docs/PLUGIN_DEVELOPMENT.md)**.
 
 
+## 🆕 What's new in v3.0.0-alpha.7 — assigning apps by clicking works again
+
+A hotfix round for the App Deck's two click problems, plus a genuinely easier
+picker. The suite grew to 447.
+
+1. **🖱️ Click-to-assign, unbricked.** After a single drag-to-swap, every click
+   on an empty card silently did nothing — the OLE drag loop consumed the mouse
+   release, the "a drag ate the release" flag was never cleared, and an empty
+   card's press didn't clear it either. One drag and assigning looked dead.
+   The press → drag → click decision now lives in a pure, fully tested state
+   machine (`DeckDragLatch`, 9 new tests pinning the whole gesture table), and
+   the latch clears itself on **every** press — no gesture can poison the next.
+2. **👆 One click assigns.** Inside the app picker, a **single click** on an app
+   now commits it to the slot — that was the "easy way to select an app and
+   assign it" all along. Enter and double-click still work; clicking the
+   scrollbar or empty space never assigns by accident.
+3. **🛡️ No phantom launches.** A shaky press that accidentally crosses the drag
+   threshold no longer launches the app when released, and can no longer
+   swallow the next click either — drag and click are now cleanly separate
+   gestures, in every order.
+
 ## 🆕 What's new in v3.0.0-alpha.6 — the App Deck gets genuinely useful
 
 Four asks (a real app picker, multi-mode pages, import/export, plus "add 10 more

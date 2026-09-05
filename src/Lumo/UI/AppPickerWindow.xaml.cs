@@ -193,6 +193,25 @@ public partial class AppPickerWindow : Window
         // in Rebuild — nothing to do here today, kept as the hook for row feedback.
     }
 
+    // v3.0.0-alpha.7 — ONE click assigns. The original request was "an easy way
+    // to select an app and assign it", and the double-click bar was reported as
+    // "assigning by clicking is not working": a single click now commits the
+    // row under the cursor (scrollbar/empty space are safe), while Enter and
+    // double-click keep working — a double-click's first press already assigns
+    // and closes, so the old handler below is now just a harmless fallback.
+    private void OnListClick(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            if (System.Windows.Controls.ItemsControl.ContainerFromElement(
+                    PickerList, e.OriginalSource as DependencyObject) is not System.Windows.Controls.ListBoxItem)
+                return;   // release over the scrollbar or blank space — not a row
+            ConfirmSelection();
+        }
+        catch (Exception ex) { DiagnosticLogger.LogException("AppPicker.Click", ex); }
+    }
+
     private void OnListDoubleClick(object sender, MouseButtonEventArgs e) => ConfirmSelection();
 
     private void ConfirmSelection()
