@@ -32,9 +32,6 @@ public partial class AppDeckWindow : Window
     /// <summary>The tutorial toggled global numpad hotkeys — App re-registers them on the launcher.</summary>
     public event Action? GlobalHotkeysChanged;
 
-    /// <summary>Raised by the hub's rail deck button — App opens (or focuses) this window.</summary>
-    public event Action? DeckLaunchRequested;
-
     private bool _sourceReady;
 
     public AppDeckWindow(Settings settings)

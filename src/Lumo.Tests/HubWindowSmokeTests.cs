@@ -61,6 +61,12 @@ public class HubWindowSmokeTests
                 try
                 {
                     var app = new Application();   // one Application per AppDomain — created here, kept alive below
+                    // Closing a test window must NEVER take the shared Application down
+                    // (the default OnLastWindowClose did exactly that: the first test that
+                    // closed its window killed the app, and every later LoadComponent died
+                    // with "The Application object is being shut down" — the alpha.5 CI
+                    // failure, twice). The app now only ever ends with the test process.
+                    app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                     app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ThemesDictionary { Theme = Wpf.Ui.Appearance.ApplicationTheme.Dark });
                     app.Resources.MergedDictionaries.Add(new Wpf.Ui.Markup.ControlsDictionary());
                     _staDispatcher = Dispatcher.CurrentDispatcher;

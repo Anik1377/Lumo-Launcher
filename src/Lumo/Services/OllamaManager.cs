@@ -353,7 +353,8 @@ public static class OllamaManager
                 Arguments = BuildInstallArgs(installDir),
                 UseShellExecute = true,
             };
-            DiagnosticLogger.Log("Ollama", $"running OllamaSetup.exe (silent){((installDir ?? "").Trim().Length > 0 ? $" → {installDir.Trim()}" : "")}");
+            string dirArg = (installDir ?? "").Trim();
+            DiagnosticLogger.Log("Ollama", $"running OllamaSetup.exe (silent){(dirArg.Length > 0 ? $" → {dirArg}" : "")}");
             using var p = Process.Start(psi);
             if (p is null) return false;
             await p.WaitForExitAsync(ct).ConfigureAwait(false);
